@@ -118,7 +118,6 @@ class ChatModel(Protocol):
 
     async def complete(self, messages: list[dict], tools: list[dict]) -> ChatCompletionMessage:
         """Send the conversation and the tool definitions; return the model's next message."""
-        ...
 
 
 @dataclass
