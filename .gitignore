@@ -1,0 +1,30 @@
+# OS and editors
+.DS_Store
+.vscode/
+.idea/
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+coverage.xml
+htmlcov/
+build/
+dist/
+
+# Local settings, state and logs (may hold endpoints, findings, credentials)
+.env
+.data/
+audit.jsonl
+*.log
+
+# Local planning notes and AI-assistant scratch space
+tasks/
+.superpowers/
+.claude/settings.local.json

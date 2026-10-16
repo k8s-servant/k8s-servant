@@ -1,0 +1,22 @@
+name: Documentation issue
+description: Something in the docs is missing, wrong or unclear.
+title: "docs: "
+labels: ["type/docs", "triage"]
+body:
+  - type: input
+    id: page
+    attributes:
+      label: Page or section
+      placeholder: "README.md#configuration, docs/deployment.md, ..."
+    validations:
+      required: true
+  - type: textarea
+    id: issue
+    attributes:
+      label: What is wrong or missing?
+    validations:
+      required: true
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: Suggested fix

@@ -1,0 +1,58 @@
+name: Claude review
+
+# Automatic Claude review on every non-draft PR from a branch in this repository.
+# Fork PRs are skipped: they get no secrets, and running a model on untrusted code
+# with write access is a prompt-injection risk. Maintainers can still ask for a review
+# on a fork PR by commenting "@claude review".
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review, reopened]
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    if: >-
+      !github.event.pull_request.draft &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.actor != 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+      - uses: anthropics/claude-code-action@374f254f5efaf968abfe15d399fd90972e8138b9 # v1.0.251
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          track_progress: true
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
+
+            Review this pull request. Follow the conventions in CLAUDE.md. Focus, in order:
+
+            1. **Read-only guarantee.** Flag anything that could let the agent change
+               cluster objects, read Secrets, widen RBAC beyond get/list/watch, loosen
+               the kubectl allow-list, enable MCP toolsets other than "core", or use a shell.
+            2. **Correctness.** Bugs, unhandled errors, async/concurrency issues, edge cases.
+            3. **Security.** Credential leaks (including in logs and error messages),
+               injection, unsafe defaults in the Helm chart or Dockerfile.
+            4. **Tests.** New behavior has tests; tests are meaningful.
+            5. **Docs.** README, docs/ and chart values match the change.
+
+            Use inline comments for specific lines and one short summary comment.
+            Skip praise and style nits that ruff already enforces. If nothing is
+            wrong, say so in one sentence.
+          claude_args: |
+            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)"
