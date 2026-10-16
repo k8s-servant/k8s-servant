@@ -32,7 +32,8 @@ docker build -t k8s-servant:dev . # image
    (`feat: ...`, `fix(chart): ...`, `docs: ...`). PRs are squash-merged, and the title
    becomes the commit message that drives the changelog and version bumps.
    A breaking change uses `feat!:` or a `BREAKING CHANGE:` footer.
-5. CI must be green: lint, tests, Helm, Docker build, security scans.
+5. CI must be green: lint, tests, Helm, Docker build, security scans. What each check
+   does and how to run it locally: [docs/ci-and-releases.md](docs/ci-and-releases.md).
 
 ## AI-assisted contributions
 
@@ -42,6 +43,7 @@ you submit. Maintainers can also mention `@claude` on issues and PRs.
 
 ## Releases
 
-Maintainers merge the release PR that release-please keeps open. That tags the release,
+Maintainers merge the release PR that release-please keeps open (details in
+[docs/ci-and-releases.md](docs/ci-and-releases.md#release-pleaseyml-versions-and-published-artifacts)). That tags the release,
 publishes the signed image to `ghcr.io/k8s-servant/k8s-servant`, and pushes the Helm
 chart to `oci://ghcr.io/k8s-servant/charts`.
