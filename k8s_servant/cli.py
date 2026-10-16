@@ -144,6 +144,7 @@ async def check_and_post(
         MODEL_ERRORS: The model call failed (the run is recorded as failed first).
     """
     started = datetime.now(UTC)
+    result: CheckResult | None = None
     error = None
     async with open_agent(config, knowledge, memory, chat=chat) as session:
         try:

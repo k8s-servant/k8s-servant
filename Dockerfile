@@ -20,7 +20,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 # kubectl supports one minor version of skew against the API server, and the guard's
 # flag allow-list was checked against this version. Override with --build-arg for
 # clusters more than one minor version away.
-ARG KUBECTL_VERSION=v1.33.13
+ARG KUBECTL_VERSION=v1.35.9
 # Set by BuildKit from --platform (amd64, arm64); no default so multi-arch builds work.
 ARG TARGETARCH
 
@@ -60,6 +60,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 RUN apk add --no-cache ca-certificates
 
 COPY --from=builder /install /usr/local
+
+# pip is not needed at runtime and vendors its own (often outdated) libraries, so drop
+# it and the bundled wheels: a smaller image and fewer findings in vulnerability scans.
+RUN python -m pip uninstall -y pip && \
+    rm -rf /usr/local/lib/python3*/ensurepip
 COPY --from=builder /usr/local/bin/kubectl /usr/local/bin/kubectl
 
 # Fixed numeric UID so Kubernetes can verify runAsNonRoot without reading /etc/passwd.

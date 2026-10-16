@@ -93,13 +93,24 @@ jobs:
           cache-to: type=gha,mode=max
       - name: Smoke test the image
         run: docker run --rm k8s-servant:ci --help
-      - name: Scan the image for vulnerabilities
+      # Fixable CRITICAL findings block the PR. HIGH findings are reported only:
+      # upstream kubectl binaries often lag behind Go patch releases for weeks.
+      - name: Scan the image (blocking, CRITICAL)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: k8s-servant:ci
-          severity: CRITICAL,HIGH
+          severity: CRITICAL
           ignore-unfixed: true
           exit-code: "1"
+      - name: Scan the image (report, HIGH)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        env:
+          TRIVY_SKIP_DB_UPDATE: "true"
+        with:
+          image-ref: k8s-servant:ci
+          severity: HIGH
+          ignore-unfixed: true
+          exit-code: "0"
 
   result:
     # The one check the branch ruleset requires, so jobs can be added or renamed freely.

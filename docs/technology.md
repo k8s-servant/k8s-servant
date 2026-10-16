@@ -89,7 +89,7 @@ it runs as a sidecar container on `localhost:8080`, from the upstream image `ghc
 | **External Secrets Operator** + **Azure Key Vault** (optional) | The Teams webhook URL: synced from a Key Vault secret into the agent's own Kubernetes Secret |
 | **GitHub Container Registry** (`ghcr.io/k8s-servant`) | The agent image and the Helm chart, signed with cosign (keyless), with SBOM and provenance |
 | **GitHub Actions** + **release-please** | Tests, linting and security scans on every pull request; releases build, scan, sign and publish the image and the chart |
-| **Docker** (`python:3.14-alpine`, multi-stage) | The image: the package plus kubectl v1.33 (checksum-verified), UID 1000, runs with a read-only root filesystem |
+| **Docker** (`python:3.14-alpine`, multi-stage) | The image: the package plus a pinned kubectl (checksum-verified), UID 1000, runs with a read-only root filesystem |
 | PersistentVolume (1 Gi) | Memory (`/data`) |
 
 ## Repository tooling
