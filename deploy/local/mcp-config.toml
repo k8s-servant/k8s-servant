@@ -1,0 +1,21 @@
+# kubernetes-mcp-server configuration for LOCAL development.
+# The Helm chart renders the same settings for the in-cluster sidecar.
+#
+# Start:   kubernetes-mcp-server --config deploy/local/mcp-config.toml
+# It uses your current kubeconfig context and listens on http://localhost:8080/mcp
+
+port = "8080"                   # streamable HTTP endpoint at /mcp
+bind_address = "127.0.0.1"      # only the agent on the same host (or pod) can reach it
+read_only = true                # expose only tools annotated as read-only
+stateless = true                # no MCP session state between requests
+# Only "core". Not "config": its configuration_view tool returns the raw kubeconfig,
+# including tokens and client keys, which must never reach the model. Not "helm":
+# Helm stores releases in Secrets, which are denied.
+toolsets = ["core"]
+
+# Hide Secrets completely. In the cluster RBAC forbids them too; locally your own
+# kubeconfig may allow them, so this setting is what protects them here.
+[[denied_resources]]
+group = ""
+version = "v1"
+kind = "Secret"

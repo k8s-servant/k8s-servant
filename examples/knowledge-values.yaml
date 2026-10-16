@@ -1,0 +1,64 @@
+# Example platform description, shared by all of your clusters.
+#
+# The agent puts `knowledge.environment` into its system prompt on every run, so it
+# knows what is normal on your platform and what the Kubernetes API cannot show.
+# Keep it factual, short and current; remove facts as soon as they stop being true.
+# Never put secrets here. Per-cluster notes go in the cluster's own values file
+# (knowledge.clusterNotes, see values-azure.yaml).
+#
+# Everything below is an EXAMPLE. Replace it with facts about your platform.
+#
+# Use it locally:   k8s-servant --values examples/knowledge-values.yaml \
+#                               --values examples/values-azure.yaml ask "..."
+# In the cluster, pass the same files to helm install / your HelmRelease, in the same order.
+knowledge:
+  environment: |
+    # Example platform
+
+    ## Clusters
+    - Two clusters: dev (also hosts staging namespaces, *-stage) and prod. Kubernetes 1.33.
+    - All egress goes through a corporate firewall. New "connection timed out" errors to
+      external services usually mean a missing firewall rule.
+    - One node pool spread over three zones, no taints. The cluster autoscaler waits 30 min
+      after a scale-up before scaling down.
+    - Default StorageClass: a zone-redundant SSD class with WaitForFirstConsumer.
+
+    ## What is normal here (do not report it as an incident)
+    - kured reboots nodes one at a time after OS patches, in a weekly maintenance window.
+      Cordoned or NotReady nodes and moved pods in that window are expected.
+    - The descheduler evicts pods that crash-loop for more than 5 minutes, so a crash-looping
+      workload may show few restarts and no --previous logs: look at events, the ReplicaSet
+      and the time pattern instead.
+    - A policy engine (e.g. Kyverno) creates a LimitRange and a ResourceQuota in every
+      application namespace. "exceeded quota" in a ReplicaSet's events is a common reason
+      for missing pods.
+
+    ## Namespaces
+    - Application namespaces are named <app>-<env>, e.g. shop-prod, and are deployed by
+      CI/CD pipelines.
+    - Platform namespaces: flux-system, kyverno, external-secrets, ingress-nginx,
+      cert-manager, kube-prometheus-stack, descheduler, kured.
+
+    ## GitOps
+    - Flux manages only platform components; manual changes to them are reverted at the
+      next reconcile. Application releases are a pipeline matter.
+
+    ## Traffic into the cluster
+    - External traffic: load balancer -> ingress-nginx -> services. Only internal load
+      balancers exist.
+
+    ## Policies
+    - Enforced: images only from approved registries, non-root containers, no privileged
+      containers, no hostPath. A rejected workload shows as an admission error in the events
+      of its ReplicaSet, StatefulSet or Job.
+
+    ## Monitoring and logs
+    - Prometheus, Alertmanager and Grafana run in namespace kube-prometheus-stack (14 days of
+      metrics). Alertmanager already notifies the platform team about critical alerts.
+    - container_cpu_cfs_throttled_seconds_total is not collected: measure CPU throttling with
+      the periods ratio (throttled periods / periods).
+
+    ## Secrets
+    - Secrets come from a cloud secret store through External Secrets Operator. An
+      ExternalSecret that is not Ready (SecretSyncedError) usually means missing access or a
+      missing secret in the store.

@@ -1,0 +1,13 @@
+{{- /*
+The agent's settings as environment variables (envFrom). Only non-secret values:
+see k8s-servant.appConfig in _helpers.tpl for the rules.
+*/ -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "k8s-servant.name" . }}-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "k8s-servant.labels" . | nindent 4 }}
+data:
+  {{- include "k8s-servant.appConfig" . | nindent 2 }}

@@ -1,0 +1,52 @@
+# Example values for one AKS cluster using Azure AI Foundry, Workload Identity and
+# Azure Key Vault (through External Secrets Operator) for the Teams webhook.
+# Only what differs from the chart defaults is here; every key is explained in
+# charts/k8s-servant/values.yaml. All names below are placeholders.
+#
+#   helm install k8s-servant oci://ghcr.io/k8s-servant/charts/k8s-servant \
+#     -n k8s-servant --create-namespace \
+#     -f examples/knowledge-values.yaml -f examples/values-azure.yaml
+#
+# The CLI learns the same with:
+#   k8s-servant --values examples/knowledge-values.yaml --values examples/values-azure.yaml ask "..."
+
+# Extra labels on every object.
+labels:
+  # Free-form; use whatever your conventions need.
+  environment: production
+
+# Managed identity for Foundry and Key Vault, created by scripts/setup-workload-identity.sh.
+azureWorkloadIdentity:
+  # Client ID printed by the script.
+  clientId: "00000000-0000-0000-0000-000000000000"
+  # Your Entra ID tenant.
+  tenantId: "00000000-0000-0000-0000-000000000000"
+
+# Agent settings for this cluster.
+appConfig:
+  # Shown in reports and Teams cards.
+  CLUSTER_NAME: my-cluster
+  # Foundry resource created by scripts/setup-foundry.sh.
+  FOUNDRY_ENDPOINT: https://my-foundry.openai.azure.com/openai/v1/
+  # kube-prometheus-stack in this cluster.
+  PROMETHEUS_URL: http://kube-prometheus-stack-prometheus.kube-prometheus-stack.svc:9090
+  # Alertmanager of kube-prometheus-stack.
+  ALERTMANAGER_URL: http://kube-prometheus-stack-alertmanager.kube-prometheus-stack.svc:9093
+  # Local time zone of the morning report.
+  MORNING_REPORT_TIMEZONE: Europe/Berlin
+
+# Teams: the agent's own Secret, synced by ESO from a Key Vault secret.
+teamsWebhook:
+  # Post health-check changes and the morning report to Teams.
+  enabled: true
+  # Key Vault holding the Workflows webhook URL.
+  keyVaultUrl: https://my-keyvault.vault.azure.net
+  # Name of the Key Vault secret.
+  keyVaultSecretName: teams-webhook-url
+
+# What the agent should know about this cluster (added to the platform description).
+knowledge:
+  clusterNotes: |
+    - This is my-cluster: production, 8-10 nodes.
+    - kured reboots nodes on Sundays 02:00-05:00 UTC, one node at a time.
+    - Treat anything that can affect users (missing replicas, ingress, DNS) as critical.
