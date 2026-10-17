@@ -291,6 +291,13 @@ pushes a fix to a branch. Only the owner, organization members and collaborators
 trigger it, because the job has write permissions and the Claude credential (the
 `CLAUDE_CODE_OAUTH_TOKEN` secret and the Claude GitHub App).
 
+**Maintainers need public organization membership.** The check uses GitHub's
+`author_association`. For a member whose membership in the `k8s-servant` organization
+is *private*, GitHub reports `CONTRIBUTOR` instead of `MEMBER` in workflow events, so
+their `@claude` is skipped (and their comments count as untrusted for running tests).
+Set your membership to **Public** at github.com/orgs/k8s-servant/people. Outside
+collaborators are reported as `COLLABORATOR` either way.
+
 Before Claude starts, the job installs Python, helm and the dev dependencies, and
 allows Claude to run `.venv/bin/pytest`, `.venv/bin/ruff check|format` and
 `helm lint charts/k8s-servant` (an exact command, because helm's `--post-renderer`
