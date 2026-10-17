@@ -588,7 +588,16 @@ def test_extra_objects_are_rendered_with_templates(tmp_path):
 
 
 @pytest.mark.parametrize(
-    "name", ["FOUNDRY_API_KEY", "TEAMS_WEBHOOK_URL", "SLACK_WEBHOOK_URL", "GITHUB_TOKEN", "DB_PASSWORD", "MY_SECRET"]
+    "name",
+    [
+        "FOUNDRY_API_KEY",
+        "TEAMS_WEBHOOK_URL",
+        "SLACK_WEBHOOK_URL",
+        "GITHUB_TOKEN",
+        "DB_PASSWORD",
+        "MY_SECRET",
+        "api_key",
+    ],
 )
 def test_extra_env_cannot_carry_a_credential_as_plain_text(tmp_path, name):
     error = render_error(*values_file(tmp_path, {"extraEnv": [{"name": name, "value": "x"}]}))
@@ -601,3 +610,12 @@ def test_extra_env_cannot_carry_a_credential_as_plain_text(tmp_path, name):
 def test_extra_env_cannot_override_what_the_chart_sets(tmp_path, name):
     error = render_error(*values_file(tmp_path, {"extraEnv": [{"name": name, "value": "/x"}]}))
     assert name in error
+
+
+def test_chart_settings_win_over_extra_env_from(tmp_path):
+    # With envFrom, a later source wins on duplicate keys. The extra sources come first,
+    # so they cannot override chart-set paths or credential files.
+    docs = render(*values_file(tmp_path, {"extraEnvFrom": [{"configMapRef": {"name": "site-settings"}}]}))
+    env_from = containers(docs)["agent"]["envFrom"]
+    assert env_from[0] == {"configMapRef": {"name": "site-settings"}}
+    assert env_from[-1] == {"configMapRef": {"name": "k8s-servant-config"}}

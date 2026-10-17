@@ -108,7 +108,7 @@ e.g. a secretKeyRef, is fine).
 {{- if hasKey $fixed .name }}
 {{- fail (printf "extraEnv %s is set by the chart and cannot be overridden" .name) }}
 {{- end }}
-{{- if and (hasKey . "value") (regexMatch "API_KEY|WEBHOOK_URL|TOKEN|PASSWORD|SECRET" .name) }}
+{{- if and (hasKey . "value") (regexMatch "(?i)API_KEY|WEBHOOK_URL|TOKEN|PASSWORD|SECRET" .name) }}
 {{- fail (printf "extraEnv %s looks like a credential: use valueFrom (e.g. secretKeyRef), not a plain value" .name) }}
 {{- end }}
 {{- end }}

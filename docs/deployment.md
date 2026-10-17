@@ -185,10 +185,12 @@ For anything the chart does not model, the agent container takes `extraEnv`,
 `extraEnvFrom`, `extraVolumes` and `extraVolumeMounts`, and `extraObjects` installs
 extra manifests with the release. Typical uses: an HTTPS proxy, a corporate CA bundle,
 site-wide settings from a ConfigMap. Two rules keep the safety promises: `extraEnv`
-cannot override what the chart sets (in-cluster paths, the credential files), and a
-name that looks like a credential (`API_KEY`, `WEBHOOK_URL`, `TOKEN`, `PASSWORD`,
-`SECRET`) is accepted only through `valueFrom`, never as a plain value. None of this
-changes RBAC: the agent stays read-only whatever you add.
+and `extraEnvFrom` cannot override what the chart sets (in-cluster paths, the
+credential files), and an `extraEnv` name that looks like a credential (`API_KEY`,
+`WEBHOOK_URL`, `TOKEN`, `PASSWORD`, `SECRET`, any case) is accepted only through
+`valueFrom`, never as a plain value. Environment variables and volumes cannot change
+RBAC. `extraObjects` is the exception: it installs any manifest you give it, so a Role
+or binding there could widen the agent's access ([security.md](security.md#in-the-cluster)).
 
 Values files are applied in order (later wins). A common layout is one shared file for
 the platform description and one file per cluster. The CLI reads the same files

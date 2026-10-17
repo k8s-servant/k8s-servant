@@ -183,7 +183,8 @@ affinity: {}
 # SECRET) are only accepted through valueFrom, never as a plain value.
 extraEnv: []
 
-# Extra envFrom sources, e.g. [{configMapRef: {name: site-settings}}].
+# Extra envFrom sources, e.g. [{configMapRef: {name: site-settings}}]. They come before
+# the chart's own settings, so the chart's values win on duplicate keys.
 extraEnvFrom: []
 
 # Extra pod volumes, e.g. a ConfigMap with a CA bundle or a CSI secrets volume.

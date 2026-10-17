@@ -47,7 +47,7 @@ def test_minimal_example_needs_nothing_cloud_specific():
     result = subprocess.run(command, capture_output=True, text=True, check=False)
     assert result.returncode == 0, result.stderr
     docs = [d for d in yaml.safe_load_all(result.stdout) if d]
-    assert not [d for d in docs if d["apiVersion"].startswith("external-secrets.io")]
+    assert not [d for d in docs if d["apiVersion"].split("/")[0] == "external-secrets.io"]
     assert "annotations" not in find(docs, "ServiceAccount", "k8s-servant")["metadata"]
     pod_labels = find(docs, "Deployment")["spec"]["template"]["metadata"]["labels"]
     assert "azure.workload.identity/use" not in pod_labels

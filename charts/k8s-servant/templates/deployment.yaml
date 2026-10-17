@@ -55,12 +55,14 @@ spec:
         - name: agent
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          # A later envFrom source wins on duplicate keys: the extras come first, so they
+          # cannot override what the chart sets.
           envFrom:
-            - configMapRef:
-                name: {{ include "k8s-servant.name" . }}-config
             {{- with .Values.extraEnvFrom }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
+            - configMapRef:
+                name: {{ include "k8s-servant.name" . }}-config
           {{- with .Values.extraEnv }}
           env:
             {{- include "k8s-servant.extraEnv" $ | nindent 12 }}
