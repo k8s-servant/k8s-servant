@@ -59,8 +59,8 @@ venv (see [troubleshooting.md](troubleshooting.md#local-setup)).
 - **Document as you go.** Every module starts with a docstring that explains what and
   why; every public function and every function longer than 15 lines has a Google-style
   docstring (`tests/test_docs.py` enforces this). Comments explain intent, not syntax.
-- **CHANGELOG.md** for every user-visible change; conventional commit messages
-  (`feat:`, `fix:`, `docs:`, `refactor:`, `test:`); no `Co-Authored-By` lines.
+- **Conventional commit messages and PR titles** (`feat:`, `fix:`, `docs:`, `refactor:`,
+  `test:`); release-please writes `CHANGELOG.md` from them, so never edit it by hand.
 
 ## Tests
 
@@ -88,7 +88,7 @@ venv (see [troubleshooting.md](troubleshooting.md#local-setup)).
    (`_int`, `_bool`, `_choice`, `_name_list`, ...) so a bad value names the variable.
 2. Test it in `tests/test_config.py` (default, a valid value, an invalid value).
 3. Add a row to the right table in `README.md`. `tests/test_docs.py` fails until you do.
-4. Add a commented line to `.env.example`, and a CHANGELOG entry.
+4. Add a commented line to `.env.example`.
 5. If it has a sensible per-cluster value, add it to `appConfig` in `charts/k8s-servant/values.yaml`
    (with a comment) or to the environment files.
 

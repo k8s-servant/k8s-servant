@@ -615,7 +615,7 @@ See [docs/architecture.md](docs/architecture.md#why-our-own-loop-and-no-framewor
 | [docs/foundry-concepts.md](docs/foundry-concepts.md) | What Azure AI Foundry is: resources, deployments, quota, cost, access, network |
 | [docs/foundry-setup.md](docs/foundry-setup.md) | Setting up the model in Azure AI Foundry, step by step |
 | [docs/roadmap.md](docs/roadmap.md) | What exists, what is next and ideas for later |
-| [CHANGELOG.md](CHANGELOG.md) | What changed, release by release |
+| [Releases](https://github.com/k8s-servant/k8s-servant/releases) | What changed, release by release (also in `CHANGELOG.md`) |
 
 ---
 
