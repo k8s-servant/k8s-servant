@@ -1,0 +1,120 @@
+{{- /*
+What the agent may read beyond the built-in "view" role (clusterrolebinding.yaml binds
+both). "view" covers namespaced workloads, events, quotas and PVCs but not cluster-scoped
+objects, metrics or most CRDs.
+
+Rules for this file (enforced here for rbac.extraRules and by tests/test_helm_chart.py):
+  - verbs get, list, watch only;
+  - never "secrets", never "*" in apiGroups or resources, no nonResourceURLs;
+  - never "nodes/proxy" (nor a wildcard proxy subresource): the kubelet API allows much
+    more than reading; likewise no exec, attach, portforward or token subresources.
+Things that can hold credentials are left out on purpose (Secrets, Alertmanager configs).
+*/ -}}
+{{- range .Values.rbac.extraRules }}
+{{- $rule := . }}
+{{- range $rule.verbs }}
+{{- if not (has . (list "get" "list" "watch")) }}
+{{- fail (printf "rbac.extraRules: verb %q is not allowed (only get, list, watch)" .) }}
+{{- end }}
+{{- end }}
+{{- if has "*" (default (list) $rule.apiGroups) }}
+{{- fail "rbac.extraRules: apiGroups \"*\" is not allowed" }}
+{{- end }}
+{{- range $rule.resources }}
+{{- $parts := splitList "/" . }}
+{{- if or (has (first $parts) (list "*" "secrets")) (and (gt (len $parts) 1) (has (last $parts) (list "*" "proxy" "exec" "attach" "portforward" "token"))) }}
+{{- fail (printf "rbac.extraRules: resource %q is not allowed (no wildcards, secrets, or proxy/exec/attach/portforward/token subresources)" .) }}
+{{- end }}
+{{- end }}
+{{- if or $rule.nonResourceURLs $rule.resourceNames }}
+{{- fail "rbac.extraRules: nonResourceURLs and resourceNames are not allowed" }}
+{{- end }}
+{{- end }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "k8s-servant.name" . }}-cluster-reader
+  labels:
+    {{- include "k8s-servant.labels" . | nindent 4 }}
+rules:
+  # Cluster-scoped core objects: nodes and their capacity, volumes, namespaces.
+  - apiGroups: [""]
+    resources: [nodes, persistentvolumes, namespaces]
+    verbs: [get, list, watch]
+  # Storage: classes, attachments and CSI drivers (volume mount problems).
+  - apiGroups: [storage.k8s.io]
+    resources: [storageclasses, volumeattachments, csidrivers, csinodes]
+    verbs: [get, list, watch]
+  # Which APIs exist and whether aggregated APIs (metrics-server) are available.
+  - apiGroups: [apiextensions.k8s.io]
+    resources: [customresourcedefinitions]
+    verbs: [get, list, watch]
+  - apiGroups: [apiregistration.k8s.io]
+    resources: [apiservices]
+    verbs: [get, list, watch]
+  # Pod priorities (preemption, pending pods).
+  - apiGroups: [scheduling.k8s.io]
+    resources: [priorityclasses]
+    verbs: [get, list, watch]
+  # CPU and memory usage (kubectl top, MCP pods_top / nodes_top).
+  - apiGroups: [metrics.k8s.io]
+    resources: [nodes, pods]
+    verbs: [get, list]
+  # Admission webhooks: a failing webhook blocks pod creation everywhere.
+  - apiGroups: [admissionregistration.k8s.io]
+    resources: [validatingwebhookconfigurations, mutatingwebhookconfigurations]
+    verbs: [get, list, watch]
+  # Flux: what is deployed from git and why it fails (flux-gitops-status skill).
+  - apiGroups: [source.toolkit.fluxcd.io]
+    resources: [gitrepositories, helmrepositories, helmcharts, ocirepositories, buckets]
+    verbs: [get, list, watch]
+  - apiGroups: [kustomize.toolkit.fluxcd.io]
+    resources: [kustomizations]
+    verbs: [get, list, watch]
+  - apiGroups: [helm.toolkit.fluxcd.io]
+    resources: [helmreleases]
+    verbs: [get, list, watch]
+  # Kyverno policies and their reports (admission denials, policy violations).
+  - apiGroups: [kyverno.io]
+    resources: [clusterpolicies, policies, policyexceptions]
+    verbs: [get, list, watch]
+  # Kyverno CEL policies (policies.kyverno.io): admission
+  # denials (signatures, registries, non-root) come from these.
+  - apiGroups: [policies.kyverno.io]
+    resources:
+      - validatingpolicies
+      - namespacedvalidatingpolicies
+      - imagevalidatingpolicies
+      - namespacedimagevalidatingpolicies
+      - generatingpolicies
+      - namespacedgeneratingpolicies
+      - mutatingpolicies
+      - namespacedmutatingpolicies
+      - deletingpolicies
+      - namespaceddeletingpolicies
+      - policyexceptions
+    verbs: [get, list, watch]
+  - apiGroups: [wgpolicyk8s.io]
+    resources: [policyreports, clusterpolicyreports]
+    verbs: [get, list, watch]
+  # External Secrets: sync status only; these objects hold no secret values.
+  - apiGroups: [external-secrets.io]
+    resources: [externalsecrets, clusterexternalsecrets, secretstores, clustersecretstores]
+    verbs: [get, list, watch]
+  # Gateway API routing (envoy gateway).
+  - apiGroups: [gateway.networking.k8s.io]
+    resources: [gatewayclasses, gateways, httproutes, grpcroutes, referencegrants]
+    verbs: [get, list, watch]
+  # Certificates and their issuers (expiry, failed renewals); not the key Secrets.
+  - apiGroups: [cert-manager.io]
+    resources: [certificates, certificaterequests, issuers, clusterissuers]
+    verbs: [get, list, watch]
+  # Prometheus Operator: alert rules and scrape targets (not Alertmanager configs,
+  # which can contain receiver credentials).
+  - apiGroups: [monitoring.coreos.com]
+    resources: [prometheusrules, servicemonitors, podmonitors, prometheuses, alertmanagers]
+    verbs: [get, list, watch]
+  {{- with .Values.rbac.extraRules }}
+  # Site-specific additions from values (rbac.extraRules), checked above.
+  {{- toYaml . | nindent 2 }}
+  {{- end }}

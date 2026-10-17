@@ -1,0 +1,165 @@
+# Default values for k8s-servant.
+# This is a YAML-formatted file.
+#
+# A typical install layers values files, in this order (later wins):
+#   1. this file (the defaults)
+#   2. a platform description shared by your clusters (see examples/knowledge-values.yaml)
+#   3. the cluster's own settings and notes (see examples/values-azure.yaml)
+# The CLI reads the same files with `k8s-servant --values ...`, so it knows the same.
+# Every setting of the agent itself is documented in README.md#configuration.
+
+# Extra labels added to every object, e.g. {team: platform, environment: production}.
+labels: {}
+
+# The agent's image, built and signed by this repository's release workflow.
+image:
+  # Registry and repository; point it at your mirror if you have one.
+  repository: ghcr.io/k8s-servant/k8s-servant
+  # Image tag; empty means the chart's appVersion (the normal case).
+  tag: ""
+  # Release tags are immutable, so pulling once per node is enough.
+  pullPolicy: IfNotPresent
+
+# The kubernetes-mcp-server sidecar (https://github.com/containers/kubernetes-mcp-server).
+mcp:
+  # Sidecar image.
+  image:
+    # Registry and repository; point it at your mirror if you have one.
+    repository: ghcr.io/containers/kubernetes-mcp-server
+    # Pinned version, tested with this chart.
+    tag: v0.0.67
+    # The tag is immutable, so pulling once per node is enough.
+    pullPolicy: IfNotPresent
+  # Requests and limits of the sidecar (it only relays API reads).
+  resources:
+    # Guaranteed share.
+    requests:
+      # CPU request.
+      cpu: 50m
+      # Memory request.
+      memory: 128Mi
+    # Upper bound.
+    limits:
+      # CPU limit.
+      cpu: 500m
+      # Memory limit.
+      memory: 512Mi
+
+# Requests and limits of the agent container (Python, waits on the model most of the time).
+resources:
+  # Guaranteed share.
+  requests:
+    # CPU request.
+    cpu: 100m
+    # Memory request.
+    memory: 256Mi
+  # Upper bound; a full check on a large cluster peaks at a few hundred MB.
+  limits:
+    # CPU limit.
+    cpu: 1000m
+    # Memory limit.
+    memory: 1Gi
+
+# The ServiceAccount used by both containers (RBAC, Workload Identity).
+serviceAccount:
+  # Must match the federated credential subject created by
+  # scripts/setup-workload-identity.sh: system:serviceaccount:k8s-servant:k8s-servant.
+  name: k8s-servant
+
+# Azure Workload Identity: the pod gets Entra ID tokens for Foundry and Key Vault
+# without any key. The identity is created by scripts/setup-workload-identity.sh.
+azureWorkloadIdentity:
+  # Turn Workload Identity on (needed for Foundry without an API key, and for ESO).
+  enabled: true
+  # Client ID of the managed identity, printed by the script, or:
+  # az identity show --name <identity> --resource-group <rg> --query clientId -o tsv
+  clientId: ""
+  # Entra ID tenant ID.
+  tenantId: ""
+
+# API key for the model endpoint, read from an existing Secret. Leave empty to use
+# Entra ID tokens through Workload Identity (recommended on AKS). Needed for other
+# OpenAI-compatible endpoints, or Foundry without Workload Identity.
+#   kubectl -n k8s-servant create secret generic my-llm-key --from-literal=api-key=...
+llmApiKey:
+  # Name of the Secret in the release namespace; empty = no API key.
+  existingSecret: ""
+  # Key inside the Secret that holds the API key.
+  secretKey: api-key
+
+# The agent's settings, rendered as environment variables (ConfigMap + envFrom).
+# Any setting from README.md#configuration may be added; empty values are left out,
+# so the code's default applies. Not allowed here: in-cluster paths (KNOWLEDGE_DIR,
+# DATA_DIR, HEARTBEAT_FILE, MCP_URL, KUBECTL_PATH are set by the chart) and anything
+# with WEBHOOK_URL (a credential: see teamsWebhook).
+appConfig:
+  # Cluster name shown in reports and Teams cards; required.
+  CLUSTER_NAME: ""
+  # Foundry v1 endpoint, e.g. https://my-foundry.openai.azure.com/openai/v1/; required.
+  FOUNDRY_ENDPOINT: ""
+  # Foundry deployment name (scripts/setup-foundry.sh creates "k8s-servant"); required.
+  FOUNDRY_DEPLOYMENT: k8s-servant
+  # In-cluster Prometheus URL; empty = no Prometheus tools.
+  PROMETHEUS_URL: ""
+  # In-cluster Alertmanager URL; empty = no Alertmanager tool.
+  ALERTMANAGER_URL: ""
+  # Minutes between scheduled health checks.
+  CHECK_INTERVAL_MINUTES: "60"
+  # Local time of the morning report.
+  MORNING_REPORT_TIME: "08:00"
+  # Time zone of the morning report's schedule and title.
+  MORNING_REPORT_TIMEZONE: UTC
+  # When to post to Teams: changes, always or off (forced to off when teamsWebhook is off).
+  TEAMS_POST_MODE: changes
+  # Log level: DEBUG, INFO, WARNING or ERROR.
+  LOG_LEVEL: INFO
+
+# Posting to MS Teams. The webhook URL is a credential: ESO copies it from Key Vault
+# into the agent's own Secret, which is mounted as a file (never an env var).
+teamsWebhook:
+  # Create the SecretStore and ExternalSecret and mount the Secret.
+  enabled: false
+  # Key Vault URL, e.g. https://my-keyvault.vault.azure.net; required when enabled.
+  keyVaultUrl: ""
+  # Name of the Key Vault secret that holds the Workflows webhook URL.
+  keyVaultSecretName: alertmanager-teams-webhook-url
+  # How often ESO re-reads the Key Vault secret.
+  refreshInterval: 1h
+
+# What the agent knows beyond the cluster API (see docs/knowledge-and-skills.md).
+# Built-in skills come from the chart's knowledge/skills folder.
+knowledge:
+  # Platform description shared by all clusters (see examples/knowledge-values.yaml).
+  environment: ""
+  # Notes about this one cluster.
+  clusterNotes: ""
+  # Extra skills: {name: SKILL.md content}; a built-in skill with the same name is replaced.
+  extraSkills: {}
+
+# The agent's memory volume (/data).
+persistence:
+  # Size; memory.db and notes.md stay far below 100 MB.
+  size: 1Gi
+  # StorageClass; empty = the cluster default.
+  storageClassName: ""
+
+# Read-only access rights (templates/clusterrole.yaml). The ServiceAccount is bound to
+# the built-in "view" role and to the agent's own cluster reader role.
+rbac:
+  # Additional read-only rules for site-specific CRDs, e.g.
+  # - {apiGroups: [example.com], resources: [widgets], verbs: [get, list, watch]}
+  # Only get/list/watch; secrets, wildcards, proxy/exec/attach/portforward/token
+  # subresources and nonResourceURLs fail the render.
+  extraRules: []
+
+# PriorityClass of the pod; empty = the cluster default. The agent is useful, not critical.
+priorityClassName: ""
+
+# Node selection; empty = any node.
+nodeSelector: {}
+
+# Tolerations for tainted nodes; empty = none.
+tolerations: []
+
+# Affinity rules; empty = none.
+affinity: {}

@@ -1,0 +1,64 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "k8s-servant"
+version = "0.0.0" # x-release-please-version
+description = "Read-only AI SRE agent for Kubernetes clusters"
+readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
+authors = [{ name = "The k8s-servant Authors" }]
+keywords = ["kubernetes", "sre", "ai-agent", "llm", "mcp", "kubectl"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: System Administrators",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Topic :: System :: Monitoring",
+]
+requires-python = ">=3.12"
+dependencies = [
+  "openai>=3.27,<4",        # chat model client (Foundry exposes an OpenAI-compatible v1 endpoint)
+  "mcp>=2.3,<3",            # Model Context Protocol client for kubernetes-mcp-server
+  "azure-identity>=1.26,<2",# Entra ID tokens: Workload Identity in the cluster, az login locally
+  "pyyaml>=6,<7",           # skill frontmatter and Helm values files
+  "httpx2>=2.13,<3",        # Prometheus, Alertmanager and Teams HTTP calls (same client the SDKs use)
+  "tzdata>=2025.1",         # time zone data for the daily report; Alpine images have none
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=9,<10", "pytest-asyncio>=1.4,<2", "pytest-cov>=7", "ruff>=0.17", "pre-commit>=4"]
+
+[project.urls]
+Homepage = "https://github.com/k8s-servant/k8s-servant"
+Issues = "https://github.com/k8s-servant/k8s-servant/issues"
+Changelog = "https://github.com/k8s-servant/k8s-servant/blob/main/CHANGELOG.md"
+
+[project.scripts]
+k8s-servant = "k8s_servant.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["k8s_servant*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "S", "SIM", "RUF"]
+ignore = [
+  "E501", # line length is the formatter's job; long strings and comments are left as they are
+  "S603", # subprocess without shell: the kubectl tool runs an allow-listed argument list by design
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "S105", "S106", "S108", "S607"] # asserts, dummy credentials and helm/bash from PATH are fine in tests

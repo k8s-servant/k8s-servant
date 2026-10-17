@@ -1,0 +1,17 @@
+apiVersion: v2
+name: k8s-servant
+description: Read-only AI SRE agent for Kubernetes clusters (agent + kubernetes-mcp-server sidecar)
+type: application
+home: https://github.com/k8s-servant/k8s-servant
+sources:
+  - https://github.com/k8s-servant/k8s-servant
+annotations:
+  artifacthub.io/license: Apache-2.0
+keywords: [kubernetes, sre, ai, llm, mcp]
+maintainers:
+  - name: k8s-servant maintainers
+    url: https://github.com/orgs/k8s-servant/teams/maintainers
+# Chart version and app version are kept equal with pyproject.toml; release-please
+# bumps all three together. Do not edit them by hand.
+version: 0.0.0 # x-release-please-version
+appVersion: "0.0.0" # x-release-please-version

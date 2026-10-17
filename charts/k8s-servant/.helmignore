@@ -1,0 +1,11 @@
+# Files Helm leaves out of the chart package. knowledge/ must stay in: the
+# knowledge ConfigMap reads the built-in skills from it with .Files.Glob.
+.DS_Store
+.git/
+*.swp
+*.bak
+*.tmp
+*.orig
+*~
+.vscode/
+.idea/

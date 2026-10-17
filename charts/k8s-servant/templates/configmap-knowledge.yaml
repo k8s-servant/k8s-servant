@@ -1,0 +1,35 @@
+{{- /*
+What the agent knows beyond the cluster API, mounted at /knowledge:
+  environment.md        knowledge.environment (shared platform facts)
+  cluster.md            knowledge.clusterNotes (this cluster)
+  skill__<name>.md      built-in skills from knowledge/skills/<name>/SKILL.md, then
+                        knowledge.extraSkills (same name = override)
+The flat skill__ layout exists because ConfigMap keys cannot contain "/".
+*/ -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "k8s-servant.name" . }}-knowledge
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "k8s-servant.labels" . | nindent 4 }}
+data:
+  {{- with .Values.knowledge.environment }}
+  environment.md: |
+    {{- . | nindent 4 }}
+  {{- end }}
+  {{- with .Values.knowledge.clusterNotes }}
+  cluster.md: |
+    {{- . | nindent 4 }}
+  {{- end }}
+  {{- $skills := dict }}
+  {{- range $path, $unused := .Files.Glob "knowledge/skills/*/SKILL.md" }}
+  {{- $_ := set $skills (base (dir $path)) ($.Files.Get $path) }}
+  {{- end }}
+  {{- range $name, $content := .Values.knowledge.extraSkills }}
+  {{- $_ := set $skills $name $content }}
+  {{- end }}
+  {{- range $name, $content := $skills }}
+  skill__{{ $name }}.md: |
+    {{- $content | nindent 4 }}
+  {{- end }}

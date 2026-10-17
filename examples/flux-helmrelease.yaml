@@ -1,0 +1,49 @@
+# Example: install k8s-servant with Flux from the OCI chart, with values from ConfigMaps.
+#
+#   kubectl -n flux-system create configmap k8s-servant-knowledge \
+#     --from-file=values.yaml=examples/knowledge-values.yaml
+#   kubectl -n flux-system create configmap k8s-servant-values \
+#     --from-file=values.yaml=examples/values-azure.yaml
+#
+# (In a GitOps repository you would generate those ConfigMaps with a Kustomize
+# configMapGenerator instead.)
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: OCIRepository
+metadata:
+  name: k8s-servant
+  namespace: flux-system
+spec:
+  interval: 1h
+  url: oci://ghcr.io/k8s-servant/charts/k8s-servant
+  ref:
+    semver: ">=0.1.0 <1.0.0"
+  # Release charts are signed with cosign (keyless, GitHub Actions OIDC).
+  verify:
+    provider: cosign
+    matchOIDCIdentity:
+      - issuer: ^https://token\.actions\.githubusercontent\.com$
+        subject: ^https://github\.com/k8s-servant/k8s-servant/\.github/workflows/release-please\.yml@refs/heads/main$
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: k8s-servant
+  namespace: flux-system
+spec:
+  interval: 10m
+  targetNamespace: k8s-servant
+  storageNamespace: k8s-servant
+  releaseName: k8s-servant
+  chartRef:
+    kind: OCIRepository
+    name: k8s-servant
+  # Later entries win: platform description, then this cluster.
+  valuesFrom:
+    - kind: ConfigMap
+      name: k8s-servant-knowledge
+    - kind: ConfigMap
+      name: k8s-servant-values
+  install:
+    createNamespace: true
+  upgrade:
+    cleanupOnFail: true

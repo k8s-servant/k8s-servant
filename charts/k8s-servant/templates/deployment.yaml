@@ -1,0 +1,161 @@
+{{- /*
+One pod, two containers:
+  agent  the Python agent (`k8s-servant serve`): scheduled checks, the morning report
+  mcp    kubernetes-mcp-server on 127.0.0.1:8080, the agent's main way to read the cluster
+One replica with Recreate: memory is SQLite on a ReadWriteOnce volume, and two agents
+would post the same findings twice.
+*/ -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "k8s-servant.name" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "k8s-servant.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "k8s-servant.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "k8s-servant.labels" . | nindent 8 }}
+        {{- if .Values.azureWorkloadIdentity.enabled }}
+        azure.workload.identity/use: "true"
+        {{- end }}
+      annotations:
+        # Restart the pod when settings, knowledge or the MCP config change: the agent
+        # and the MCP server read them only at start-up.
+        checksum/config: {{ include (print $.Template.BasePath "/configmap-app.yaml") . | sha256sum }}
+        checksum/knowledge: {{ include (print $.Template.BasePath "/configmap-knowledge.yaml") . | sha256sum }}
+        checksum/mcp: {{ include (print $.Template.BasePath "/configmap-mcp.yaml") . | sha256sum }}
+    spec:
+      serviceAccountName: {{ include "k8s-servant.serviceAccountName" . }}
+      # Both containers need the token: the agent for kubectl, the sidecar for MCP.
+      automountServiceAccountToken: true
+      {{- with .Values.priorityClassName }}
+      priorityClassName: {{ . | quote }}
+      {{- end }}
+      # SIGTERM cancels a running check at once; this is only a safety margin.
+      terminationGracePeriodSeconds: 60
+      securityContext:
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: agent
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "k8s-servant.name" . }}-config
+          {{- with .Values.llmApiKey.existingSecret }}
+          # The model endpoint's API key, a credential: only from a Secret.
+          env:
+            - name: FOUNDRY_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ . }}
+                  key: {{ $.Values.llmApiKey.secretKey }}
+          {{- end }}
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            privileged: false
+            capabilities:
+              drop:
+                - ALL
+          # The scheduler touches /tmp/heartbeat at least once a minute, also while a
+          # check runs; a heartbeat older than 5 minutes means the loop is stuck.
+          livenessProbe:
+            exec:
+              command:
+                - python
+                - -c
+                - "import os, sys, time; sys.exit(0 if time.time() - os.path.getmtime('/tmp/heartbeat') < 300 else 1)"
+            initialDelaySeconds: 120
+            periodSeconds: 60
+            timeoutSeconds: 10
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: data
+              mountPath: /data
+            - name: knowledge
+              mountPath: /knowledge
+              readOnly: true
+            {{- if .Values.teamsWebhook.enabled }}
+            # The Teams webhook URL, a credential: a file, never an env var.
+            - name: teams-webhook
+              mountPath: /var/run/secrets/teams
+              readOnly: true
+            {{- end }}
+        - name: mcp
+          image: "{{ .Values.mcp.image.repository }}:{{ .Values.mcp.image.tag }}"
+          imagePullPolicy: {{ .Values.mcp.image.pullPolicy }}
+          args:
+            - --config
+            - /etc/mcp/config.toml
+          # No probes: the server listens on 127.0.0.1 only, which the kubelet cannot
+          # reach. When it is down the agent notices and falls back to kubectl.
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65532
+            runAsGroup: 65532
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            privileged: false
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            {{- toYaml .Values.mcp.resources | nindent 12 }}
+          volumeMounts:
+            - name: mcp-config
+              mountPath: /etc/mcp
+              readOnly: true
+            - name: mcp-tmp
+              mountPath: /tmp
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 256Mi
+        - name: mcp-tmp
+          emptyDir:
+            sizeLimit: 64Mi
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ include "k8s-servant.name" . }}-data
+        - name: knowledge
+          configMap:
+            name: {{ include "k8s-servant.name" . }}-knowledge
+        - name: mcp-config
+          configMap:
+            name: {{ include "k8s-servant.name" . }}-mcp
+        {{- if .Values.teamsWebhook.enabled }}
+        - name: teams-webhook
+          secret:
+            secretName: {{ include "k8s-servant.name" . }}-teams-webhook
+            defaultMode: 0440
+        {{- end }}

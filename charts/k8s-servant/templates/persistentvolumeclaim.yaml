@@ -1,0 +1,23 @@
+{{- /*
+The agent's memory (/data): findings, run history and learned notes in SQLite and
+Markdown. Kept when the release is uninstalled, so a reinstall does not report every
+open problem as new again; delete the claim by hand to forget everything.
+*/ -}}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "k8s-servant.name" . }}-data
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "k8s-servant.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/resource-policy: keep
+spec:
+  accessModes:
+    - ReadWriteOnce
+  {{- with .Values.persistence.storageClassName }}
+  storageClassName: {{ . | quote }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.persistence.size }}

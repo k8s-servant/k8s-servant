@@ -1,0 +1,27 @@
+{{- /*
+kubernetes-mcp-server configuration for the sidecar. Not configurable from values on
+purpose: these settings are the read-only guarantee (see deploy/local/mcp-config.toml,
+which tests/test_helm_chart.py keeps identical).
+*/ -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "k8s-servant.name" . }}-mcp
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "k8s-servant.labels" . | nindent 4 }}
+data:
+  config.toml: |
+    # Streamable HTTP endpoint at /mcp, reachable only from inside the pod.
+    port = "8080"
+    bind_address = "127.0.0.1"
+    # Expose only read-only tools; keep no MCP session state between requests.
+    read_only = true
+    stateless = true
+    # Only "core": "config" leaks kubeconfig credentials, "helm" reads Secrets.
+    toolsets = ["core"]
+    # Hide Secrets completely (RBAC forbids them too).
+    [[denied_resources]]
+    group = ""
+    version = "v1"
+    kind = "Secret"
