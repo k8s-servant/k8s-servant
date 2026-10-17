@@ -68,3 +68,20 @@ docker build -t k8s-servant:dev .                               # image
   `my-cluster`).
 - **Git:** Conventional Commit messages and PR titles (`feat:`, `fix(chart):`, ...).
   The changelog is generated from them.
+- **Changelog:** never create or edit `CHANGELOG.md`. release-please writes it, and only
+  produces a clean file when it starts absent or empty.
+- **Release signing identity:** releases are signed keyless as
+  `.github/workflows/release-please.yml@refs/heads/main`, and users pin that string in
+  their policies (`docs/verifying-releases.md`). Don't rename that file or release from
+  another branch. Keep `id-token: write` limited to the publish jobs, since any job in
+  that file can sign as the identity. Keep signing the multi-arch index digest, so the
+  SBOM and provenance stay covered.
+
+## Review feedback (human or bot)
+
+- A review is input to check, not a list of orders. Verify each point against the code
+  or the upstream docs before changing anything. Fix what is right, and reply with the
+  evidence when a suggestion is wrong.
+- The Claude review workflow posts its summary as a PR conversation comment and its
+  line findings as inline comments. Read both (`gh pr view N --comments` and
+  `gh api repos/{owner}/{repo}/pulls/N/comments`) before saying a PR has no feedback.
