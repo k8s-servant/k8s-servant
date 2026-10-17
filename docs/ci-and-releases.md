@@ -292,11 +292,27 @@ trigger it, because the job has write permissions and the Claude credential (the
 `CLAUDE_CODE_OAUTH_TOKEN` secret and the Claude GitHub App).
 
 Before Claude starts, the job installs Python, helm and the dev dependencies, and
-allows Claude to run exactly the checks from `CLAUDE.md`: `.venv/bin/pytest`,
-`.venv/bin/ruff`, `helm lint` and `helm template`. So Claude tests its change before it
-pushes, and CI then confirms. On a **fork PR** this is switched off: Claude can still
-read and comment, but it runs nothing, because the fork's code would run next to the
-Claude credential.
+allows Claude to run `.venv/bin/pytest`, `.venv/bin/ruff check|format` and
+`helm lint charts/k8s-servant` (an exact command, because helm's `--post-renderer`
+runs any binary). So Claude tests its change before it pushes, and CI then confirms.
+
+**Running tests executes repository code**, including tests Claude itself writes. That
+code runs inside the job, next to the Claude credential. So the tests are switched off
+unless **both** of these are true:
+
+- the issue or PR was written by the owner, a member or a collaborator (outsider-written
+  text could try to steer Claude into writing and running hostile code);
+- for a PR, its branch is in this repository, not a fork.
+
+When they are off, Claude can still read, answer and push changes, but it runs nothing.
+What remains is an accepted risk: comments from outsiders on a trusted issue are still
+part of what Claude reads. Only ask `@claude` to implement issues whose discussion you
+trust, and revoke the `CLAUDE_CODE_OAUTH_TOKEN` (`claude setup-token` makes a new one)
+if you ever suspect misuse.
+
+Known limitation: the dependencies are installed from the default branch before Claude
+switches to a PR branch. If that PR changes dependencies in `pyproject.toml`, Claude's
+test run can be stale; CI is the authority.
 
 Typical flow on an issue: comment `@claude implement this`. Claude works on a branch
 `claude/issue-N-…`, commits as `claude[bot]`, and replies with a **Create PR** link.

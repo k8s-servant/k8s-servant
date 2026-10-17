@@ -4,8 +4,9 @@ name: Claude
 # review. Only trusted authors (owner, org members, collaborators) can trigger it,
 # because the job holds write permissions and the Claude credential.
 #
-# Claude may run the tests, ruff and helm lint so it checks its work before pushing,
-# except on fork PRs: running untrusted code next to the credential would leak it.
+# Claude may run the tests, ruff and helm lint so it checks its work before pushing.
+# Running tests executes repository code, so this is allowed only when the issue or PR
+# was written by a trusted author and the code comes from this repository (not a fork).
 on:
   issue_comment: # zizmor: ignore[dangerous-triggers] gated on trusted author_association below
     types: [created]
@@ -44,7 +45,8 @@ jobs:
         with:
           fetch-depth: 1
           persist-credentials: false
-      # Tests are allowed for issues and for PRs from a branch in this repository only.
+      # Tests are allowed only for issues and PRs written by trusted authors, and never
+      # for fork PRs. Outsider-written text could steer Claude into running hostile code.
       - name: Decide whether Claude may run the test suite
         id: trust
         env:
@@ -53,7 +55,12 @@ jobs:
           EVENT: ${{ github.event_name }}
           ISSUE_PR_URL: ${{ github.event.issue.pull_request.url }}
           PR_HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          AUTHOR_ASSOCIATION: ${{ github.event.issue.author_association || github.event.pull_request.author_association }}
         run: |
+          case "${AUTHOR_ASSOCIATION}" in
+            OWNER|MEMBER|COLLABORATOR) ;;
+            *) echo "run_tests=false" >> "${GITHUB_OUTPUT}"; exit 0 ;;
+          esac
           is_pr=false
           head="${PR_HEAD_REPO}"
           if [ -n "${PR_HEAD_REPO}" ] || [ "${EVENT#pull_request}" != "${EVENT}" ]; then
@@ -83,8 +90,9 @@ jobs:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           additional_permissions: |
             actions: read
-          # The same commands as CLAUDE.md lists; nothing else gains shell access.
+          # Exact commands for helm (a prefix match would allow --post-renderer <binary>).
+          # pytest still runs repository code by design; see docs/ci-and-releases.md.
           claude_args: >-
             ${{ steps.trust.outputs.run_tests == 'true'
-            && '--allowedTools "Bash(.venv/bin/pytest:*),Bash(.venv/bin/ruff:*),Bash(helm lint:*),Bash(helm template:*)"'
+            && '--allowedTools "Bash(.venv/bin/pytest:*),Bash(.venv/bin/ruff check:*),Bash(.venv/bin/ruff format:*),Bash(helm lint charts/k8s-servant)"'
             || '' }}
