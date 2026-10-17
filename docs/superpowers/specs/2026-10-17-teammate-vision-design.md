@@ -115,10 +115,14 @@ and fit the "teammate" idea:
   use the agent's own read-only identity, which can see the whole cluster. When
   developers get access (step 5), each answer is limited to what the asking person may
   see (for example through Kubernetes impersonation of the asker), and the broad read
-  identity is used only for scheduled checks and platform-team questions.
+  identity is used only for scheduled checks and platform-team questions. Chat makes it
+  easier for an answer to repeat something the agent read: Secrets stay denied, but log
+  lines and events can carry credentials, so step 1's design must decide how answers
+  handle them (redaction is listed under "Ideas for later").
 - **Reachable only where the user opts in.** Two-way Teams needs Microsoft's cloud to
   reach the bot: an Azure Bot registration, an Entra app and a public HTTPS endpoint
-  (ingress, TLS, request validation). That is accepted, but as an **opt-in component**:
+  (ingress, TLS, validation of the Bot Framework token on every request, no credentials
+  in logs). That is accepted, but as an **opt-in component**:
   a default install stays outbound-only and works exactly like today.
 - **Self-hosted and provider-neutral.** It runs in the user's infrastructure and works
   with any model provider (issue #2). No *core* feature may depend on a SaaS. A chat
@@ -186,7 +190,7 @@ on their own tracks and don't block this order.
   Teams users are the platform team, who can judge answers themselves.
 - **A simple per-day budget cap ships with step 1**; the full cost meter stays step 3.
 - No hosted SaaS for the core, ever. The project stays self-hosted.
-- Once this is approved, `docs/roadmap.md` is rewritten to follow this order (done with this document).
+- `docs/roadmap.md` follows this order.
 
 ## 10. Left to each step's own design
 
