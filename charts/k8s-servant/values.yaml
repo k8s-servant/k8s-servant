@@ -69,8 +69,9 @@ serviceAccount:
 # Azure Workload Identity: the pod gets Entra ID tokens for Foundry and Key Vault
 # without any key. The identity is created by scripts/setup-workload-identity.sh.
 azureWorkloadIdentity:
-  # Turn Workload Identity on (needed for Foundry without an API key, and for ESO).
-  enabled: true
+  # Off by default. Turn it on for AKS: Foundry without an API key, and the Teams
+  # webhook from Key Vault (External Secrets) both need it.
+  enabled: false
   # Client ID of the managed identity, printed by the script, or:
   # az identity show --name <identity> --resource-group <rg> --query clientId -o tsv
   clientId: ""

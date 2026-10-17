@@ -49,6 +49,9 @@ def test_example_values_render_the_chart():
     vault = find(docs, "SecretStore")["spec"]["provider"]["azurekv"]["vaultUrl"]
     assert vault == "https://my-keyvault.vault.azure.net"
     assert find(docs, "Deployment")["metadata"]["labels"]["environment"] == "production"
+    # The Azure example turns Workload Identity on explicitly (the chart default is off).
+    account = find(docs, "ServiceAccount", "k8s-servant")["metadata"]
+    assert account["annotations"]["azure.workload.identity/client-id"] == "00000000-0000-0000-0000-000000000000"
 
 
 def test_cli_with_the_same_files_knows_the_same():

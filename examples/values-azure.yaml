@@ -17,6 +17,8 @@ labels:
 
 # Managed identity for Foundry and Key Vault, created by scripts/setup-workload-identity.sh.
 azureWorkloadIdentity:
+  # Off by default in the chart; this example uses it.
+  enabled: true
   # Client ID printed by the script.
   clientId: "00000000-0000-0000-0000-000000000000"
   # Your Entra ID tenant.

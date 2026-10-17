@@ -27,11 +27,20 @@ pytestmark = pytest.mark.skipif(shutil.which("helm") is None, reason="helm is no
 
 # The minimum a render needs: values without a site default are required on purpose.
 REQUIRED = {
-    "azureWorkloadIdentity.clientId": "00000000-0000-0000-0000-00000000c11e",
-    "azureWorkloadIdentity.tenantId": "00000000-0000-0000-0000-000000007e7",
     "appConfig.CLUSTER_NAME": "aks-test",
     "appConfig.FOUNDRY_ENDPOINT": "https://example.openai.azure.com/openai/v1/",
 }
+
+# Azure Workload Identity is opt-in; these arguments turn it on with test IDs.
+CLIENT_ID = "00000000-0000-0000-0000-00000000c11e"
+AZURE = [
+    "--set",
+    "azureWorkloadIdentity.enabled=true",
+    "--set-string",
+    f"azureWorkloadIdentity.clientId={CLIENT_ID}",
+    "--set-string",
+    "azureWorkloadIdentity.tenantId=00000000-0000-0000-0000-000000007e7",
+]
 
 
 def render(*args: str, required: bool = True) -> list[dict]:
@@ -97,21 +106,30 @@ def test_containers_are_locked_down(name, uid):
     assert context["capabilities"] == {"drop": ["ALL"]}
 
 
-def test_pod_uses_workload_identity_and_its_service_account():
+def test_default_render_needs_no_azure_settings():
+    # Only the cluster name and model endpoint are required; nothing Azure-specific.
     docs = render()
+    pod = find(docs, "Deployment")["spec"]["template"]
+    assert "azure.workload.identity/use" not in pod["metadata"].get("labels", {})
+    account = find(docs, "ServiceAccount", "k8s-servant")
+    assert "azure.workload.identity/client-id" not in (account["metadata"].get("annotations") or {})
+
+
+def test_pod_uses_workload_identity_and_its_service_account():
+    docs = render(*AZURE)
     pod = find(docs, "Deployment")["spec"]["template"]
     assert pod["metadata"]["labels"]["azure.workload.identity/use"] == "true"
     assert pod["spec"]["serviceAccountName"] == "k8s-servant"
     account = find(docs, "ServiceAccount", "k8s-servant")
     assert account["metadata"]["labels"]["azure.workload.identity/use"] == "true"
     annotations = account["metadata"]["annotations"]
-    assert annotations["azure.workload.identity/client-id"] == REQUIRED["azureWorkloadIdentity.clientId"]
+    assert annotations["azure.workload.identity/client-id"] == CLIENT_ID
     assert annotations["azure.workload.identity/tenant-id"]
 
 
 @pytest.mark.parametrize("key", ["clientId", "tenantId"])
 def test_workload_identity_ids_are_required(key):
-    assert key in render_error("--set-string", f"azureWorkloadIdentity.{key}=")
+    assert key in render_error(*AZURE, "--set-string", f"azureWorkloadIdentity.{key}=")
 
 
 def test_agent_mounts_are_the_only_writable_places():
@@ -430,6 +448,7 @@ def test_extra_rules_that_could_write_or_read_secrets_fail_the_render(tmp_path, 
 # --- Teams webhook via External Secrets ---------------------------------------------
 
 TEAMS_ON = (
+    *AZURE,
     "--set",
     "teamsWebhook.enabled=true",
     "--set-string",
@@ -489,7 +508,14 @@ def test_teams_off_means_no_eso_objects_no_mount_and_no_posting():
 
 
 def test_teams_on_requires_the_key_vault_url():
-    assert "keyVaultUrl" in render_error("--set", "teamsWebhook.enabled=true")
+    assert "keyVaultUrl" in render_error(*AZURE, "--set", "teamsWebhook.enabled=true")
+
+
+def test_teams_on_requires_workload_identity():
+    # External Secrets reads Key Vault as the agent's Workload Identity; without it the
+    # SecretStore could never authenticate, so the render fails instead.
+    error = render_error(*TEAMS_ON, "--set", "azureWorkloadIdentity.enabled=false")
+    assert "azureWorkloadIdentity.enabled" in error
 
 
 def test_webhook_file_is_readable_by_the_agents_group_only():

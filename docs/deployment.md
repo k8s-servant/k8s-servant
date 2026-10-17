@@ -123,22 +123,23 @@ credential.
 
 Role assignments can take a few minutes to take effect.
 
-**Without AKS or Workload Identity:** set `azureWorkloadIdentity.enabled: false` and
-give the agent an API key from a Kubernetes Secret:
+**Without AKS or Workload Identity** (the chart default, `azureWorkloadIdentity.enabled:
+false`), give the agent an API key from a Kubernetes Secret:
 
 ```bash
 kubectl -n k8s-servant create secret generic my-llm-key --from-literal=api-key=<key>
 ```
 
 ```yaml
-azureWorkloadIdentity:
-  enabled: false
 llmApiKey:
   existingSecret: my-llm-key   # mounted as FOUNDRY_API_KEY; never put the key in appConfig
 ```
 
-The Teams webhook then needs a Secret you create yourself (or with any External
-Secrets provider).
+Teams posting from the chart currently reads the webhook URL from Key Vault through
+Workload Identity, so `teamsWebhook.enabled: true` requires
+`azureWorkloadIdentity.enabled: true` (the chart refuses to render otherwise). A
+webhook from a plain Kubernetes Secret is tracked in
+[#3](https://github.com/k8s-servant/k8s-servant/issues/3).
 
 ## 2. Network
 
@@ -184,7 +185,8 @@ teamsWebhook:
   keyVaultSecretName: teams-webhook-url
 ```
 
-With Workload Identity enabled, the chart refuses to render with an empty client ID.
+Workload Identity is off in the chart defaults, so the Azure path turns it on explicitly.
+With it enabled, the chart refuses to render with an empty client ID.
 
 Values files are applied in order (later wins). A common layout is one shared file for
 the platform description and one file per cluster. The CLI reads the same files
