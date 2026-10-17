@@ -109,10 +109,10 @@ k8s-servant/
 │       ├── mcp_tools.py            # Tools from kubernetes-mcp-server
 │       ├── kubectl_tool.py         # Guarded read-only kubectl (allow-listed verbs and flags)
 │       └── prometheus_tool.py      # PromQL, Alertmanager, alert history
-├── charts/k8s-servant/             # Helm chart: agent + MCP sidecar, RBAC, PVC, ESO (values.yaml: every key commented)
+├── charts/k8s-servant/             # Helm chart: agent + MCP sidecar, RBAC, PVC (values.yaml: every key commented)
 │   ├── Chart.yaml                  # version = appVersion = image version
 │   ├── values.yaml                 # Defaults
-│   ├── templates/                  # Deployment, ConfigMaps (settings, knowledge, MCP), RBAC, PVC, SecretStore, ExternalSecret
+│   ├── templates/                  # Deployment, ConfigMaps (settings, knowledge, MCP), RBAC, PVC, extraObjects
 │   └── knowledge/skills/           # Built-in generic skills, one SKILL.md each (rendered into the knowledge ConfigMap)
 │       ├── cluster-health-check/
 │       ├── workload-troubleshooting/
@@ -121,7 +121,8 @@ k8s-servant/
 │       └── prometheus-queries/
 ├── examples/
 │   ├── knowledge-values.yaml       # Example environment description and cluster notes for a fictional platform
-│   ├── values-azure.yaml           # AKS + Azure AI Foundry + Workload Identity + Key Vault (External Secrets)
+│   ├── values-azure.yaml           # The complete Azure setup: Foundry + Workload Identity + Key Vault via External Secrets
+│   ├── values-minimal.yaml         # Any cluster: API key and Teams webhook from kubectl-created Secrets
 │   └── flux-helmrelease.yaml       # Flux HelmRelease installing the OCI chart
 ├── deploy/local/
 │   └── mcp-config.toml             # kubernetes-mcp-server config for local runs (read-only, core toolset)
@@ -340,6 +341,7 @@ from the Helm chart (`appConfig` in the values, rendered into a ConfigMap). A te
 | `FOUNDRY_ENDPOINT` | *(required)* | Model endpoint. For Azure AI Foundry the resource endpoint, e.g. `https://<name>.openai.azure.com/`; `/openai/v1/` is appended automatically. A URL that already includes a path (e.g. `https://api.openai.com/v1`, `http://localhost:11434/v1`) is used as-is: other OpenAI-compatible endpoints (experimental), authenticated with `FOUNDRY_API_KEY`. |
 | `FOUNDRY_DEPLOYMENT` | *(required)* | Model **deployment** name in Foundry (the model name for other endpoints). |
 | `FOUNDRY_API_KEY` | *(empty)* | API key. Empty = Entra ID (`az login` locally, Workload Identity in the cluster), the recommended way for Azure AI Foundry. Required for other OpenAI-compatible endpoints. |
+| `FOUNDRY_API_KEY_FILE` | *(empty)* | File containing the API key (the mounted Secret in the cluster, set by the chart from `llmApiKey.existingSecret`); wins over `FOUNDRY_API_KEY`. An unreadable file stops the agent with an error. |
 | `FOUNDRY_TOKEN_SCOPE` | `https://ai.azure.com/.default` | Scope requested for the Entra ID token. |
 | `FOUNDRY_TIMEOUT_SECONDS` | `120` | Timeout of one model request (the SDK retries up to 3 times; retries are logged). |
 | `FOUNDRY_REASONING_EFFORT` | `medium` | How hard a reasoning model thinks: `none`, `minimal`, `low`, `medium`, `high`. gpt-5.4-mini does not reason at all unless asked. Empty = not sent (for models that reject it). |
@@ -421,12 +423,15 @@ Almost nothing in `.env` is secret:
 |---|---|---|---|
 | Endpoints, names, URLs of Prometheus etc., timeouts | No | `.env` | ConfigMap rendered by the Helm chart |
 | **Access to the model (Azure AI Foundry)** | — | your `az login` session; nothing is stored in `.env` | **Workload Identity**: the pod's ServiceAccount is federated with a managed identity that has *Cognitive Services OpenAI User* on the Foundry resource. No key anywhere |
-| `FOUNDRY_API_KEY` | **Yes** | leave it empty for Azure AI Foundry (keys only for quick experiments); required for other OpenAI-compatible endpoints | for Azure AI Foundry not used; otherwise a Kubernetes Secret named in `llmApiKey.existingSecret` |
-| **`TEAMS_WEBHOOK_URL`** | **Yes**: anyone with it can post to the channel | load it from your secret store into your shell (below) | **External Secrets Operator** syncs the secret (e.g. from Azure Key Vault) into the agent's **own** Kubernetes Secret (a `SecretStore` using Workload Identity plus an `ExternalSecret`), mounted as a file and read through `TEAMS_WEBHOOK_URL_FILE` |
+| `FOUNDRY_API_KEY` | **Yes** | leave it empty for Azure AI Foundry (keys only for quick experiments); required for other OpenAI-compatible endpoints | for Azure AI Foundry not used; otherwise a Kubernetes Secret you create, named in `llmApiKey.existingSecret`, mounted as a file (`FOUNDRY_API_KEY_FILE`) |
+| **`TEAMS_WEBHOOK_URL`** | **Yes**: anyone with it can post to the channel | load it from your secret store into your shell (below) | A Kubernetes Secret you create any way you like (kubectl, External Secrets, Sealed Secrets, ...), named in `teamsWebhook.existingSecret`, mounted as a file and read through `TEAMS_WEBHOOK_URL_FILE`. `examples/values-azure.yaml` syncs it from Azure Key Vault with External Secrets |
 
-On AKS, one managed identity does both jobs: it reads the webhook secret from Key
-Vault (for ESO) and calls the model. `scripts/setup-workload-identity.sh` creates it
-([docs/deployment.md](docs/deployment.md#1-workload-identity-aks)).
+In the Azure example, one managed identity does both jobs: it calls the model and
+reads the webhook secret from Key Vault (for External Secrets).
+`scripts/setup-workload-identity.sh` creates it
+([docs/deployment.md](docs/deployment.md#1-workload-identity-aks)). The chart itself
+never creates Secrets; see
+[Credentials](docs/deployment.md#credentials-bring-your-own-secrets).
 
 **What protects `.env` locally.** It is listed in `.gitignore`, so git never commits it,
 and neither the agent's memory (`.data/`). It is still a plain-text file on your disk,
@@ -459,10 +464,11 @@ connectors were retired). The cards look and behave as described in
    alerts to a channel"** → name it (e.g. *k8s-servant my-cluster*) → **Save**, and copy
    the URL. Add a co-owner to the flow so it does not depend on one person. Reusing the
    webhook of an existing channel (for example the one Alertmanager posts to) also works.
-2. **Secret store.** The URL is a password. Keep it in a secret store such as Azure Key
-   Vault (e.g. secret `teams-webhook-url` in `my-keyvault`). In the cluster External
-   Secrets Operator copies it into the agent's own Kubernetes Secret; the secret's name
-   is a Helm value (`teamsWebhook.keyVaultSecretName`).
+2. **Secret store.** The URL is a password. Keep it in a secret store (for example
+   Azure Key Vault, secret `teams-webhook-url` in `my-keyvault`). In the cluster the
+   agent reads it from a Kubernetes Secret named in `teamsWebhook.existingSecret`,
+   which you create with kubectl, External Secrets or any other tool
+   ([how](docs/deployment.md#credentials-bring-your-own-secrets)).
 3. **Test.** Load the URL into your shell (see
    [Secrets: local vs cluster](#secrets-local-vs-cluster)). `k8s-servant doctor` should
    show `[OK] teams`. Then `TEAMS_POST_MODE=always k8s-servant check --post` posts a

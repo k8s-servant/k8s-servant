@@ -147,3 +147,22 @@ def test_model_retries_are_logged_but_http_noise_is_not():
     configure_logging("INFO")
     assert logging.getLogger("openai").level == logging.INFO  # only logs "Retrying request ..."
     assert logging.getLogger("httpx2").level == logging.WARNING
+
+
+def test_api_key_file_wins_over_the_variable(tmp_path):
+    # In the cluster the key is a mounted Secret file, so it never sits in the environment.
+    key_file = tmp_path / "api-key"
+    key_file.write_text(" from-file\n")
+    config = configure_app({"FOUNDRY_API_KEY": "from-env", "FOUNDRY_API_KEY_FILE": str(key_file)})
+    assert config["foundry_api_key"] == "from-file"
+
+
+def test_api_key_variable_is_used_without_a_file():
+    assert configure_app({"FOUNDRY_API_KEY": " k "})["foundry_api_key"] == "k"
+
+
+def test_unreadable_api_key_file_is_an_error_that_names_only_the_variable(tmp_path):
+    # Falling back to Entra ID silently would hide the mistake; the message must not
+    # contain the key, only the setting's name.
+    with pytest.raises(ValueError, match="FOUNDRY_API_KEY_FILE"):
+        configure_app({"FOUNDRY_API_KEY_FILE": str(tmp_path / "missing")})

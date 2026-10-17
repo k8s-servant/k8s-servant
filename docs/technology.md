@@ -86,7 +86,7 @@ it runs as a sidecar container on `localhost:8080`, from the upstream image `ghc
 | **Kubernetes** (tested on AKS) | Runs the agent: one Deployment, one replica, agent + MCP sidecar |
 | **Helm** chart (OCI, `oci://ghcr.io/k8s-servant/charts/k8s-servant`) | Installation with `helm install`, or a Flux HelmRelease (`examples/flux-helmrelease.yaml`) |
 | **Azure Workload Identity** (optional) | The pod's identity for Foundry and Key Vault, without secrets |
-| **External Secrets Operator** + **Azure Key Vault** (optional) | The Teams webhook URL: synced from a Key Vault secret into the agent's own Kubernetes Secret |
+| **External Secrets Operator** + **Azure Key Vault** (optional, Azure example) | The Teams webhook URL, synced from Key Vault into a Kubernetes Secret. Not a chart dependency: any way of creating the Secret works |
 | **GitHub Container Registry** (`ghcr.io/k8s-servant`) | The agent image and the Helm chart, signed with cosign (keyless), with SBOM and provenance |
 | **GitHub Actions** + **release-please** | Tests, linting and security scans on every pull request; releases build, scan, sign and publish the image and the chart |
 | **Docker** (`python:3.14-alpine`, multi-stage) | The image: the package plus a pinned kubectl (checksum-verified), UID 1000, runs with a read-only root filesystem |

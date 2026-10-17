@@ -60,17 +60,27 @@ resources:
     # Memory limit.
     memory: 1Gi
 
-# The ServiceAccount used by both containers (RBAC, Workload Identity).
+# The ServiceAccount used by both containers (RBAC, cloud identity).
 serviceAccount:
   # Must match the federated credential subject created by
   # scripts/setup-workload-identity.sh: system:serviceaccount:k8s-servant:k8s-servant.
   name: k8s-servant
+  # Extra annotations, e.g. for AWS IRSA {eks.amazonaws.com/role-arn: ...} or GCP
+  # Workload Identity {iam.gke.io/gcp-service-account: ...}.
+  annotations: {}
 
-# Azure Workload Identity: the pod gets Entra ID tokens for Foundry and Key Vault
-# without any key. The identity is created by scripts/setup-workload-identity.sh.
+# Extra labels on the pod (not on other objects; see `labels` for those).
+podLabels: {}
+
+# Extra annotations on the pod.
+podAnnotations: {}
+
+# Azure Workload Identity: the pod gets Entra ID tokens for Foundry (and, if you use
+# them, Key Vault and External Secrets) without any key. A convenience for AKS that
+# sets the label and annotations; the identity is created by
+# scripts/setup-workload-identity.sh.
 azureWorkloadIdentity:
-  # Off by default. Turn it on for AKS: Foundry without an API key, and the Teams
-  # webhook from Key Vault (External Secrets) both need it.
+  # Off by default; turn it on for AKS.
   enabled: false
   # Client ID of the managed identity, printed by the script, or:
   # az identity show --name <identity> --resource-group <rg> --query clientId -o tsv
@@ -78,9 +88,10 @@ azureWorkloadIdentity:
   # Entra ID tenant ID.
   tenantId: ""
 
-# API key for the model endpoint, read from an existing Secret. Leave empty to use
-# Entra ID tokens through Workload Identity (recommended on AKS). Needed for other
-# OpenAI-compatible endpoints, or Foundry without Workload Identity.
+# API key for the model endpoint, from a Secret you create (kubectl, External Secrets,
+# Sealed Secrets, ...). Mounted as a file (FOUNDRY_API_KEY_FILE), never an environment
+# variable. Leave empty to use Entra ID tokens through Workload Identity (recommended
+# on AKS). Needed for other OpenAI-compatible endpoints.
 #   kubectl -n k8s-servant create secret generic my-llm-key --from-literal=api-key=...
 llmApiKey:
   # Name of the Secret in the release namespace; empty = no API key.
@@ -92,7 +103,7 @@ llmApiKey:
 # Any setting from README.md#configuration may be added; empty values are left out,
 # so the code's default applies. Not allowed here: in-cluster paths (KNOWLEDGE_DIR,
 # DATA_DIR, HEARTBEAT_FILE, MCP_URL, KUBECTL_PATH are set by the chart) and anything
-# with WEBHOOK_URL (a credential: see teamsWebhook).
+# with WEBHOOK_URL or API_KEY (credentials: see teamsWebhook and llmApiKey).
 appConfig:
   # Cluster name shown in reports and Teams cards; required.
   CLUSTER_NAME: ""
@@ -110,22 +121,20 @@ appConfig:
   MORNING_REPORT_TIME: "08:00"
   # Time zone of the morning report's schedule and title.
   MORNING_REPORT_TIMEZONE: UTC
-  # When to post to Teams: changes, always or off (forced to off when teamsWebhook is off).
+  # When to post to Teams: changes, always or off (forced to off without teamsWebhook).
   TEAMS_POST_MODE: changes
   # Log level: DEBUG, INFO, WARNING or ERROR.
   LOG_LEVEL: INFO
 
-# Posting to MS Teams. The webhook URL is a credential: ESO copies it from Key Vault
-# into the agent's own Secret, which is mounted as a file (never an env var).
+# Posting to MS Teams. The webhook URL is a credential, read from a Secret you create
+# (kubectl, External Secrets, Sealed Secrets, ...) and mounted as a file, never an
+# environment variable. examples/values-azure.yaml syncs it from Key Vault with ESO.
+#   kubectl -n k8s-servant create secret generic my-teams-hook --from-literal=webhook-url=...
 teamsWebhook:
-  # Create the SecretStore and ExternalSecret and mount the Secret.
-  enabled: false
-  # Key Vault URL, e.g. https://my-keyvault.vault.azure.net; required when enabled.
-  keyVaultUrl: ""
-  # Name of the Key Vault secret that holds the Workflows webhook URL.
-  keyVaultSecretName: alertmanager-teams-webhook-url
-  # How often ESO re-reads the Key Vault secret.
-  refreshInterval: 1h
+  # Name of the Secret in the release namespace; empty = no posting to Teams.
+  existingSecret: ""
+  # Key inside the Secret that holds the webhook URL.
+  secretKey: webhook-url
 
 # What the agent knows beyond the cluster API (see docs/knowledge-and-skills.md).
 # Built-in skills come from the chart's knowledge/skills folder.
@@ -164,3 +173,25 @@ tolerations: []
 
 # Affinity rules; empty = none.
 affinity: {}
+
+# --- Extension points ----------------------------------------------------------------
+# For what the chart does not model itself: proxies, CA bundles, CSI secret volumes,
+# your own ExternalSecret, ... They apply to the agent container only.
+
+# Extra environment variables (name + value or valueFrom). Chart-set names cannot be
+# overridden, and credentials (names with API_KEY, WEBHOOK_URL, TOKEN, PASSWORD or
+# SECRET) are only accepted through valueFrom, never as a plain value.
+extraEnv: []
+
+# Extra envFrom sources, e.g. [{configMapRef: {name: site-settings}}].
+extraEnvFrom: []
+
+# Extra pod volumes, e.g. a ConfigMap with a CA bundle or a CSI secrets volume.
+extraVolumes: []
+
+# Where to mount extraVolumes in the agent container.
+extraVolumeMounts: []
+
+# Extra manifests installed with the release, as objects or template strings
+# ({{ .Release.Namespace }} works), e.g. an ExternalSecret (see examples/values-azure.yaml).
+extraObjects: []

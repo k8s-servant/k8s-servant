@@ -38,20 +38,34 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end }}
 
 {{/*
-The agent's environment variables, rendered as ConfigMap data. In-cluster paths are
-fixed by the chart and cannot be overridden from appConfig; the Teams webhook URL may
-never be a plain setting (it is a credential, see teamsWebhook).
+Names the chart sets itself: in-cluster paths, and the files that hold credentials.
+Neither appConfig nor extraEnv may override them.
 */}}
-{{- define "k8s-servant.appConfig" -}}
+{{- define "k8s-servant.fixedEnv" -}}
 {{- $fixed := dict
   "KNOWLEDGE_DIR" "/knowledge"
   "DATA_DIR" "/data"
   "HEARTBEAT_FILE" "/tmp/heartbeat"
   "MCP_URL" "http://127.0.0.1:8080/mcp"
-  "KUBECTL_PATH" "/usr/local/bin/kubectl" -}}
-{{- if .Values.teamsWebhook.enabled }}
+  "KUBECTL_PATH" "/usr/local/bin/kubectl"
+  "FOUNDRY_API_KEY_FILE" ""
+  "TEAMS_WEBHOOK_URL_FILE" "" -}}
+{{- if .Values.llmApiKey.existingSecret }}
+{{- $_ := set $fixed "FOUNDRY_API_KEY_FILE" "/var/run/secrets/llm/api-key" }}
+{{- end }}
+{{- if .Values.teamsWebhook.existingSecret }}
 {{- $_ := set $fixed "TEAMS_WEBHOOK_URL_FILE" "/var/run/secrets/teams/webhook-url" }}
 {{- end }}
+{{- toYaml $fixed }}
+{{- end }}
+
+{{/*
+The agent's environment variables, rendered as ConfigMap data. Chart-set names cannot
+be overridden, and credentials may never be plain settings: the API key and the Teams
+webhook URL come only from Secrets mounted as files.
+*/}}
+{{- define "k8s-servant.appConfig" -}}
+{{- $fixed := include "k8s-servant.fixedEnv" . | fromYaml }}
 {{- $required := list "CLUSTER_NAME" "FOUNDRY_ENDPOINT" "FOUNDRY_DEPLOYMENT" }}
 {{- range $required }}
 {{- if not (toString (index $.Values.appConfig .) ) }}
@@ -67,14 +81,36 @@ never be a plain setting (it is a credential, see teamsWebhook).
 {{- fail "appConfig.FOUNDRY_API_KEY is not allowed: the API key is a credential and comes only from a Secret (llmApiKey.existingSecret)" }}
 {{- end }}
 {{- if contains "WEBHOOK_URL" $key }}
-{{- fail (printf "appConfig.%s is not allowed: the Teams webhook URL is a credential and comes only from the Secret (teamsWebhook)" $key) }}
+{{- fail (printf "appConfig.%s is not allowed: the Teams webhook URL is a credential and comes only from a Secret (teamsWebhook.existingSecret)" $key) }}
 {{- end }}
 {{- if ne (toString $value) "" }}
 {{- $_ := set $config $key (toString $value) }}
 {{- end }}
 {{- end }}
-{{- if not .Values.teamsWebhook.enabled }}
+{{- if not .Values.teamsWebhook.existingSecret }}
 {{- $_ := set $config "TEAMS_POST_MODE" "off" }}
 {{- end }}
-{{- toYaml (merge $config $fixed) }}
+{{- range $key, $value := $fixed }}
+{{- if $value }}
+{{- $_ := set $config $key $value }}
+{{- end }}
+{{- end }}
+{{- toYaml $config }}
+{{- end }}
+
+{{/*
+extraEnv, checked: no chart-set name, and no credential as a plain value (valueFrom,
+e.g. a secretKeyRef, is fine).
+*/}}
+{{- define "k8s-servant.extraEnv" -}}
+{{- $fixed := include "k8s-servant.fixedEnv" . | fromYaml }}
+{{- range .Values.extraEnv }}
+{{- if hasKey $fixed .name }}
+{{- fail (printf "extraEnv %s is set by the chart and cannot be overridden" .name) }}
+{{- end }}
+{{- if and (hasKey . "value") (regexMatch "API_KEY|WEBHOOK_URL|TOKEN|PASSWORD|SECRET" .name) }}
+{{- fail (printf "extraEnv %s looks like a credential: use valueFrom (e.g. secretKeyRef), not a plain value" .name) }}
+{{- end }}
+{{- end }}
+{{- toYaml .Values.extraEnv }}
 {{- end }}

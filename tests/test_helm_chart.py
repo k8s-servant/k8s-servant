@@ -77,6 +77,11 @@ def containers(docs: list[dict]) -> dict[str, dict]:
     return {c["name"]: c for c in spec["containers"]}
 
 
+def volumes(docs: list[dict]) -> dict[str, dict]:
+    """The pod's volumes by name."""
+    return {v["name"]: v for v in find(docs, "Deployment")["spec"]["template"]["spec"]["volumes"]}
+
+
 def app_config(docs: list[dict]) -> dict[str, str]:
     """The env vars the agent gets from its ConfigMap."""
     return find(docs, "ConfigMap", "k8s-servant-config")["data"]
@@ -219,22 +224,32 @@ def test_api_key_can_never_be_a_plain_setting():
 
 
 def test_no_api_key_by_default():
-    agent = containers(render())["agent"]
-    assert "FOUNDRY_API_KEY" not in {e["name"] for e in agent.get("env", [])}
+    docs = render()
+    assert "FOUNDRY_API_KEY_FILE" not in app_config(docs)
+    assert "/var/run/secrets/llm" not in {m["mountPath"] for m in containers(docs)["agent"]["volumeMounts"]}
 
 
-def test_api_key_comes_from_an_existing_secret():
-    agent = containers(render("--set-string", "llmApiKey.existingSecret=my-llm-key"))["agent"]
-    env = {e["name"]: e for e in agent["env"]}
-    assert env["FOUNDRY_API_KEY"]["valueFrom"] == {"secretKeyRef": {"name": "my-llm-key", "key": "api-key"}}
+def test_api_key_is_a_file_from_an_existing_secret():
+    # A credential: mounted as a file (FOUNDRY_API_KEY_FILE), never an environment variable.
+    docs = render("--set-string", "llmApiKey.existingSecret=my-llm-key")
+    agent = containers(docs)["agent"]
+    assert not any("API_KEY" in e["name"] for e in agent.get("env", []))
+    assert app_config(docs)["FOUNDRY_API_KEY_FILE"] == "/var/run/secrets/llm/api-key"
+    mounts = {m["mountPath"]: m for m in agent["volumeMounts"]}
+    assert mounts["/var/run/secrets/llm"]["readOnly"] is True
+    volume = volumes(docs)[mounts["/var/run/secrets/llm"]["name"]]["secret"]
+    assert volume["secretName"] == "my-llm-key"
+    assert volume["items"] == [{"key": "api-key", "path": "api-key"}]
+    assert volume["defaultMode"] & 0o040 and not volume["defaultMode"] & 0o007
 
 
-def test_api_key_works_without_workload_identity():
-    app_config = [a for k, v in REQUIRED.items() if k.startswith("appConfig") for a in ("--set-string", f"{k}={v}")]
-    args = ["--set", "azureWorkloadIdentity.enabled=false", "--set-string", "llmApiKey.existingSecret=k", *app_config]
-    docs = render(*args, required=False)
-    pod = next(d for d in docs if d["kind"] == "Deployment")["spec"]["template"]
-    assert pod["metadata"]["labels"].get("azure.workload.identity/use") != "true"
+def test_api_key_secret_key_is_a_value():
+    docs = render("--set-string", "llmApiKey.existingSecret=k", "--set-string", "llmApiKey.secretKey=token")
+    assert volumes(docs)["llm-api-key"]["secret"]["items"] == [{"key": "token", "path": "api-key"}]
+
+
+def test_api_key_file_is_set_by_the_chart():
+    assert "FOUNDRY_API_KEY_FILE" in render_error("--set-string", "appConfig.FOUNDRY_API_KEY_FILE=/x")
 
 
 @pytest.mark.parametrize("key", ["appConfig.CLUSTER_NAME", "appConfig.FOUNDRY_ENDPOINT"])
@@ -447,40 +462,7 @@ def test_extra_rules_that_could_write_or_read_secrets_fail_the_render(tmp_path, 
 
 # --- Teams webhook via External Secrets ---------------------------------------------
 
-TEAMS_ON = (
-    *AZURE,
-    "--set",
-    "teamsWebhook.enabled=true",
-    "--set-string",
-    "teamsWebhook.keyVaultUrl=https://my-keyvault.vault.azure.net",
-)
-
-
-def test_secret_store_reads_key_vault_with_the_agents_workload_identity():
-    store = find(render(*TEAMS_ON), "SecretStore")
-    assert store["apiVersion"] == "external-secrets.io/v1"
-    provider = store["spec"]["provider"]["azurekv"]
-    assert provider["authType"] == "WorkloadIdentity"
-    assert provider["vaultUrl"] == "https://my-keyvault.vault.azure.net"
-    assert provider["serviceAccountRef"] == {"name": "k8s-servant"}
-
-
-def test_external_secret_creates_the_agents_own_secret_from_the_key_vault_secret():
-    docs = render(*TEAMS_ON)
-    external = find(docs, "ExternalSecret")
-    assert external["spec"]["secretStoreRef"] == {
-        "kind": "SecretStore",
-        "name": find(docs, "SecretStore")["metadata"]["name"],
-    }
-    assert external["spec"]["target"] == {"name": "k8s-servant-teams-webhook", "creationPolicy": "Owner"}
-    assert external["spec"]["data"] == [
-        {"secretKey": "webhook-url", "remoteRef": {"key": "alertmanager-teams-webhook-url"}}
-    ]
-
-
-def test_key_vault_secret_name_is_a_value():
-    docs = render(*TEAMS_ON, "--set-string", "teamsWebhook.keyVaultSecretName=other-hook")
-    assert find(docs, "ExternalSecret")["spec"]["data"][0]["remoteRef"]["key"] == "other-hook"
+TEAMS_ON = ("--set-string", "teamsWebhook.existingSecret=my-teams-hook")
 
 
 def test_agent_reads_the_webhook_url_from_a_mounted_file():
@@ -488,8 +470,9 @@ def test_agent_reads_the_webhook_url_from_a_mounted_file():
     agent = containers(docs)["agent"]
     mounts = {m["mountPath"]: m for m in agent["volumeMounts"]}
     assert mounts["/var/run/secrets/teams"]["readOnly"] is True
-    volumes = {v["name"]: v for v in find(docs, "Deployment")["spec"]["template"]["spec"]["volumes"]}
-    assert volumes[mounts["/var/run/secrets/teams"]["name"]]["secret"]["secretName"] == "k8s-servant-teams-webhook"
+    volume = volumes(docs)[mounts["/var/run/secrets/teams"]["name"]]["secret"]
+    assert volume["secretName"] == "my-teams-hook"
+    assert volume["items"] == [{"key": "webhook-url", "path": "webhook-url"}]
     config = app_config(docs)
     assert config["TEAMS_WEBHOOK_URL_FILE"] == "/var/run/secrets/teams/webhook-url"
     assert config["TEAMS_POST_MODE"] == "changes"
@@ -497,9 +480,13 @@ def test_agent_reads_the_webhook_url_from_a_mounted_file():
     assert not any("env" in c and any("WEBHOOK" in e["name"] for e in c["env"]) for c in containers(docs).values())
 
 
-def test_teams_off_means_no_eso_objects_no_mount_and_no_posting():
+def test_teams_secret_key_is_a_value():
+    docs = render(*TEAMS_ON, "--set-string", "teamsWebhook.secretKey=url")
+    assert volumes(docs)["teams-webhook"]["secret"]["items"] == [{"key": "url", "path": "webhook-url"}]
+
+
+def test_teams_off_means_no_mount_and_no_posting():
     docs = render()
-    assert not [d for d in docs if d["kind"] in ("SecretStore", "ExternalSecret")]
     mounts = {m["mountPath"] for m in containers(docs)["agent"]["volumeMounts"]}
     assert "/var/run/secrets/teams" not in mounts
     config = app_config(docs)
@@ -507,20 +494,110 @@ def test_teams_off_means_no_eso_objects_no_mount_and_no_posting():
     assert "TEAMS_WEBHOOK_URL_FILE" not in config
 
 
-def test_teams_on_requires_the_key_vault_url():
-    assert "keyVaultUrl" in render_error(*AZURE, "--set", "teamsWebhook.enabled=true")
-
-
-def test_teams_on_requires_workload_identity():
-    # External Secrets reads Key Vault as the agent's Workload Identity; without it the
-    # SecretStore could never authenticate, so the render fails instead.
-    error = render_error(*TEAMS_ON, "--set", "azureWorkloadIdentity.enabled=false")
-    assert "azureWorkloadIdentity.enabled" in error
+def test_chart_never_creates_secrets_or_secret_sync_objects():
+    # How Secrets reach the cluster (kubectl, ESO, Sealed Secrets, CSI, ...) is the
+    # user's choice; the chart only references them by name.
+    docs = render(*TEAMS_ON, "--set-string", "llmApiKey.existingSecret=k")
+    assert not [d for d in docs if d["kind"] in ("Secret", "SecretStore", "ExternalSecret")]
 
 
 def test_webhook_file_is_readable_by_the_agents_group_only():
     # Secret files belong to root with the pod's fsGroup (1000); the agent (UID 1000)
     # reads them through the group, and nobody else may.
-    volumes = {v["name"]: v for v in find(render(*TEAMS_ON), "Deployment")["spec"]["template"]["spec"]["volumes"]}
-    mode = volumes["teams-webhook"]["secret"]["defaultMode"]
+    mode = volumes(render(*TEAMS_ON))["teams-webhook"]["secret"]["defaultMode"]
     assert mode & 0o040 and not mode & 0o007
+
+
+# --- Identity and extension points ----------------------------------------------------
+
+
+def values_file(tmp_path: Path, data: dict) -> tuple[str, str]:
+    """Write `data` as a values file and return the `-f` arguments for it."""
+    path = tmp_path / "values.yaml"
+    path.write_text(yaml.safe_dump(data))
+    return "-f", str(path)
+
+
+def test_service_account_and_pod_take_generic_annotations_and_labels(tmp_path):
+    # The same fields serve AWS IRSA, GCP Workload Identity and anything else.
+    docs = render(
+        *values_file(
+            tmp_path,
+            {
+                "serviceAccount": {"annotations": {"eks.amazonaws.com/role-arn": "arn:aws:iam::123:role/x"}},
+                "podLabels": {"team": "platform"},
+                "podAnnotations": {"example.com/note": "hi"},
+            },
+        )
+    )
+    account = find(docs, "ServiceAccount", "k8s-servant")["metadata"]
+    assert account["annotations"]["eks.amazonaws.com/role-arn"] == "arn:aws:iam::123:role/x"
+    pod = find(docs, "Deployment")["spec"]["template"]["metadata"]
+    assert pod["labels"]["team"] == "platform"
+    assert pod["annotations"]["example.com/note"] == "hi"
+    assert "checksum/config" in pod["annotations"]
+
+
+def test_workload_identity_keeps_generic_service_account_annotations(tmp_path):
+    extra = values_file(tmp_path, {"serviceAccount": {"annotations": {"example.com/a": "b"}}})
+    annotations = find(render(*AZURE, *extra), "ServiceAccount", "k8s-servant")["metadata"]["annotations"]
+    assert annotations["example.com/a"] == "b"
+    assert annotations["azure.workload.identity/client-id"] == CLIENT_ID
+
+
+def test_extra_env_volumes_and_mounts_reach_the_agent(tmp_path):
+    docs = render(
+        *values_file(
+            tmp_path,
+            {
+                "extraEnv": [
+                    {"name": "HTTPS_PROXY", "value": "http://proxy.example.com:3128"},
+                    {"name": "SOME_TOKEN", "valueFrom": {"secretKeyRef": {"name": "s", "key": "k"}}},
+                ],
+                "extraEnvFrom": [{"configMapRef": {"name": "site-settings"}}],
+                "extraVolumes": [{"name": "ca", "configMap": {"name": "corporate-ca"}}],
+                "extraVolumeMounts": [{"name": "ca", "mountPath": "/etc/ssl/custom", "readOnly": True}],
+            },
+        )
+    )
+    agent = containers(docs)["agent"]
+    env = {e["name"]: e for e in agent["env"]}
+    assert env["HTTPS_PROXY"]["value"] == "http://proxy.example.com:3128"
+    assert env["SOME_TOKEN"]["valueFrom"]["secretKeyRef"] == {"name": "s", "key": "k"}
+    assert {"configMapRef": {"name": "site-settings"}} in agent["envFrom"]
+    assert {"name": "ca", "mountPath": "/etc/ssl/custom", "readOnly": True} in agent["volumeMounts"]
+    assert volumes(docs)["ca"] == {"name": "ca", "configMap": {"name": "corporate-ca"}}
+    # The MCP sidecar gets none of it.
+    assert "env" not in containers(docs)["mcp"]
+
+
+def test_extra_objects_are_rendered_with_templates(tmp_path):
+    docs = render(
+        *values_file(
+            tmp_path,
+            {
+                "extraObjects": [
+                    {"apiVersion": "v1", "kind": "ConfigMap", "metadata": {"name": "a"}},
+                    "apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: b\n  namespace: {{ .Release.Namespace }}\n",
+                ]
+            },
+        )
+    )
+    assert find(docs, "ConfigMap", "a")
+    assert find(docs, "ConfigMap", "b")["metadata"]["namespace"] == "k8s-servant"
+
+
+@pytest.mark.parametrize(
+    "name", ["FOUNDRY_API_KEY", "TEAMS_WEBHOOK_URL", "SLACK_WEBHOOK_URL", "GITHUB_TOKEN", "DB_PASSWORD", "MY_SECRET"]
+)
+def test_extra_env_cannot_carry_a_credential_as_plain_text(tmp_path, name):
+    error = render_error(*values_file(tmp_path, {"extraEnv": [{"name": name, "value": "x"}]}))
+    assert name in error
+
+
+@pytest.mark.parametrize(
+    "name", ["KNOWLEDGE_DIR", "DATA_DIR", "MCP_URL", "FOUNDRY_API_KEY_FILE", "TEAMS_WEBHOOK_URL_FILE"]
+)
+def test_extra_env_cannot_override_what_the_chart_sets(tmp_path, name):
+    error = render_error(*values_file(tmp_path, {"extraEnv": [{"name": name, "value": "/x"}]}))
+    assert name in error

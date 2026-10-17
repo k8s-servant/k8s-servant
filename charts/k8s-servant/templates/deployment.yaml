@@ -26,12 +26,18 @@ spec:
         {{- if .Values.azureWorkloadIdentity.enabled }}
         azure.workload.identity/use: "true"
         {{- end }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
       annotations:
         # Restart the pod when settings, knowledge or the MCP config change: the agent
         # and the MCP server read them only at start-up.
         checksum/config: {{ include (print $.Template.BasePath "/configmap-app.yaml") . | sha256sum }}
         checksum/knowledge: {{ include (print $.Template.BasePath "/configmap-knowledge.yaml") . | sha256sum }}
         checksum/mcp: {{ include (print $.Template.BasePath "/configmap-mcp.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
     spec:
       serviceAccountName: {{ include "k8s-servant.serviceAccountName" . }}
       # Both containers need the token: the agent for kubectl, the sidecar for MCP.
@@ -52,14 +58,12 @@ spec:
           envFrom:
             - configMapRef:
                 name: {{ include "k8s-servant.name" . }}-config
-          {{- with .Values.llmApiKey.existingSecret }}
-          # The model endpoint's API key, a credential: only from a Secret.
+            {{- with .Values.extraEnvFrom }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- with .Values.extraEnv }}
           env:
-            - name: FOUNDRY_API_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: {{ . }}
-                  key: {{ $.Values.llmApiKey.secretKey }}
+            {{- include "k8s-servant.extraEnv" $ | nindent 12 }}
           {{- end }}
           securityContext:
             runAsNonRoot: true
@@ -93,11 +97,20 @@ spec:
             - name: knowledge
               mountPath: /knowledge
               readOnly: true
-            {{- if .Values.teamsWebhook.enabled }}
+            {{- if .Values.llmApiKey.existingSecret }}
+            # The model endpoint's API key, a credential: a file, never an env var.
+            - name: llm-api-key
+              mountPath: /var/run/secrets/llm
+              readOnly: true
+            {{- end }}
+            {{- if .Values.teamsWebhook.existingSecret }}
             # The Teams webhook URL, a credential: a file, never an env var.
             - name: teams-webhook
               mountPath: /var/run/secrets/teams
               readOnly: true
+            {{- end }}
+            {{- with .Values.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
             {{- end }}
         - name: mcp
           image: "{{ .Values.mcp.image.repository }}:{{ .Values.mcp.image.tag }}"
@@ -153,9 +166,24 @@ spec:
         - name: mcp-config
           configMap:
             name: {{ include "k8s-servant.name" . }}-mcp
-        {{- if .Values.teamsWebhook.enabled }}
+        {{- with .Values.llmApiKey.existingSecret }}
+        - name: llm-api-key
+          secret:
+            secretName: {{ . }}
+            items:
+              - key: {{ $.Values.llmApiKey.secretKey }}
+                path: api-key
+            defaultMode: 0440
+        {{- end }}
+        {{- with .Values.teamsWebhook.existingSecret }}
         - name: teams-webhook
           secret:
-            secretName: {{ include "k8s-servant.name" . }}-teams-webhook
+            secretName: {{ . }}
+            items:
+              - key: {{ $.Values.teamsWebhook.secretKey }}
+                path: webhook-url
             defaultMode: 0440
+        {{- end }}
+        {{- with .Values.extraVolumes }}
+        {{- toYaml . | nindent 8 }}
         {{- end }}

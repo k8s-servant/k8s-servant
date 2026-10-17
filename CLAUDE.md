@@ -62,6 +62,11 @@ docker build -t k8s-servant:dev .                               # image
 - **Chart rules:** a new per-cluster setting goes into `appConfig`; RBAC stays
   get/list/watch, never `secrets`, `*` or `nodes/proxy`. Versions are managed by
   release-please; do not bump them by hand.
+- **Chart credentials:** the chart never creates Secrets and never depends on a secret
+  tool (ESO, Sealed Secrets, ...). A credential is an `existingSecret` value, mounted as
+  a file and read through a `*_FILE` setting, never an environment variable. Anything
+  site-specific goes through the extension points (`extraEnv`, `extraEnvFrom`,
+  `extraVolumes`, `extraVolumeMounts`, `extraObjects`), not new tool-specific values.
 - **Public repository.** Never add real cluster names, registries, tenant or
   subscription IDs, hostnames, company names or personal data to code, tests, docs or
   examples. Use placeholders (`example.com`, `00000000-0000-0000-0000-000000000000`,

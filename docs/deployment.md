@@ -31,13 +31,13 @@ namespace k8s-servant
 │   │                                   `k8s-servant serve`: hourly checks, morning report
 │   └── container mcp                   image ghcr.io/containers/kubernetes-mcp-server:<pinned tag>
 │                                       read-only, Secrets denied, listens on 127.0.0.1:8080
-├── ServiceAccount k8s-servant       optionally federated with a managed identity (Workload Identity)
+├── ServiceAccount k8s-servant       optional cloud identity via annotations (Azure Workload Identity, IRSA, ...)
 ├── ConfigMap k8s-servant-config     settings (envFrom), from appConfig
 ├── ConfigMap k8s-servant-knowledge  environment.md, cluster.md, skill__*.md → /knowledge
 ├── ConfigMap k8s-servant-mcp        the MCP server's config.toml
 ├── PersistentVolumeClaim k8s-servant-data   1 Gi, /data: memory.db + notes.md (kept on uninstall)
-├── SecretStore k8s-servant-keyvault          (optional) External Secrets → Key Vault, with the agent's identity
-├── ExternalSecret k8s-servant-teams-webhook  (optional) → Secret k8s-servant-teams-webhook (file /var/run/secrets/teams/webhook-url)
+├── (your Secrets)                   API key and Teams webhook, created by you; mounted as files
+├── (extraObjects)                  anything else you install with the release, e.g. an ExternalSecret
 cluster-wide
 ├── ClusterRoleBinding k8s-servant-view            → built-in "view" (namespaced, no Secrets)
 └── ClusterRoleBinding k8s-servant-cluster-reader  → ClusterRole k8s-servant-cluster-reader
@@ -78,15 +78,16 @@ If your cluster only admits images from your own registry, mirror both images an
 |---|---|
 | A chat model with tool calling | Azure AI Foundry: `scripts/setup-foundry.sh` ([foundry-setup.md](foundry-setup.md)) |
 | (AKS) OIDC issuer and Workload Identity on the cluster | `az aks show -g my-cluster-rg -n my-cluster --query "[oidcIssuerProfile.enabled, securityProfile.workloadIdentity.enabled]"` → `[true, true]` |
-| (Optional) External Secrets Operator, for the Teams webhook | `kubectl get crd externalsecrets.external-secrets.io secretstores.external-secrets.io` |
-| (Optional) The secret with the Teams webhook URL | e.g. `teams-webhook-url` in `my-keyvault` ([MS Teams setup](../README.md#ms-teams-setup)) |
+| (Optional) The Teams webhook URL, as a Kubernetes Secret or in your secret store | [MS Teams setup](../README.md#ms-teams-setup); see [Credentials](#credentials-bring-your-own-secrets) |
+| (Optional, Azure example) External Secrets Operator, to sync it from Key Vault | `kubectl get crd externalsecrets.external-secrets.io secretstores.external-secrets.io` |
 | Approval to send this cluster's data to the model | your organisation's data-processing rules ([data-processing.md](data-processing.md)) |
 | (AKS) Rights | Contributor on the identity's resource group; Owner or User Access Administrator on the Key Vault and the Foundry resource |
 
 ## 1. Workload Identity (AKS)
 
-A user-assigned managed identity, used for two things: External Secrets reads the
-webhook URL from Key Vault with it, and the agent calls the model with it. Several
+A user-assigned managed identity, used for two things: the agent calls the model with
+it, and (in `examples/values-azure.yaml`) External Secrets reads the webhook URL from
+Key Vault with it. Several
 clusters (for example `dev` and `staging`) can share one identity, with one federated
 credential per cluster. Keep the identity in a resource group that outlives the
 clusters.
@@ -124,22 +125,10 @@ credential.
 Role assignments can take a few minutes to take effect.
 
 **Without AKS or Workload Identity** (the chart default, `azureWorkloadIdentity.enabled:
-false`), give the agent an API key from a Kubernetes Secret:
-
-```bash
-kubectl -n k8s-servant create secret generic my-llm-key --from-literal=api-key=<key>
-```
-
-```yaml
-llmApiKey:
-  existingSecret: my-llm-key   # mounted as FOUNDRY_API_KEY; never put the key in appConfig
-```
-
-Teams posting from the chart currently reads the webhook URL from Key Vault through
-Workload Identity, so `teamsWebhook.enabled: true` requires
-`azureWorkloadIdentity.enabled: true` (the chart refuses to render otherwise). A
-webhook from a plain Kubernetes Secret is tracked in
-[#3](https://github.com/k8s-servant/k8s-servant/issues/3).
+false`), give the agent an API key from a Secret (`llmApiKey.existingSecret`, see
+[Credentials](#credentials-bring-your-own-secrets)). On EKS or GKE, the cloud identity
+annotations go into `serviceAccount.annotations` (for example
+`eks.amazonaws.com/role-arn`).
 
 ## 2. Network
 
@@ -160,33 +149,46 @@ Start from the examples in this repository:
 |---|---|
 | `charts/k8s-servant/values.yaml` | chart defaults, every key commented |
 | `examples/knowledge-values.yaml` | an example platform description and cluster notes: copy and describe *your* platform |
-| `examples/values-azure.yaml` | AKS + Azure AI Foundry + Workload Identity + Key Vault through External Secrets |
+| `examples/values-azure.yaml` | **The complete Azure setup:** Azure AI Foundry with Workload Identity, and the Teams webhook synced from Key Vault by External Secrets (its objects installed through `extraObjects`) |
+| `examples/values-minimal.yaml` | Any cluster: an API key and the Teams webhook from Secrets created with kubectl, nothing cloud-specific |
 
-The minimum for the Azure path is the cluster name, the model endpoint and deployment,
-and the client ID the script printed:
+The chart requires only `appConfig.CLUSTER_NAME` and `appConfig.FOUNDRY_ENDPOINT`.
+Workload Identity is off in the chart defaults, so the Azure example turns it on
+explicitly; with it enabled, the chart refuses to render with an empty client ID.
 
-```yaml
-azureWorkloadIdentity:
-  enabled: true
-  clientId: "<client id>"
-  tenantId: "00000000-0000-0000-0000-000000000000"
+### Credentials: bring your own Secrets
 
-appConfig:
-  CLUSTER_NAME: my-cluster
-  FOUNDRY_ENDPOINT: https://my-foundry.openai.azure.com/
-  FOUNDRY_DEPLOYMENT: k8s-servant
-  PROMETHEUS_URL: http://prometheus-operated.monitoring:9090
-  ALERTMANAGER_URL: http://alertmanager-operated.monitoring:9093
-  MORNING_REPORT_TIMEZONE: UTC
+The chart never creates Secrets and does not depend on any secret tool. It mounts
+Secrets **you** create, by name, as files (never as environment variables):
 
-teamsWebhook:
-  enabled: true
-  keyVaultUrl: https://my-keyvault.vault.azure.net/
-  keyVaultSecretName: teams-webhook-url
-```
+| Credential | Value | Read by the agent from |
+|---|---|---|
+| Model API key (not needed with Workload Identity) | `llmApiKey.existingSecret` (key `llmApiKey.secretKey`, default `api-key`) | `FOUNDRY_API_KEY_FILE` |
+| Teams webhook URL | `teamsWebhook.existingSecret` (key `teamsWebhook.secretKey`, default `webhook-url`) | `TEAMS_WEBHOOK_URL_FILE` |
 
-Workload Identity is off in the chart defaults, so the Azure path turns it on explicitly.
-With it enabled, the chart refuses to render with an empty client ID.
+How the Secret gets there is your choice:
+
+- **kubectl:** put the value in a file named after the key, then
+  `kubectl -n k8s-servant create secret generic teams-webhook --from-file=./webhook-url`
+  (see `examples/values-minimal.yaml`).
+- **External Secrets Operator:** put a `SecretStore` and an `ExternalSecret` that
+  creates the Secret into `extraObjects`, so they are installed with the release.
+  `examples/values-azure.yaml` does this for Azure Key Vault with Workload Identity.
+- **Sealed Secrets, SOPS, Vault Agent, ...:** create the Secret as you usually do, and
+  set its name.
+- **Secrets Store CSI driver:** mount the volume with `extraVolumes` and
+  `extraVolumeMounts`, and use its synced Secret's name.
+
+### Extension points
+
+For anything the chart does not model, the agent container takes `extraEnv`,
+`extraEnvFrom`, `extraVolumes` and `extraVolumeMounts`, and `extraObjects` installs
+extra manifests with the release. Typical uses: an HTTPS proxy, a corporate CA bundle,
+site-wide settings from a ConfigMap. Two rules keep the safety promises: `extraEnv`
+cannot override what the chart sets (in-cluster paths, the credential files), and a
+name that looks like a credential (`API_KEY`, `WEBHOOK_URL`, `TOKEN`, `PASSWORD`,
+`SECRET`) is accepted only through `valueFrom`, never as a plain value. None of this
+changes RBAC: the agent stays read-only whatever you add.
 
 Values files are applied in order (later wins). A common layout is one shared file for
 the platform description and one file per cluster. The CLI reads the same files
@@ -271,7 +273,8 @@ clusters.
 | **Change a setting** | `appConfig` in your values; the pod restarts by itself (ConfigMap checksum) |
 | **Change what the agent knows** | `knowledge` in the values files ([knowledge-and-skills.md](knowledge-and-skills.md)); the pod restarts by itself |
 | **Change the kubernetes-mcp-server version** | `mcp.image.tag` in the values. The chart's default is the tested version |
-| **Stop posting to Teams** | `teamsWebhook.enabled: false` (no ESO objects, `TEAMS_POST_MODE=off`), or `appConfig.TEAMS_POST_MODE: off` |
+| **Stop posting to Teams** | Empty `teamsWebhook.existingSecret` (no mount, `TEAMS_POST_MODE=off`), or `appConfig.TEAMS_POST_MODE: off` |
+| **Rotate a credential** | Update the Secret (or let your secret tool do it). The Teams URL is read on every post, so the new one is used once the kubelet refreshes the mounted file (about a minute). The API key is read at start-up: `kubectl -n k8s-servant rollout restart deploy/k8s-servant` |
 | **Read or edit learned notes** | `kubectl -n k8s-servant exec deploy/k8s-servant -c agent -- k8s-servant notes`; editing: [memory.md](memory.md#learned-notes) |
 | **Copy the memory out** | `kubectl -n k8s-servant cp -c agent <pod>:/data ./agent-data` |
 | **Uninstall** | `helm uninstall k8s-servant -n k8s-servant` (or remove the HelmRelease). Everything is deleted **except** the PersistentVolumeClaim (`helm.sh/resource-policy: keep`). Delete it by hand to forget all findings: `kubectl -n k8s-servant delete pvc k8s-servant-data` |

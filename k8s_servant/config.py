@@ -109,6 +109,22 @@ def _timezone(env: Mapping[str, str], name: str, default: str) -> str:
     return raw
 
 
+def _secret(env: Mapping[str, str], name: str) -> str:
+    """Read a credential from the file named by NAME_FILE (a mounted Secret), else NAME.
+
+    The file wins, so in the cluster the value never has to sit in the environment.
+    An unreadable file is an error rather than a silent fallback; the message names
+    the setting only, never the value.
+    """
+    path = env.get(f"{name}_FILE", "").strip()
+    if path:
+        try:
+            return Path(path).read_text(encoding="utf-8").strip()
+        except OSError as exc:
+            raise ValueError(f"Environment variable {name}_FILE points to an unreadable file: {exc.strerror}") from None
+    return env.get(name, "").strip()
+
+
 def configure_app(env: Mapping[str, str] | None = None) -> dict:
     """Build the application settings dict from environment variables.
 
@@ -133,9 +149,10 @@ def configure_app(env: Mapping[str, str] | None = None) -> dict:
         "foundry_endpoint": env.get("FOUNDRY_ENDPOINT", "").strip(),
         # Name of the model *deployment* in Foundry (not the model name).
         "foundry_deployment": env.get("FOUNDRY_DEPLOYMENT", "").strip(),
-        # API key, for local experiments only. Empty = Entra ID token (az login
-        # locally, Workload Identity in the cluster), which is the recommended way.
-        "foundry_api_key": env.get("FOUNDRY_API_KEY", "").strip(),
+        # API key, from the file in FOUNDRY_API_KEY_FILE (a mounted Secret, which wins)
+        # or FOUNDRY_API_KEY. Empty = Entra ID token (az login locally, Workload
+        # Identity in the cluster), the recommended way for Azure AI Foundry.
+        "foundry_api_key": _secret(env, "FOUNDRY_API_KEY"),
         # OAuth scope requested for the Entra ID token.
         "foundry_token_scope": env.get("FOUNDRY_TOKEN_SCOPE", "https://ai.azure.com/.default").strip(),
         # Per-request timeout; reasoning models can take a while on large contexts.

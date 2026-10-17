@@ -1,0 +1,31 @@
+# Example values for any Kubernetes cluster, without cloud-specific features.
+# Credentials come from ordinary Kubernetes Secrets that you create first, here with
+# kubectl (External Secrets, Sealed Secrets, SOPS, ... work just as well: the chart
+# only needs the Secret's name). All names below are placeholders.
+#
+# Put each value in a file named after its key (keeps it out of your shell history):
+#   kubectl create namespace k8s-servant
+#   kubectl -n k8s-servant create secret generic llm-api-key --from-file=./api-key
+#   kubectl -n k8s-servant create secret generic teams-webhook --from-file=./webhook-url
+#   rm ./api-key ./webhook-url
+#   helm install k8s-servant oci://ghcr.io/k8s-servant/charts/k8s-servant \
+#     -n k8s-servant -f examples/values-minimal.yaml
+
+# Agent settings for this cluster.
+appConfig:
+  # Shown in reports and Teams cards.
+  CLUSTER_NAME: my-cluster
+  # Any OpenAI-compatible endpoint: the full base URL, including its path.
+  FOUNDRY_ENDPOINT: https://api.example.com/v1
+  # The model name at that endpoint.
+  FOUNDRY_DEPLOYMENT: my-model
+
+# The endpoint's API key, mounted as a file.
+llmApiKey:
+  # Secret created above.
+  existingSecret: llm-api-key
+
+# Teams posting; remove this block to keep reports in logs and history only.
+teamsWebhook:
+  # Secret created above.
+  existingSecret: teams-webhook
