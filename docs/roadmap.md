@@ -1,7 +1,7 @@
 # Roadmap
 
 What exists today, what comes next, and ideas for later. What changed release by
-release is in the [CHANGELOG](../CHANGELOG.md). Ideas and votes are welcome as GitHub
+release is in the [release notes](https://github.com/k8s-servant/k8s-servant/releases). Ideas and votes are welcome as GitHub
 issues.
 
 ## Available today
