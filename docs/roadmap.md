@@ -26,6 +26,7 @@ default and the core.
 | Step | What | Issue |
 |---|---|---|
 | 0 | Multi-provider LLM support (Anthropic, OpenAI, Ollama, ...; Azure AI Foundry stays the main example) and provider-neutral docs | [#2](https://github.com/k8s-servant/k8s-servant/issues/2), [#11](https://github.com/k8s-servant/k8s-servant/issues/11) |
+| 0b | **Documentation site** (Zensical on GitHub Pages), once the docs are provider-neutral, before the Teams launch | [#5](https://github.com/k8s-servant/k8s-servant/issues/5) |
 | 1 | **Two-way MS Teams bot for the whole fleet**: @mention questions, interactive cards, platform-team allow-list, per-day budget (opt-in component) | [#27](https://github.com/k8s-servant/k8s-servant/issues/27) |
 | 2 | **Scoreboard**: answers graded by the asker, the platform team and the bot's own verification; accuracy per task type; the offline evaluation set | [#28](https://github.com/k8s-servant/k8s-servant/issues/28) |
 | 3 | **Cost meter and budgets** | [#29](https://github.com/k8s-servant/k8s-servant/issues/29) |
@@ -36,8 +37,7 @@ default and the core.
 On their own tracks, not blocking the order above: Slack and other notification
 channels ([#3](https://github.com/k8s-servant/k8s-servant/issues/3),
 [#4](https://github.com/k8s-servant/k8s-servant/issues/4)), Key Vault references
-([#20](https://github.com/k8s-servant/k8s-servant/issues/20)), the documentation site
-([#5](https://github.com/k8s-servant/k8s-servant/issues/5)) and CI/image hardening
+([#20](https://github.com/k8s-servant/k8s-servant/issues/20)) and CI/image hardening
 ([#6](https://github.com/k8s-servant/k8s-servant/issues/6),
 [#7](https://github.com/k8s-servant/k8s-servant/issues/7),
 [#8](https://github.com/k8s-servant/k8s-servant/issues/8),
