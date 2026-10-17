@@ -291,6 +291,18 @@ pushes a fix to a branch. Only the owner, organization members and collaborators
 trigger it, because the job has write permissions and the Claude credential (the
 `CLAUDE_CODE_OAUTH_TOKEN` secret and the Claude GitHub App).
 
+Before Claude starts, the job installs Python, helm and the dev dependencies, and
+allows Claude to run exactly the checks from `CLAUDE.md`: `.venv/bin/pytest`,
+`.venv/bin/ruff`, `helm lint` and `helm template`. So Claude tests its change before it
+pushes, and CI then confirms. On a **fork PR** this is switched off: Claude can still
+read and comment, but it runs nothing, because the fork's code would run next to the
+Claude credential.
+
+Typical flow on an issue: comment `@claude implement this`. Claude works on a branch
+`claude/issue-N-…`, commits as `claude[bot]`, and replies with a **Create PR** link.
+You open the PR (check that the title is a Conventional Commit), and the normal CI and
+review run on it.
+
 ## release-please.yml: versions and published artifacts
 
 Runs on every push to `main`. The work is split between Google's
