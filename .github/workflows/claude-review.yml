@@ -4,6 +4,8 @@ name: Claude review
 # Fork PRs are skipped: they get no secrets, and running a model on untrusted code
 # with write access is a prompt-injection risk. Maintainers can still ask for a review
 # on a fork PR by commenting "@claude review".
+# Bot PRs (release-please, Dependabot) are skipped too: they are generated, and the
+# action refuses to run for non-human actors.
 on:
   pull_request:
     types: [opened, synchronize, ready_for_review, reopened]
@@ -19,7 +21,7 @@ jobs:
     if: >-
       !github.event.pull_request.draft &&
       github.event.pull_request.head.repo.full_name == github.repository &&
-      github.actor != 'dependabot[bot]'
+      github.event.pull_request.user.type != 'Bot'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
