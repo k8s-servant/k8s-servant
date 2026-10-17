@@ -653,12 +653,16 @@ MCP with kubectl fallback, knowledge and skills, scheduled health checks with me
 the morning report, MS Teams cards, Prometheus/Alertmanager tools, summary tools with
 skipping of unchanged checks, a signed container image and the Helm chart.
 
-Next: multi-provider LLM support (Anthropic, OpenAI, Ollama, ...;
-[#2](https://github.com/k8s-servant/k8s-servant/issues/2)), pluggable notifiers with
-Slack ([#3](https://github.com/k8s-servant/k8s-servant/issues/3)), an evaluation set for
-answer quality, a small HTTP API and a Teams chat bot, log search, and read-only
-cloud-provider context. Details: [docs/roadmap.md](docs/roadmap.md); the backlog is in
-[GitHub issues](https://github.com/k8s-servant/k8s-servant/issues).
+Where it is going: k8s-servant should feel like **one more person on the team**. Next
+come multi-provider LLM support
+([#2](https://github.com/k8s-servant/k8s-servant/issues/2)), then a **two-way MS Teams
+bot** for the whole fleet ([#27](https://github.com/k8s-servant/k8s-servant/issues/27)),
+a **scoreboard** that shows how often it is right
+([#28](https://github.com/k8s-servant/k8s-servant/issues/28)), cost budgets, and later
+**approved runbooks** such as rolling node restarts after patching, unlocked step by step
+as the scoreboard earns trust, and developer self-service. Being read-only stays the
+default. Details: [docs/roadmap.md](docs/roadmap.md) and the
+[vision](docs/superpowers/specs/2026-10-17-teammate-vision-design.md).
 
 ---
 
