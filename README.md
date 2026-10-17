@@ -122,6 +122,7 @@ k8s-servant/
 ├── examples/
 │   ├── knowledge-values.yaml       # Example environment description and cluster notes for a fictional platform
 │   ├── values-azure.yaml           # The complete Azure setup: Foundry + Workload Identity + Key Vault via External Secrets
+│   ├── values-azure-csi.yaml       # Azure without Kubernetes Secrets: Key Vault mounted by the CSI driver
 │   ├── values-minimal.yaml         # Any cluster: API key and Teams webhook from kubectl-created Secrets
 │   └── flux-helmrelease.yaml       # Flux HelmRelease installing the OCI chart
 ├── deploy/local/

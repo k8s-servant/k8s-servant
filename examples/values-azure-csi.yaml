@@ -1,0 +1,70 @@
+# Example values for one AKS cluster, Azure without any Kubernetes Secret:
+#   - Azure AI Foundry as the model, reached with Workload Identity (no API key);
+#   - the Teams webhook URL mounted straight from Azure Key Vault as a file by the
+#     Secrets Store CSI driver (Azure provider), also authenticated with Workload
+#     Identity. Nothing is synced into a Kubernetes Secret, so nothing lands in etcd.
+# Compare examples/values-azure.yaml, which syncs a Secret with External Secrets.
+# Prerequisites: the AKS add-on azure-keyvault-secrets-provider (the CSI driver), and
+# scripts/setup-workload-identity.sh run (identity, federated credential, roles).
+# All names below are placeholders.
+#
+#   helm install k8s-servant oci://ghcr.io/k8s-servant/charts/k8s-servant \
+#     -n k8s-servant --create-namespace \
+#     -f examples/knowledge-values.yaml -f examples/values-azure-csi.yaml
+
+# Managed identity for Foundry and Key Vault, created by scripts/setup-workload-identity.sh.
+azureWorkloadIdentity:
+  # Off by default in the chart; this example uses it.
+  enabled: true
+  # Client ID printed by the script.
+  clientId: "00000000-0000-0000-0000-000000000000"
+  # Your Entra ID tenant.
+  tenantId: "00000000-0000-0000-0000-000000000000"
+
+# Agent settings for this cluster.
+appConfig:
+  # Shown in reports and Teams cards.
+  CLUSTER_NAME: my-cluster
+  # Foundry resource created by scripts/setup-foundry.sh.
+  FOUNDRY_ENDPOINT: https://my-foundry.openai.azure.com/openai/v1/
+
+# Teams: the agent reads the URL from the file the CSI driver mounts below.
+teamsWebhook:
+  # <mountPath>/<objectName> of the CSI volume.
+  file: /mnt/secrets/teams-webhook-url
+
+# The CSI volume and where the agent sees it.
+extraVolumes:
+  - name: keyvault
+    csi:
+      driver: secrets-store.csi.k8s.io
+      readOnly: true
+      volumeAttributes:
+        secretProviderClass: k8s-servant-keyvault
+
+# Mounted read-only into the agent container.
+extraVolumeMounts:
+  - name: keyvault
+    mountPath: /mnt/secrets
+    readOnly: true
+
+# What to fetch from Key Vault, installed with the release. The driver authenticates
+# as the agent's Workload Identity (clientID), which needs only "Key Vault Secrets
+# User" on the one secret.
+extraObjects:
+  - apiVersion: secrets-store.csi.x-k8s.io/v1
+    kind: SecretProviderClass
+    metadata:
+      name: k8s-servant-keyvault
+    spec:
+      provider: azure
+      parameters:
+        usePodIdentity: "false"
+        clientID: "00000000-0000-0000-0000-000000000000"
+        tenantId: "00000000-0000-0000-0000-000000000000"
+        keyvaultName: my-keyvault
+        objects: |
+          array:
+            - |
+              objectName: teams-webhook-url
+              objectType: secret

@@ -150,6 +150,7 @@ Start from the examples in this repository:
 | `charts/k8s-servant/values.yaml` | chart defaults, every key commented |
 | `examples/knowledge-values.yaml` | an example platform description and cluster notes: copy and describe *your* platform |
 | `examples/values-azure.yaml` | **The complete Azure setup:** Azure AI Foundry with Workload Identity, and the Teams webhook synced from Key Vault by External Secrets (its objects installed through `extraObjects`) |
+| `examples/values-azure-csi.yaml` | Azure **without any Kubernetes Secret**: Workload Identity, and the Teams webhook mounted straight from Key Vault by the Secrets Store CSI driver |
 | `examples/values-minimal.yaml` | Any cluster: an API key and the Teams webhook from Secrets created with kubectl, nothing cloud-specific |
 
 The chart requires only `appConfig.CLUSTER_NAME` and `appConfig.FOUNDRY_ENDPOINT`.
@@ -158,15 +159,22 @@ explicitly; with it enabled, the chart refuses to render with an empty client ID
 
 ### Credentials: bring your own Secrets
 
-The chart never creates Secrets and does not depend on any secret tool. It mounts
-Secrets **you** create, by name, as files (never as environment variables). If you
-add a Secret to the environment yourself, for example through `extraEnvFrom`, that is
-your choice; the chart's own wiring never does it.
+The chart never creates Secrets and does not depend on any secret tool. The agent
+reads each credential from a **file** (never an environment variable), and you choose
+where the file comes from:
 
-| Credential | Value | Read by the agent from |
+- `existingSecret`: a Kubernetes Secret you create; the chart mounts it; or
+- `file`: the absolute path of a file you mount yourself with `extraVolumes` and
+  `extraVolumeMounts` (Secrets Store CSI driver, Vault Agent, ...). No Kubernetes
+  Secret is involved.
+
+Set one or the other, not both. If you add a Secret to the environment yourself, for
+example through `extraEnvFrom`, that is your choice; the chart's own wiring never does it.
+
+| Credential | Values | Read by the agent from |
 |---|---|---|
-| Model API key (not needed with Workload Identity) | `llmApiKey.existingSecret` (key `llmApiKey.secretKey`, default `api-key`) | `FOUNDRY_API_KEY_FILE` |
-| Teams webhook URL | `teamsWebhook.existingSecret` (key `teamsWebhook.secretKey`, default `webhook-url`) | `TEAMS_WEBHOOK_URL_FILE` |
+| Model API key (not needed with Workload Identity) | `llmApiKey.existingSecret` (key `llmApiKey.secretKey`, default `api-key`) or `llmApiKey.file` | `FOUNDRY_API_KEY_FILE` |
+| Teams webhook URL | `teamsWebhook.existingSecret` (key `teamsWebhook.secretKey`, default `webhook-url`) or `teamsWebhook.file` | `TEAMS_WEBHOOK_URL_FILE` |
 
 How the Secret gets there is your choice:
 
@@ -179,7 +187,9 @@ How the Secret gets there is your choice:
 - **Sealed Secrets, SOPS, Vault Agent, ...:** create the Secret as you usually do, and
   set its name.
 - **Secrets Store CSI driver:** mount the volume with `extraVolumes` and
-  `extraVolumeMounts`, and use its synced Secret's name.
+  `extraVolumeMounts`, put the `SecretProviderClass` into `extraObjects`, and point
+  `file` at the mounted file. `examples/values-azure-csi.yaml` does this for Azure Key
+  Vault: nothing is stored in a Kubernetes Secret.
 
 ### Extension points
 

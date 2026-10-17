@@ -50,13 +50,29 @@ Neither appConfig nor extraEnv may override them.
   "KUBECTL_PATH" "/usr/local/bin/kubectl"
   "FOUNDRY_API_KEY_FILE" ""
   "TEAMS_WEBHOOK_URL_FILE" "" -}}
-{{- if .Values.llmApiKey.existingSecret }}
-{{- $_ := set $fixed "FOUNDRY_API_KEY_FILE" "/var/run/secrets/llm/api-key" }}
+{{- $credentials := list
+  (list "llmApiKey" .Values.llmApiKey "FOUNDRY_API_KEY_FILE" "/var/run/secrets/llm/api-key")
+  (list "teamsWebhook" .Values.teamsWebhook "TEAMS_WEBHOOK_URL_FILE" "/var/run/secrets/teams/webhook-url") }}
+{{- range $credentials }}
+{{- $name := index . 0 }}{{- $values := index . 1 }}{{- $env := index . 2 }}{{- $mounted := index . 3 }}
+{{- if and $values.existingSecret $values.file }}
+{{- fail (printf "%s: set existingSecret or file, not both" $name) }}
 {{- end }}
-{{- if .Values.teamsWebhook.existingSecret }}
-{{- $_ := set $fixed "TEAMS_WEBHOOK_URL_FILE" "/var/run/secrets/teams/webhook-url" }}
+{{- if $values.existingSecret }}
+{{- $_ := set $fixed $env $mounted }}
+{{- else if $values.file }}
+{{- if not (hasPrefix "/" $values.file) }}
+{{- fail (printf "%s.file must be an absolute path, got %q" $name $values.file) }}
+{{- end }}
+{{- $_ := set $fixed $env $values.file }}
+{{- end }}
 {{- end }}
 {{- toYaml $fixed }}
+{{- end }}
+
+{{/* Whether Teams posting has a webhook source (a Secret or a file). */}}
+{{- define "k8s-servant.teamsEnabled" -}}
+{{- if or .Values.teamsWebhook.existingSecret .Values.teamsWebhook.file }}true{{ end }}
 {{- end }}
 
 {{/*
@@ -87,7 +103,7 @@ webhook URL come only from Secrets mounted as files.
 {{- $_ := set $config $key (toString $value) }}
 {{- end }}
 {{- end }}
-{{- if not .Values.teamsWebhook.existingSecret }}
+{{- if not (include "k8s-servant.teamsEnabled" .) }}
 {{- $_ := set $config "TEAMS_POST_MODE" "off" }}
 {{- end }}
 {{- range $key, $value := $fixed }}

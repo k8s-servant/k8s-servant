@@ -56,6 +56,27 @@ def test_minimal_example_needs_nothing_cloud_specific():
     assert config["TEAMS_WEBHOOK_URL_FILE"] == "/var/run/secrets/teams/webhook-url"
 
 
+@needs_helm
+def test_azure_csi_example_keeps_the_webhook_out_of_kubernetes_secrets():
+    files = [EXAMPLES / "knowledge-values.yaml", EXAMPLES / "values-azure-csi.yaml"]
+    command = ["helm", "template", "k8s-servant", str(CHART), "-n", "k8s-servant"]
+    for path in files:
+        command += ["-f", str(path)]
+    result = subprocess.run(command, capture_output=True, text=True, check=False)
+    assert result.returncode == 0, result.stderr
+    docs = [d for d in yaml.safe_load_all(result.stdout) if d]
+    assert not [d for d in docs if d["kind"] in ("Secret", "ExternalSecret", "SecretStore")]
+    provider = find(docs, "SecretProviderClass")
+    spec = find(docs, "Deployment")["spec"]["template"]["spec"]
+    volume = {v["name"]: v for v in spec["volumes"]}["keyvault"]["csi"]
+    assert volume["volumeAttributes"]["secretProviderClass"] == provider["metadata"]["name"]
+    agent = {c["name"]: c for c in spec["containers"]}["agent"]
+    mount = {m["name"]: m for m in agent["volumeMounts"]}["keyvault"]
+    config = find(docs, "ConfigMap", "k8s-servant-config")["data"]
+    assert config["TEAMS_WEBHOOK_URL_FILE"] == f"{mount['mountPath']}/teams-webhook-url"
+    assert "teams-webhook-url" in provider["spec"]["parameters"]["objects"]
+
+
 def find(docs: list[dict], kind: str, name: str | None = None) -> dict:
     """Return the one document of `kind` (and `name`, if given)."""
     matches = [d for d in docs if d["kind"] == kind and (name is None or d["metadata"]["name"] == name)]

@@ -98,6 +98,9 @@ llmApiKey:
   existingSecret: ""
   # Key inside the Secret that holds the API key.
   secretKey: api-key
+  # Or: the absolute path of a file you mount yourself through extraVolumes (Secrets
+  # Store CSI driver, Vault Agent, ...). Not together with existingSecret.
+  file: ""
 
 # The agent's settings, rendered as environment variables (ConfigMap + envFrom).
 # Any setting from README.md#configuration may be added; empty values are left out,
@@ -135,6 +138,9 @@ teamsWebhook:
   existingSecret: ""
   # Key inside the Secret that holds the webhook URL.
   secretKey: webhook-url
+  # Or: the absolute path of a file you mount yourself through extraVolumes (Secrets
+  # Store CSI driver, Vault Agent, ...). Not together with existingSecret.
+  file: ""
 
 # What the agent knows beyond the cluster API (see docs/knowledge-and-skills.md).
 # Built-in skills come from the chart's knowledge/skills folder.

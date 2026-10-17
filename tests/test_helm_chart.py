@@ -619,3 +619,32 @@ def test_chart_settings_win_over_extra_env_from(tmp_path):
     env_from = containers(docs)["agent"]["envFrom"]
     assert env_from[0] == {"configMapRef": {"name": "site-settings"}}
     assert env_from[-1] == {"configMapRef": {"name": "k8s-servant-config"}}
+
+
+# --- Credentials from a file you mount yourself (CSI driver, Vault Agent, ...) --------
+
+
+def test_api_key_can_come_from_a_file_mounted_by_you():
+    docs = render("--set-string", "llmApiKey.file=/mnt/secrets/llm-api-key")
+    assert app_config(docs)["FOUNDRY_API_KEY_FILE"] == "/mnt/secrets/llm-api-key"
+    # The chart mounts nothing itself: the volume comes from extraVolumes.
+    assert "llm-api-key" not in volumes(docs)
+
+
+def test_teams_can_come_from_a_file_mounted_by_you():
+    docs = render("--set-string", "teamsWebhook.file=/mnt/secrets/teams-webhook-url")
+    config = app_config(docs)
+    assert config["TEAMS_WEBHOOK_URL_FILE"] == "/mnt/secrets/teams-webhook-url"
+    assert config["TEAMS_POST_MODE"] == "changes"
+    assert "teams-webhook" not in volumes(docs)
+
+
+@pytest.mark.parametrize("prefix", ["llmApiKey", "teamsWebhook"])
+def test_existing_secret_and_file_are_mutually_exclusive(prefix):
+    error = render_error("--set-string", f"{prefix}.existingSecret=s", "--set-string", f"{prefix}.file=/f")
+    assert prefix in error
+
+
+@pytest.mark.parametrize("prefix", ["llmApiKey", "teamsWebhook"])
+def test_credential_file_must_be_an_absolute_path(prefix):
+    assert prefix in render_error("--set-string", f"{prefix}.file=relative/path")
