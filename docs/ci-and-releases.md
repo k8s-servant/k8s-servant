@@ -300,15 +300,16 @@ runs any binary). So Claude tests its change before it pushes, and CI then confi
 code runs inside the job, next to the Claude credential. So the tests are switched off
 unless **both** of these are true:
 
-- the issue or PR was written by the owner, a member or a collaborator (outsider-written
-  text could try to steer Claude into writing and running hostile code);
+- the issue or PR, and every human comment in its thread (including PR review
+  comments), was written by the owner, a member or a collaborator (outsider-written text
+  could try to steer Claude into writing and running hostile code);
 - for a PR, its branch is in this repository, not a fork.
 
 When they are off, Claude can still read, answer and push changes, but it runs nothing.
-What remains is an accepted risk: comments from outsiders on a trusted issue are still
-part of what Claude reads. Only ask `@claude` to implement issues whose discussion you
-trust, and revoke the `CLAUDE_CODE_OAUTH_TOKEN` (`claude setup-token` makes a new one)
-if you ever suspect misuse.
+One outsider comment anywhere in the thread is enough to switch the tests off. What
+remains is an accepted risk: the trust check runs when the job starts, so a comment
+posted while Claude is working is not covered. Revoke the `CLAUDE_CODE_OAUTH_TOKEN`
+(`claude setup-token` makes a new one) if you ever suspect misuse.
 
 Known limitation: the dependencies are installed from the default branch before Claude
 switches to a PR branch. If that PR changes dependencies in `pyproject.toml`, Claude's
