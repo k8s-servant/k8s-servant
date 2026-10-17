@@ -10,7 +10,7 @@ issues.
 |---|---|
 | **Core agent** | The tool-calling loop on an Azure AI Foundry chat model; MCP tools with a guarded kubectl fallback; knowledge (environment description, cluster notes, skills); CLI `ask`, `tools`, `doctor`; Foundry guide and `scripts/setup-foundry.sh` |
 | **Checks, memory, Teams** | Scheduled health checks with findings memory (new / still open / resolved), the morning report, Teams cards, Prometheus and Alertmanager tools; `cluster_problems` / `warning_events` summary tools, the policy-event filter, reasoning effort, skipping unchanged checks |
-| **In the cluster** | Signed container image, Helm chart as an OCI artifact (agent + MCP sidecar, read-only RBAC, PVC, Teams Secret through External Secrets), examples for Azure and Flux, `scripts/setup-workload-identity.sh`, the [deployment guide](deployment.md) |
+| **In the cluster** | Signed container image, Helm chart as an OCI artifact (agent + MCP sidecar, read-only RBAC, PVC, credentials from your own Secrets, extension points), examples for Azure, any cluster and Flux, `scripts/setup-workload-identity.sh`, the [deployment guide](deployment.md) |
 
 ## Next
 

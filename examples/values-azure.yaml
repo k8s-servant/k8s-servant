@@ -1,5 +1,11 @@
-# Example values for one AKS cluster using Azure AI Foundry, Workload Identity and
-# Azure Key Vault (through External Secrets Operator) for the Teams webhook.
+# Example values for one AKS cluster: the complete Azure setup.
+#   - Azure AI Foundry as the model, reached with Workload Identity (no API key);
+#   - the Teams webhook URL kept in Azure Key Vault and synced into a Kubernetes Secret
+#     by External Secrets Operator (ESO), which also authenticates with Workload Identity.
+# The chart itself knows nothing about Key Vault or ESO: the SecretStore and
+# ExternalSecret below are ordinary manifests installed through extraObjects, and the
+# chart only mounts the resulting Secret. Prerequisites: ESO installed in the cluster,
+# and scripts/setup-workload-identity.sh run (identity, federated credential, roles).
 # Only what differs from the chart defaults is here; every key is explained in
 # charts/k8s-servant/values.yaml. All names below are placeholders.
 #
@@ -17,6 +23,8 @@ labels:
 
 # Managed identity for Foundry and Key Vault, created by scripts/setup-workload-identity.sh.
 azureWorkloadIdentity:
+  # Off by default in the chart; this example uses it.
+  enabled: true
   # Client ID printed by the script.
   clientId: "00000000-0000-0000-0000-000000000000"
   # Your Entra ID tenant.
@@ -35,14 +43,45 @@ appConfig:
   # Local time zone of the morning report.
   MORNING_REPORT_TIMEZONE: Europe/Berlin
 
-# Teams: the agent's own Secret, synced by ESO from a Key Vault secret.
+# Teams: post health-check changes and the morning report. The chart mounts this
+# Secret; the ExternalSecret below creates it from Key Vault.
 teamsWebhook:
-  # Post health-check changes and the morning report to Teams.
-  enabled: true
-  # Key Vault holding the Workflows webhook URL.
-  keyVaultUrl: https://my-keyvault.vault.azure.net
-  # Name of the Key Vault secret.
-  keyVaultSecretName: teams-webhook-url
+  # Created by the ExternalSecret in extraObjects.
+  existingSecret: k8s-servant-teams-webhook
+  # Key inside that Secret.
+  secretKey: webhook-url
+
+# ESO objects, installed with the release. The SecretStore reads Key Vault as the
+# agent's own ServiceAccount (Workload Identity), so the identity needs only
+# "Key Vault Secrets User" on the one secret.
+extraObjects:
+  - apiVersion: external-secrets.io/v1
+    kind: SecretStore
+    metadata:
+      name: k8s-servant-keyvault
+    spec:
+      provider:
+        azurekv:
+          authType: WorkloadIdentity
+          vaultUrl: https://my-keyvault.vault.azure.net
+          serviceAccountRef:
+            name: k8s-servant
+  - apiVersion: external-secrets.io/v1
+    kind: ExternalSecret
+    metadata:
+      name: k8s-servant-teams-webhook
+    spec:
+      refreshInterval: 1h
+      secretStoreRef:
+        kind: SecretStore
+        name: k8s-servant-keyvault
+      target:
+        name: k8s-servant-teams-webhook
+        creationPolicy: Owner
+      data:
+        - secretKey: webhook-url
+          remoteRef:
+            key: teams-webhook-url
 
 # What the agent should know about this cluster (added to the platform description).
 knowledge:

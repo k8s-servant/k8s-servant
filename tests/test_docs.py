@@ -14,7 +14,9 @@ README = (ROOT / "README.md").read_text()
 
 
 def _settings_in_code() -> set[str]:
-    return set(re.findall(r'env(?:\.get\()?,? ?"([A-Z][A-Z0-9_]+)"', CONFIG)) | {"LOG_LEVEL"}
+    names = set(re.findall(r'env(?:\.get\()?,? ?"([A-Z][A-Z0-9_]+)"', CONFIG)) | {"LOG_LEVEL"}
+    # _secret(env, "NAME") also reads NAME_FILE.
+    return names | {f"{n}_FILE" for n in re.findall(r'_secret\(env, "([A-Z][A-Z0-9_]+)"\)', CONFIG)}
 
 
 def _settings_in_readme() -> set[str]:

@@ -38,20 +38,50 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end }}
 
 {{/*
-The agent's environment variables, rendered as ConfigMap data. In-cluster paths are
-fixed by the chart and cannot be overridden from appConfig; the Teams webhook URL may
-never be a plain setting (it is a credential, see teamsWebhook).
+Names the chart sets itself: in-cluster paths, and the files that hold credentials.
+Neither appConfig nor extraEnv may override them.
 */}}
-{{- define "k8s-servant.appConfig" -}}
+{{- define "k8s-servant.fixedEnv" -}}
 {{- $fixed := dict
   "KNOWLEDGE_DIR" "/knowledge"
   "DATA_DIR" "/data"
   "HEARTBEAT_FILE" "/tmp/heartbeat"
   "MCP_URL" "http://127.0.0.1:8080/mcp"
-  "KUBECTL_PATH" "/usr/local/bin/kubectl" -}}
-{{- if .Values.teamsWebhook.enabled }}
-{{- $_ := set $fixed "TEAMS_WEBHOOK_URL_FILE" "/var/run/secrets/teams/webhook-url" }}
+  "KUBECTL_PATH" "/usr/local/bin/kubectl"
+  "FOUNDRY_API_KEY_FILE" ""
+  "TEAMS_WEBHOOK_URL_FILE" "" -}}
+{{- $credentials := list
+  (list "llmApiKey" .Values.llmApiKey "FOUNDRY_API_KEY_FILE" "/var/run/secrets/llm/api-key")
+  (list "teamsWebhook" .Values.teamsWebhook "TEAMS_WEBHOOK_URL_FILE" "/var/run/secrets/teams/webhook-url") }}
+{{- range $credentials }}
+{{- $name := index . 0 }}{{- $values := index . 1 }}{{- $env := index . 2 }}{{- $mounted := index . 3 }}
+{{- if and $values.existingSecret $values.file }}
+{{- fail (printf "%s: set existingSecret or file, not both" $name) }}
 {{- end }}
+{{- if $values.existingSecret }}
+{{- $_ := set $fixed $env $mounted }}
+{{- else if $values.file }}
+{{- if not (hasPrefix "/" $values.file) }}
+{{- fail (printf "%s.file must be an absolute path, got %q" $name $values.file) }}
+{{- end }}
+{{- $_ := set $fixed $env $values.file }}
+{{- end }}
+{{- end }}
+{{- toYaml $fixed }}
+{{- end }}
+
+{{/* Whether Teams posting has a webhook source (a Secret or a file). */}}
+{{- define "k8s-servant.teamsEnabled" -}}
+{{- if or .Values.teamsWebhook.existingSecret .Values.teamsWebhook.file }}true{{ end }}
+{{- end }}
+
+{{/*
+The agent's environment variables, rendered as ConfigMap data. Chart-set names cannot
+be overridden, and credentials may never be plain settings: the API key and the Teams
+webhook URL come only from Secrets mounted as files.
+*/}}
+{{- define "k8s-servant.appConfig" -}}
+{{- $fixed := include "k8s-servant.fixedEnv" . | fromYaml }}
 {{- $required := list "CLUSTER_NAME" "FOUNDRY_ENDPOINT" "FOUNDRY_DEPLOYMENT" }}
 {{- range $required }}
 {{- if not (toString (index $.Values.appConfig .) ) }}
@@ -64,17 +94,39 @@ never be a plain setting (it is a credential, see teamsWebhook).
 {{- fail (printf "appConfig.%s is set by the chart and cannot be overridden" $key) }}
 {{- end }}
 {{- if eq $key "FOUNDRY_API_KEY" }}
-{{- fail "appConfig.FOUNDRY_API_KEY is not allowed: the API key is a credential and comes only from a Secret (llmApiKey.existingSecret)" }}
+{{- fail "appConfig.FOUNDRY_API_KEY is not allowed: the API key is a credential and comes only from a Secret or a mounted file (llmApiKey.existingSecret / llmApiKey.file)" }}
 {{- end }}
 {{- if contains "WEBHOOK_URL" $key }}
-{{- fail (printf "appConfig.%s is not allowed: the Teams webhook URL is a credential and comes only from the Secret (teamsWebhook)" $key) }}
+{{- fail (printf "appConfig.%s is not allowed: the Teams webhook URL is a credential and comes only from a Secret or a mounted file (teamsWebhook.existingSecret / teamsWebhook.file)" $key) }}
 {{- end }}
 {{- if ne (toString $value) "" }}
 {{- $_ := set $config $key (toString $value) }}
 {{- end }}
 {{- end }}
-{{- if not .Values.teamsWebhook.enabled }}
+{{- if not (include "k8s-servant.teamsEnabled" .) }}
 {{- $_ := set $config "TEAMS_POST_MODE" "off" }}
 {{- end }}
-{{- toYaml (merge $config $fixed) }}
+{{- range $key, $value := $fixed }}
+{{- if $value }}
+{{- $_ := set $config $key $value }}
+{{- end }}
+{{- end }}
+{{- toYaml $config }}
+{{- end }}
+
+{{/*
+extraEnv, checked: no chart-set name, and no credential as a plain value (valueFrom,
+e.g. a secretKeyRef, is fine).
+*/}}
+{{- define "k8s-servant.extraEnv" -}}
+{{- $fixed := include "k8s-servant.fixedEnv" . | fromYaml }}
+{{- range .Values.extraEnv }}
+{{- if hasKey $fixed .name }}
+{{- fail (printf "extraEnv %s is set by the chart and cannot be overridden" .name) }}
+{{- end }}
+{{- if and (hasKey . "value") (regexMatch "(?i)API_KEY|WEBHOOK_URL|TOKEN|PASSWORD|SECRET" .name) }}
+{{- fail (printf "extraEnv %s looks like a credential: use valueFrom (e.g. secretKeyRef), not a plain value" .name) }}
+{{- end }}
+{{- end }}
+{{- toYaml .Values.extraEnv }}
 {{- end }}

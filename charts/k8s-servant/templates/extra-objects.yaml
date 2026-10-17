@@ -1,0 +1,13 @@
+{{- /*
+Extra manifests from values (extraObjects), installed and removed with the release:
+for what the chart does not model, such as your own ExternalSecret. Each entry is an
+object or a template string; both go through tpl, so {{ .Release.Namespace }} works.
+*/ -}}
+{{- range .Values.extraObjects }}
+---
+{{- if typeIs "string" . }}
+{{ tpl . $ }}
+{{- else }}
+{{ tpl (toYaml .) $ }}
+{{- end }}
+{{- end }}
