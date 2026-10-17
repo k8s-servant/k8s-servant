@@ -168,7 +168,9 @@ where the file comes from:
   `extraVolumeMounts` (Secrets Store CSI driver, Vault Agent, ...). No Kubernetes
   Secret is involved.
 
-Set one or the other, not both. If you add a Secret to the environment yourself, for
+Set one or the other, not both. With `file`, the mount is yours: the chart checks only
+that the path is absolute, so a path without a matching `extraVolumeMounts` entry shows
+up at runtime (the agent stops with "unreadable file"). If you add a Secret to the environment yourself, for
 example through `extraEnvFrom`, that is your choice; the chart's own wiring never does it.
 
 | Credential | Values | Read by the agent from |

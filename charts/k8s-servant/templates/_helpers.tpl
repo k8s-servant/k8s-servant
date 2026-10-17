@@ -94,10 +94,10 @@ webhook URL come only from Secrets mounted as files.
 {{- fail (printf "appConfig.%s is set by the chart and cannot be overridden" $key) }}
 {{- end }}
 {{- if eq $key "FOUNDRY_API_KEY" }}
-{{- fail "appConfig.FOUNDRY_API_KEY is not allowed: the API key is a credential and comes only from a Secret (llmApiKey.existingSecret)" }}
+{{- fail "appConfig.FOUNDRY_API_KEY is not allowed: the API key is a credential and comes only from a Secret or a mounted file (llmApiKey.existingSecret / llmApiKey.file)" }}
 {{- end }}
 {{- if contains "WEBHOOK_URL" $key }}
-{{- fail (printf "appConfig.%s is not allowed: the Teams webhook URL is a credential and comes only from a Secret (teamsWebhook.existingSecret)" $key) }}
+{{- fail (printf "appConfig.%s is not allowed: the Teams webhook URL is a credential and comes only from a Secret or a mounted file (teamsWebhook.existingSecret / teamsWebhook.file)" $key) }}
 {{- end }}
 {{- if ne (toString $value) "" }}
 {{- $_ := set $config $key (toString $value) }}
