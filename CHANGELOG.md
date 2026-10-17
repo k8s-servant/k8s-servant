@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.2.0](https://github.com/k8s-servant/k8s-servant/compare/v0.1.0...v0.2.0) (2026-10-17)
+
+
+### ⚠ BREAKING CHANGES
+
+* **chart:** bring your own Secrets, identity and extras ([#19](https://github.com/k8s-servant/k8s-servant/issues/19))
+
+### Features
+
+* **chart:** bring your own Secrets, identity and extras ([#19](https://github.com/k8s-servant/k8s-servant/issues/19)) ([cd07c5f](https://github.com/k8s-servant/k8s-servant/commit/cd07c5f74a576925227dcce173070f0ddb4a59bf))
+
 ## 0.1.0 (2026-10-17)
 
 
