@@ -310,6 +310,8 @@ Runs on every push to `main`. The work is split between Google's
    - `publish chart` packages, pushes and signs the chart at
      `oci://ghcr.io/k8s-servant/charts/k8s-servant`.
 
+   How users check these signatures: [verifying-releases.md](verifying-releases.md).
+
 The bot knows only about versions, changelogs, tags and releases. Anything else that
 should happen on a release is another job with the same `if:` condition.
 

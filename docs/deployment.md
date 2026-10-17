@@ -58,13 +58,16 @@ URL only as a file) are tested in `tests/test_helm_chart.py`. Details:
 Releases are cut by release-please from Conventional Commit PR titles; every release
 publishes the image and the chart with the same version.
 
-To verify the image signature before you deploy (for example in an admission policy):
+To verify the image signature before you deploy:
 
 ```bash
 cosign verify ghcr.io/k8s-servant/k8s-servant:<version> \
-  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-  --certificate-identity-regexp '^https://github.com/k8s-servant/k8s-servant/'
+  --certificate-identity "https://github.com/k8s-servant/k8s-servant/.github/workflows/release-please.yml@refs/heads/main" \
+  --certificate-oidc-issuer "https://token.actions.githubusercontent.com"
 ```
+
+[verifying-releases.md](verifying-releases.md) explains how the signing works, how to
+verify the chart, and how to enforce signatures with an admission policy.
 
 If your cluster only admits images from your own registry, mirror both images and set
 `image.repository` and `mcp.image.repository` in the values.
