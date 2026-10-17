@@ -113,15 +113,18 @@ def _secret(env: Mapping[str, str], name: str) -> str:
     """Read a credential from the file named by NAME_FILE (a mounted Secret), else NAME.
 
     The file wins, so in the cluster the value never has to sit in the environment.
-    An unreadable file is an error rather than a silent fallback; the message names
-    the setting only, never the value.
+    An unreadable or empty file is an error rather than a silent fallback; the message
+    names the setting only, never the value.
     """
     path = env.get(f"{name}_FILE", "").strip()
     if path:
         try:
-            return Path(path).read_text(encoding="utf-8").strip()
+            value = Path(path).read_text(encoding="utf-8").strip()
         except OSError as exc:
             raise ValueError(f"Environment variable {name}_FILE points to an unreadable file: {exc.strerror}") from None
+        if not value:
+            raise ValueError(f"Environment variable {name}_FILE points to an empty file")
+        return value
     return env.get(name, "").strip()
 
 

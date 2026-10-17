@@ -166,3 +166,11 @@ def test_unreadable_api_key_file_is_an_error_that_names_only_the_variable(tmp_pa
     # contain the key, only the setting's name.
     with pytest.raises(ValueError, match="FOUNDRY_API_KEY_FILE"):
         configure_app({"FOUNDRY_API_KEY_FILE": str(tmp_path / "missing")})
+
+
+def test_empty_api_key_file_is_an_error(tmp_path):
+    # An empty Secret value would otherwise fall back to Entra ID and fail confusingly.
+    key_file = tmp_path / "api-key"
+    key_file.write_text("  \n")
+    with pytest.raises(ValueError, match="FOUNDRY_API_KEY_FILE"):
+        configure_app({"FOUNDRY_API_KEY_FILE": str(key_file)})

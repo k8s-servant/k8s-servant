@@ -341,7 +341,7 @@ from the Helm chart (`appConfig` in the values, rendered into a ConfigMap). A te
 | `FOUNDRY_ENDPOINT` | *(required)* | Model endpoint. For Azure AI Foundry the resource endpoint, e.g. `https://<name>.openai.azure.com/`; `/openai/v1/` is appended automatically. A URL that already includes a path (e.g. `https://api.openai.com/v1`, `http://localhost:11434/v1`) is used as-is: other OpenAI-compatible endpoints (experimental), authenticated with `FOUNDRY_API_KEY`. |
 | `FOUNDRY_DEPLOYMENT` | *(required)* | Model **deployment** name in Foundry (the model name for other endpoints). |
 | `FOUNDRY_API_KEY` | *(empty)* | API key. Empty = Entra ID (`az login` locally, Workload Identity in the cluster), the recommended way for Azure AI Foundry. Required for other OpenAI-compatible endpoints. |
-| `FOUNDRY_API_KEY_FILE` | *(empty)* | File containing the API key (the mounted Secret in the cluster, set by the chart from `llmApiKey.existingSecret`); wins over `FOUNDRY_API_KEY`. An unreadable file stops the agent with an error. |
+| `FOUNDRY_API_KEY_FILE` | *(empty)* | File containing the API key (the mounted Secret in the cluster, set by the chart from `llmApiKey.existingSecret`); wins over `FOUNDRY_API_KEY`. An unreadable or empty file stops the agent with an error. |
 | `FOUNDRY_TOKEN_SCOPE` | `https://ai.azure.com/.default` | Scope requested for the Entra ID token. |
 | `FOUNDRY_TIMEOUT_SECONDS` | `120` | Timeout of one model request (the SDK retries up to 3 times; retries are logged). |
 | `FOUNDRY_REASONING_EFFORT` | `medium` | How hard a reasoning model thinks: `none`, `minimal`, `low`, `medium`, `high`. gpt-5.4-mini does not reason at all unless asked. Empty = not sent (for models that reject it). |

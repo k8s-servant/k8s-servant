@@ -159,7 +159,9 @@ explicitly; with it enabled, the chart refuses to render with an empty client ID
 ### Credentials: bring your own Secrets
 
 The chart never creates Secrets and does not depend on any secret tool. It mounts
-Secrets **you** create, by name, as files (never as environment variables):
+Secrets **you** create, by name, as files (never as environment variables). If you
+add a Secret to the environment yourself, for example through `extraEnvFrom`, that is
+your choice; the chart's own wiring never does it.
 
 | Credential | Value | Read by the agent from |
 |---|---|---|
