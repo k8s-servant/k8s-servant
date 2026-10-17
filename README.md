@@ -7,6 +7,7 @@
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 ![Python](https://img.shields.io/badge/Python-3.12%2B-3776AB)
 ![Access](https://img.shields.io/badge/Cluster_access-read--only-success)
+![Status](https://img.shields.io/badge/Status-early_alpha-orange)
 
 A **read-only AI SRE** for Kubernetes clusters. It looks at a cluster the way an
 experienced cluster administrator would: it finds what is wrong, explains why with
@@ -15,8 +16,14 @@ never changes anything.** The language model runs in **Azure AI Foundry** (other
 OpenAI-compatible endpoints are experimental); results go to the terminal and to an
 **MS Teams** channel.
 
-> **Status:** early. The API, settings and Helm values may change in breaking ways
-> before `v1.0`. Feedback and contributions are welcome.
+> [!WARNING]
+> **Early-stage project.** k8s-servant is young and has run on only a few clusters so
+> far. Expect bugs and rough edges: findings can be wrong or incomplete, and settings,
+> Helm values and commands may change in breaking ways before `v1.0` (watch for
+> **⚠ BREAKING CHANGES** in the [changelog](https://github.com/k8s-servant/k8s-servant/releases)).
+> It is read-only, so it cannot change your cluster, but **verify its findings before
+> you act on them**, try it on a non-critical cluster first, and please
+> [report what breaks](https://github.com/k8s-servant/k8s-servant/issues/new/choose).
 
 ## Table of Contents
 
@@ -93,7 +100,7 @@ k8s-servant/
 ├── k8s_servant/                    # The agent (Python package, `k8s-servant` command)
 │   ├── cli.py                      # Commands: ask, check, report, serve, findings, history, notes, tools, doctor
 │   ├── config.py                   # Every setting, from environment variables; logging
-│   ├── agent.py                    # System prompt + tool-calling loop (~100 lines)
+│   ├── agent.py                    # System prompt + tool-calling loop
 │   ├── llm.py                      # Model client: Entra ID or API key, reasoning effort, token log, error advice
 │   ├── runtime.py                  # Wires tools, prompt and model for one run
 │   ├── knowledge.py                # Environment description, cluster notes, skills; load_skill tool
@@ -308,20 +315,28 @@ OCI artifact. The full guide is [docs/deployment.md](docs/deployment.md). In sho
 | MCP sidecar image | upstream `ghcr.io/containers/kubernetes-mcp-server` |
 | Helm chart | `oci://ghcr.io/k8s-servant/charts/k8s-servant` (source: `charts/k8s-servant/`) |
 
-1. **Model access.** Deploy a chat model (`scripts/setup-foundry.sh`) and give the pod
-   an identity that may call it. On AKS, `scripts/setup-workload-identity.sh` creates a
-   managed identity with a federated credential for the agent's ServiceAccount, read
-   access to the Teams webhook secret in Key Vault, and the model role.
-2. **Values.** Start from `examples/values-azure.yaml` (cluster name, model endpoint,
-   identity client ID, Prometheus, Teams) and `examples/knowledge-values.yaml` (what is
-   normal on your platform).
-3. **Install:**
+1. **Model access.** Deploy a chat model (`scripts/setup-foundry.sh` for Azure AI
+   Foundry) and give the pod a way to call it: on AKS, a Workload Identity
+   (`scripts/setup-workload-identity.sh`); elsewhere, an API key in a Secret.
+2. **Credentials.** The chart never creates Secrets. The API key and the Teams webhook
+   URL come from a Secret you create (kubectl, External Secrets, Sealed Secrets, ...)
+   or from a file you mount (Secrets Store CSI driver), always read as files
+   ([how](docs/deployment.md#credentials-bring-your-own-secrets)).
+3. **Values.** Start from one example, plus `examples/knowledge-values.yaml` (what is
+   normal on your platform):
+
+   | Example | For |
+   |---|---|
+   | `examples/values-minimal.yaml` | any cluster: API key and Teams webhook from kubectl-created Secrets |
+   | `examples/values-azure.yaml` | AKS: Foundry with Workload Identity, Teams webhook synced from Key Vault by External Secrets |
+   | `examples/values-azure-csi.yaml` | AKS without Kubernetes Secrets: Teams webhook mounted from Key Vault by the CSI driver |
+4. **Install:**
    ```bash
    helm install k8s-servant oci://ghcr.io/k8s-servant/charts/k8s-servant \
      -n k8s-servant --create-namespace -f my-values.yaml
    ```
    With Flux, use `examples/flux-helmrelease.yaml` instead.
-4. **Check:** the pod shows 2/2 Running, then run
+5. **Check:** the pod shows 2/2 Running, then run
    `kubectl -n k8s-servant exec deploy/k8s-servant -c agent -- k8s-servant doctor`,
    and `kubectl auth can-i get secrets --as=system:serviceaccount:k8s-servant:k8s-servant -A`
    must print `no`.
@@ -559,7 +574,11 @@ Honest notes from the first real runs:
   new OIDC issuer needs the federated credential re-pointed
   ([docs/deployment.md](docs/deployment.md#when-a-cluster-is-recreated)).
 - **Only Azure AI Foundry is tested.** Other OpenAI-compatible endpoints are
-  experimental; multi-provider support is on the [Roadmap](#roadmap).
+  experimental; multi-provider support is planned
+  ([#2](https://github.com/k8s-servant/k8s-servant/issues/2)).
+- **Notifications go to MS Teams only.** Slack and other channels are planned
+  ([#3](https://github.com/k8s-servant/k8s-servant/issues/3),
+  [#4](https://github.com/k8s-servant/k8s-servant/issues/4)).
 
 ---
 
@@ -634,9 +653,12 @@ MCP with kubectl fallback, knowledge and skills, scheduled health checks with me
 the morning report, MS Teams cards, Prometheus/Alertmanager tools, summary tools with
 skipping of unchanged checks, a signed container image and the Helm chart.
 
-Next: an evaluation set for answer quality, multi-provider LLM support (OpenAI,
-Anthropic, Ollama), a small HTTP API and a Teams chat bot, log search, and read-only
-cloud-provider context. Details: [docs/roadmap.md](docs/roadmap.md).
+Next: multi-provider LLM support (Anthropic, OpenAI, Ollama, ...;
+[#2](https://github.com/k8s-servant/k8s-servant/issues/2)), pluggable notifiers with
+Slack ([#3](https://github.com/k8s-servant/k8s-servant/issues/3)), an evaluation set for
+answer quality, a small HTTP API and a Teams chat bot, log search, and read-only
+cloud-provider context. Details: [docs/roadmap.md](docs/roadmap.md); the backlog is in
+[GitHub issues](https://github.com/k8s-servant/k8s-servant/issues).
 
 ---
 
