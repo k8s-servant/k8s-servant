@@ -16,7 +16,13 @@
   description: Security hardening (report vulnerabilities privately)
 - name: area/agent
   color: c5def5
-  description: Agent loop and LLM client
+  description: Agent loop, knowledge and memory
+- name: area/llm
+  color: c5def5
+  description: LLM providers and the model client
+- name: area/notifications
+  color: c5def5
+  description: Teams, Slack and other notification channels
 - name: area/tools
   color: c5def5
   description: MCP, kubectl and Prometheus tools
