@@ -112,7 +112,8 @@ helm install k8s-servant oci://ghcr.io/k8s-servant/charts/k8s-servant \
 An admission controller can reject pods whose image is not signed by the release
 workflow, so the check happens on every deployment, not only when someone remembers.
 
-**Kyverno** (`verifyImages`):
+**Kyverno** (`ClusterPolicy` with `verifyImages`, as in the Kyverno 1.13+ docs; newer
+releases also offer the CEL-based `ImageValidatingPolicy`):
 
 ```yaml
 apiVersion: kyverno.io/v1
@@ -120,7 +121,8 @@ kind: ClusterPolicy
 metadata:
   name: verify-k8s-servant-image
 spec:
-  webhookTimeoutSeconds: 30
+  webhookConfiguration:
+    timeoutSeconds: 30
   rules:
     - name: signed-by-release-workflow
       match:
@@ -189,6 +191,12 @@ docker buildx imagetools inspect ghcr.io/k8s-servant/k8s-servant:<version> --for
   another branch, changes it, and every user's policy stops matching. If that is ever
   necessary, announce it in the release notes and update this page and
   `examples/flux-helmrelease.yaml` in the same PR.
-- Signing happens in the `publish image` and `publish chart` jobs, which have
-  `id-token: write`. Nothing else in CI can mint that identity. See
+- The identity names the workflow file and the branch, **not the job**. Any job in
+  `release-please.yml` with `id-token: write` can sign as this identity, so keep that
+  permission limited to the `publish image` and `publish chart` jobs, and review any
+  new job in that file with this in mind. See
   [ci-and-releases.md](ci-and-releases.md#release-pleaseyml-versions-and-published-artifacts).
+- The SBOM and provenance are covered by the signature because the workflow signs the
+  **image index** digest (`steps.build.outputs.digest` of the multi-arch build), and
+  the index references the attestation manifests. Keep signing that digest, not a
+  per-platform one.
