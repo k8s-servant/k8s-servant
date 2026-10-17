@@ -74,12 +74,16 @@ jobs:
           # Everything Claude reads must come from trusted people: every human comment in
           # the thread (and, on a PR, every review comment) too, not only the author's text.
           # Plain assignments, so a failed API call stops the job instead of failing open.
+          # Only our own bots are exempt; any other bot may relay outsider text.
+          own_bots='select(.user.login | IN("claude[bot]", "github-actions[bot]") | not)'
           who=$(gh api --paginate "repos/${REPO}/issues/${NUMBER}/comments" \
-            --jq '.[] | select(.user.type != "Bot") | .author_association')
+            --jq ".[] | ${own_bots} | .author_association")
           if [ "${is_pr}" = true ]; then
             more=$(gh api --paginate "repos/${REPO}/pulls/${NUMBER}/comments" \
-              --jq '.[] | select(.user.type != "Bot") | .author_association')
-            who="${who}"$'\n'"${more}"
+              --jq ".[] | ${own_bots} | .author_association")
+            reviews=$(gh api --paginate "repos/${REPO}/pulls/${NUMBER}/reviews" \
+              --jq ".[] | ${own_bots} | select((.body // \"\") != \"\") | .author_association")
+            who="${who}"$'\n'"${more}"$'\n'"${reviews}"
           fi
           untrusted=$(printf '%s\n' "${who}" | grep -vcE '^(OWNER|MEMBER|COLLABORATOR)?$' || true)
           if [ "${untrusted}" != 0 ]; then

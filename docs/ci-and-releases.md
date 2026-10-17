@@ -300,9 +300,11 @@ runs any binary). So Claude tests its change before it pushes, and CI then confi
 code runs inside the job, next to the Claude credential. So the tests are switched off
 unless **both** of these are true:
 
-- the issue or PR, and every human comment in its thread (including PR review
-  comments), was written by the owner, a member or a collaborator (outsider-written text
-  could try to steer Claude into writing and running hostile code);
+- the issue or PR, and every comment in its thread (including PR review comments and
+  review bodies), was written by the owner, a member or a collaborator. Only
+  `claude[bot]` and `github-actions[bot]` are exempt; any other bot counts as an
+  outsider, since it may repost someone else's text. Outsider-written text could try
+  to steer Claude into writing and running hostile code;
 - for a PR, its branch is in this repository, not a fork.
 
 When they are off, Claude can still read, answer and push changes, but it runs nothing.
