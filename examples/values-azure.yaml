@@ -35,7 +35,12 @@ appConfig:
   # Shown in reports and Teams cards.
   CLUSTER_NAME: my-cluster
   # Foundry resource created by scripts/setup-foundry.sh.
-  FOUNDRY_ENDPOINT: https://my-foundry.openai.azure.com/openai/v1/
+  LLM_PROVIDER: foundry
+  LLM_ENDPOINT: https://my-foundry.openai.azure.com/openai/v1/
+  # The Foundry deployment name.
+  LLM_MODEL: my-deployment
+  # Entra ID tokens through Workload Identity; no key.
+  LLM_AUTH: entra
   # kube-prometheus-stack in this cluster.
   PROMETHEUS_URL: http://kube-prometheus-stack-prometheus.kube-prometheus-stack.svc:9090
   # Alertmanager of kube-prometheus-stack.

@@ -52,7 +52,7 @@ def test_minimal_example_needs_nothing_cloud_specific():
     pod_labels = find(docs, "Deployment")["spec"]["template"]["metadata"]["labels"]
     assert "azure.workload.identity/use" not in pod_labels
     config = find(docs, "ConfigMap", "k8s-servant-config")["data"]
-    assert config["FOUNDRY_API_KEY_FILE"] == "/var/run/secrets/llm/api-key"
+    assert config["LLM_API_KEY_FILE"] == "/var/run/secrets/llm/api-key"
     assert config["TEAMS_WEBHOOK_URL_FILE"] == "/var/run/secrets/teams/webhook-url"
 
 
@@ -84,12 +84,72 @@ def find(docs: list[dict], kind: str, name: str | None = None) -> dict:
     return matches[0]
 
 
+def render_example(name: str) -> list[dict]:
+    """Render the chart with one provider example (alone, as a user would)."""
+    command = ["helm", "template", "k8s-servant", str(CHART), "-n", "k8s-servant"]
+    command += ["-f", str(EXAMPLES / f"values-{name}.yaml")]
+    result = subprocess.run(command, capture_output=True, text=True, check=False)
+    assert result.returncode == 0, result.stderr
+    return [d for d in yaml.safe_load_all(result.stdout) if d]
+
+
+def pod_spec(docs: list[dict]) -> dict:
+    return find(docs, "Deployment")["spec"]["template"]
+
+
+@needs_helm
+@pytest.mark.parametrize("name", ["anthropic", "openai", "ollama", "azure-claude"])
+def test_new_example_renders_without_creating_secrets(name):
+    docs = render_example(name)
+    assert not [d for d in docs if d["kind"] in ("Secret", "ExternalSecret", "SecretStore")]
+
+
+@needs_helm
+def test_azure_claude_uses_entra_and_workload_identity():
+    docs = render_example("azure-claude")
+    config = find(docs, "ConfigMap", "k8s-servant-config")["data"]
+    assert config["LLM_PROVIDER"] == "anthropic"
+    assert config["LLM_AUTH"] == "entra"
+    assert config["LLM_ENDPOINT"] == "https://my-foundry.services.ai.azure.com"
+    assert config["LLM_MODEL"] == "claude-sonnet-5-5"
+    assert "LLM_API_KEY_FILE" not in config
+    assert pod_spec(docs)["metadata"]["labels"]["azure.workload.identity/use"] == "true"
+    account = find(docs, "ServiceAccount", "k8s-servant")["metadata"]
+    assert account["annotations"]["azure.workload.identity/client-id"]
+
+
+@needs_helm
+@pytest.mark.parametrize("name", ["anthropic", "openai"])
+def test_key_examples_mount_the_key_file(name):
+    docs = render_example(name)
+    config = find(docs, "ConfigMap", "k8s-servant-config")["data"]
+    assert config["LLM_AUTH"] == "api-key"
+    assert config["LLM_API_KEY_FILE"] == "/var/run/secrets/llm/api-key"
+    volumes = {v["name"]: v for v in pod_spec(docs)["spec"]["volumes"]}
+    assert volumes["llm-api-key"]["secret"]["secretName"] == "k8s-servant-llm"
+    assert "azure.workload.identity/use" not in pod_spec(docs)["metadata"]["labels"]
+
+
+@needs_helm
+def test_ollama_example_has_no_key_and_no_workload_identity():
+    docs = render_example("ollama")
+    config = find(docs, "ConfigMap", "k8s-servant-config")["data"]
+    assert config["LLM_PROVIDER"] == "ollama"
+    assert config["LLM_ENDPOINT"] == "http://ollama.ollama.svc:11434/v1"
+    assert config["LLM_MODEL"] == "qwen3"
+    assert "LLM_API_KEY_FILE" not in config
+    assert "azure.workload.identity/use" not in pod_spec(docs)["metadata"]["labels"]
+
+
 @needs_helm
 def test_example_values_render_the_chart():
     docs = render()
     config = find(docs, "ConfigMap", "k8s-servant-config")["data"]
     assert config["CLUSTER_NAME"] == "my-cluster"
-    assert config["FOUNDRY_ENDPOINT"] == "https://my-foundry.openai.azure.com/openai/v1/"
+    assert config["LLM_PROVIDER"] == "foundry"
+    assert config["LLM_AUTH"] == "entra"
+    assert config["LLM_MODEL"] == "my-deployment"
+    assert config["LLM_ENDPOINT"] == "https://my-foundry.openai.azure.com/openai/v1/"
     assert config["TEAMS_POST_MODE"] == "changes"
     # The ESO objects come from extraObjects; the chart only mounts the Secret.
     store = find(docs, "SecretStore")["spec"]["provider"]["azurekv"]
