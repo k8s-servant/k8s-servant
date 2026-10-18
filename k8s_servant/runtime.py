@@ -116,7 +116,7 @@ async def open_agent(
         Session.
 
     Raises:
-        ValueError: If FOUNDRY_ENDPOINT is invalid (only when chat is not given).
+        ValueError: If LLM_ENDPOINT is invalid (only when chat is not given).
     """
     if chat is None:
         chat = build_chat(config)

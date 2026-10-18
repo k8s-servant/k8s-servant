@@ -35,7 +35,7 @@ def test_the_readme_lists_no_removed_settings():
 
 def test_the_code_side_of_this_check_finds_the_settings():
     # Guards the regex: if config.py's style changes, the checks above must not pass vacuously.
-    assert {"FOUNDRY_ENDPOINT", "EVENTS_EXCLUDE_REASONS", "CHECK_SKIP_UNCHANGED"} <= _settings_in_code()
+    assert {"LLM_ENDPOINT", "EVENTS_EXCLUDE_REASONS", "CHECK_SKIP_UNCHANGED"} <= _settings_in_code()
 
 
 def _slug(heading: str) -> str:

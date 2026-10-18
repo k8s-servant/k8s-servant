@@ -103,6 +103,7 @@ k8s-servant/
 │   ├── agent.py                    # System prompt + tool-calling loop
 │   ├── llm/                        # Model client
 │   │   ├── types.py                # Neutral Turn, ToolCall, ToolSpec; the agent depends only on these
+│   │   ├── providers.py            # The provider table (wire API, default endpoint and effort) and endpoint rules
 │   │   └── chat_completions.py     # Chat Completions client: Entra ID or API key, reasoning effort, token log, error advice
 │   ├── runtime.py                  # Wires tools, prompt and model for one run
 │   ├── knowledge.py                # Environment description, cluster notes, skills; load_skill tool
@@ -269,7 +270,7 @@ python3 -m venv .venv
 source .venv/bin/activate
 
 # 2. Configure (see the table below)
-cp .env.example .env            # set FOUNDRY_ENDPOINT, FOUNDRY_DEPLOYMENT, CLUSTER_NAME
+cp .env.example .env            # set LLM_PROVIDER, LLM_ENDPOINT, LLM_MODEL, CLUSTER_NAME
                                 #   (no secrets in it: see "Secrets: local vs cluster")
 set -a; source .env; set +a
 az login                        # the agent uses your Entra ID session for Foundry
@@ -356,13 +357,17 @@ from the Helm chart (`appConfig` in the values, rendered into a ConfigMap). A te
 | Variable | Default | Meaning |
 |---|---|---|
 | `CLUSTER_NAME` | `unknown-cluster` | Friendly cluster name used in answers, reports and Teams cards. |
-| `FOUNDRY_ENDPOINT` | *(required)* | Model endpoint. For Azure AI Foundry the resource endpoint, e.g. `https://<name>.openai.azure.com/`; `/openai/v1/` is appended automatically. A URL that already includes a path (e.g. `https://api.openai.com/v1`, `http://localhost:11434/v1`) is used as-is: other OpenAI-compatible endpoints (experimental), authenticated with `FOUNDRY_API_KEY`. |
-| `FOUNDRY_DEPLOYMENT` | *(required)* | Model **deployment** name in Foundry (the model name for other endpoints). |
-| `FOUNDRY_API_KEY` | *(empty)* | API key. Empty = Entra ID (`az login` locally, Workload Identity in the cluster), the recommended way for Azure AI Foundry. Required for other OpenAI-compatible endpoints. |
-| `FOUNDRY_API_KEY_FILE` | *(empty)* | File containing the API key (the mounted Secret in the cluster, set by the chart from `llmApiKey.existingSecret`); wins over `FOUNDRY_API_KEY`. An unreadable or empty file stops the agent with an error. |
-| `FOUNDRY_TOKEN_SCOPE` | `https://ai.azure.com/.default` | Scope requested for the Entra ID token. |
-| `FOUNDRY_TIMEOUT_SECONDS` | `120` | Timeout of one model request (the SDK retries up to 3 times; retries are logged). |
-| `FOUNDRY_REASONING_EFFORT` | `medium` | How hard a reasoning model thinks: `none`, `minimal`, `low`, `medium`, `high`. gpt-5.4-mini does not reason at all unless asked. Empty = not sent (for models that reject it). |
+| `LLM_PROVIDER` | *(required)* | Who serves the model: `foundry`, `openai`, `anthropic`, `ollama` or `openai-compatible`. It decides the wire API, the default endpoint and the default reasoning effort. |
+| `LLM_ENDPOINT` | provider default | Base URL. Required for `foundry` (the resource endpoint, e.g. `https://<name>.openai.azure.com/`; `/openai/v1/` is appended automatically) and `openai-compatible`. Defaults: `https://api.openai.com/v1`, `https://api.anthropic.com`, `http://localhost:11434/v1` (ollama). Plain `http` is accepted for localhost and, for `ollama` and `openai-compatible`, in-cluster hosts. |
+| `LLM_MODEL` | *(required)* | Model name. For `foundry` the **deployment** name. |
+| `LLM_API_KEY` | *(empty)* | API key. Empty = Entra ID (`az login` locally, Workload Identity in the cluster), the recommended way for Azure AI Foundry. |
+| `LLM_API_KEY_FILE` | *(empty)* | File containing the API key (the mounted Secret in the cluster, set by the chart from `llmApiKey.existingSecret`); wins over `LLM_API_KEY`. An unreadable or empty file stops the agent with an error. |
+| `LLM_AUTH` | `auto` | `auto` (API key when set, else Entra ID), `entra` or `api-key`. |
+| `LLM_TOKEN_SCOPE` | `https://ai.azure.com/.default` | Scope requested for the Entra ID token. |
+| `LLM_TIMEOUT_SECONDS` | `120` | Timeout of one model request (the SDK retries up to 3 times; retries are logged). |
+| `LLM_MAX_OUTPUT_TOKENS` | `32000` | Output token limit of one model reply (reasoning tokens count against it). |
+| `LLM_REASONING_EFFORT` | `medium` for `foundry`, `openai`, `anthropic`; empty otherwise | How hard a reasoning model thinks: `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max`. gpt-5.4-mini does not reason at all unless asked. Empty = not sent (for models that reject it). |
+| `AZURE_FEDERATED_TOKEN_FILE` | *(set by the platform)* | Injected by the Azure Workload Identity webhook; its presence tells the agent the pod authenticates with Workload Identity (used to explain Entra ID failures). Do not set it by hand. |
 
 ### Reading the cluster
 
@@ -441,7 +446,7 @@ Almost nothing in `.env` is secret:
 |---|---|---|---|
 | Endpoints, names, URLs of Prometheus etc., timeouts | No | `.env` | ConfigMap rendered by the Helm chart |
 | **Access to the model (Azure AI Foundry)** | — | your `az login` session; nothing is stored in `.env` | **Workload Identity**: the pod's ServiceAccount is federated with a managed identity that has *Cognitive Services OpenAI User* on the Foundry resource. No key anywhere |
-| `FOUNDRY_API_KEY` | **Yes** | leave it empty for Azure AI Foundry (keys only for quick experiments); required for other OpenAI-compatible endpoints | for Azure AI Foundry not used; otherwise a Kubernetes Secret you create, named in `llmApiKey.existingSecret`, mounted as a file (`FOUNDRY_API_KEY_FILE`) |
+| `LLM_API_KEY` | **Yes** | leave it empty for Azure AI Foundry (keys only for quick experiments); required for other OpenAI-compatible endpoints | for Azure AI Foundry not used; otherwise a Kubernetes Secret you create, named in `llmApiKey.existingSecret`, mounted as a file (`LLM_API_KEY_FILE`) |
 | **`TEAMS_WEBHOOK_URL`** | **Yes**: anyone with it can post to the channel | load it from your secret store into your shell (below) | A Kubernetes Secret you create any way you like (kubectl, External Secrets, Sealed Secrets, ...), named in `teamsWebhook.existingSecret`, mounted as a file and read through `TEAMS_WEBHOOK_URL_FILE`. `examples/values-azure.yaml` syncs it from Azure Key Vault with External Secrets |
 
 In the Azure example, one managed identity does both jobs: it calls the model and
@@ -518,7 +523,7 @@ nothing. Measured on a test cluster (~600 Deployments, ~1,250 pods) with gpt-5.4
   $10–30 a month per cluster when most hours are quiet to $70–160 if every hour ran in
   full.
 - **Levers:** `CHECK_SKIP_UNCHANGED`, `CHECK_FULL_INTERVAL_HOURS`,
-  `CHECK_INTERVAL_MINUTES`, `TOOL_OUTPUT_MAX_CHARS`, `FOUNDRY_REASONING_EFFORT`.
+  `CHECK_INTERVAL_MINUTES`, `TOOL_OUTPUT_MAX_CHARS`, `LLM_REASONING_EFFORT`.
 - Every model call is logged with its tokens: `model call: N prompt (M cached) + K
   completion tokens (R reasoning)`. Set a budget alert on the Foundry resource group.
 
@@ -608,10 +613,11 @@ or cluster notes, or let it save a learned note. See
 [Teaching the agent](#teaching-the-agent).
 
 **Can I use another model?** Yes, any chat model in Azure AI Foundry with tool calling:
-change `FOUNDRY_DEPLOYMENT`. For models without reasoning set
-`FOUNDRY_REASONING_EFFORT=` (empty). Other OpenAI-compatible endpoints (OpenAI, a local
-Ollama, ...) work experimentally: set `FOUNDRY_ENDPOINT` to the full base URL including
-its path and `FOUNDRY_API_KEY`.
+change `LLM_MODEL`. For models without reasoning set
+`LLM_REASONING_EFFORT=` (empty). Other providers (OpenAI, a local
+Ollama, any OpenAI-compatible server) work experimentally: set `LLM_PROVIDER`,
+`LLM_MODEL` and, where needed, `LLM_ENDPOINT` (full base URL including its path) and
+`LLM_API_KEY`.
 
 **Does it need AKS?** No. The agent and the chart work on any Kubernetes cluster. The
 Workload Identity and Key Vault parts are optional and AKS-specific.

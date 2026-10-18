@@ -99,7 +99,7 @@ def _make_chat(config: dict):
     """Build the model client. Returns (chat, None), or (None, exit_code) after printing why not."""
     missing = missing_model_settings(config)
     if missing:
-        print(f"Missing settings: {', '.join(missing)}. See docs/foundry-setup.md.", file=sys.stderr)
+        print(f"Missing settings: {', '.join(missing)}. See docs/model-providers.md.", file=sys.stderr)
         return None, 2
     try:
         return build_chat(config), None
@@ -354,9 +354,13 @@ async def cmd_doctor(args, config: dict, knowledge, memory: Memory) -> int:
     # 1. Configuration
     missing = missing_model_settings(config)
     if missing:
-        report("FAIL", "config", f"missing {', '.join(missing)} (see docs/foundry-setup.md)")
+        report("FAIL", "config", f"missing {', '.join(missing)} (see docs/model-providers.md)")
     else:
-        report("OK", "config", f"endpoint {config['foundry_endpoint']}, deployment {config['foundry_deployment']}")
+        report(
+            "OK",
+            "config",
+            f"provider {config['llm_provider']}, endpoint {config['llm_endpoint']}, model {config['llm_model']}",
+        )
 
     # 2. Knowledge
     report(

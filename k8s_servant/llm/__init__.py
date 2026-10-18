@@ -10,8 +10,8 @@ from k8s_servant.llm.chat_completions import (
     build_chat,
     build_client,
     explain_model_error,
-    normalize_endpoint,
 )
+from k8s_servant.llm.providers import normalize_endpoint
 from k8s_servant.llm.types import ModelOutputTruncated
 
 __all__ = [

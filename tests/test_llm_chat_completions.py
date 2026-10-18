@@ -106,11 +106,12 @@ async def test_logs_and_counts_tokens(caplog):
 
 def test_build_chat_uses_the_configured_deployment_and_effort():
     config = {
-        "foundry_endpoint": "https://x.openai.azure.com",
-        "foundry_api_key": "k",
-        "foundry_timeout_seconds": 5,
-        "foundry_deployment": "dep",
-        "foundry_reasoning_effort": "low",
+        "llm_provider": "foundry",
+        "llm_endpoint": "https://x.openai.azure.com",
+        "llm_api_key": "k",
+        "llm_timeout_seconds": 5,
+        "llm_model": "dep",
+        "llm_reasoning_effort": "low",
     }
     chat = build_chat(config)
     assert (chat.model, chat.reasoning_effort) == ("dep", "low")

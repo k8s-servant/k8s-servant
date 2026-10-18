@@ -17,10 +17,14 @@ from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+from k8s_servant.llm.providers import OLD_SETTINGS, PROVIDERS
+
 # Built-in skills ship inside the Helm chart folder (charts/k8s-servant/knowledge). When
 # the package runs from a git checkout (local development) this path points at
 # them, so local runs and the cluster use the same skill files. In the container
 # KNOWLEDGE_DIR is set explicitly to the mounted ConfigMap.
+REASONING_EFFORTS = ("", "none", "minimal", "low", "medium", "high", "xhigh", "max")
+
 DEFAULT_KNOWLEDGE_DIR = Path(__file__).resolve().parent.parent / "charts" / "k8s-servant" / "knowledge"
 
 
@@ -141,31 +145,58 @@ def configure_app(env: Mapping[str, str] | None = None) -> dict:
         ValueError: If a setting has an invalid value (the message names it).
     """
     env = os.environ if env is None else env
+    renamed = [f"{old} -> {new}" for old, new in OLD_SETTINGS.items() if old in env]
+    if renamed:
+        raise ValueError(
+            f"These settings were renamed: {', '.join(renamed)}. See docs/model-providers.md for the new names."
+        )
+    provider_name = env.get("LLM_PROVIDER", "").strip().lower()
+    if provider_name and provider_name not in PROVIDERS:
+        raise ValueError(
+            f"Environment variable LLM_PROVIDER must be one of {', '.join(PROVIDERS)}, got {provider_name!r}"
+        )
+    provider = PROVIDERS.get(provider_name)
+    default_effort = provider.default_effort if provider else ""
+    api_key = _secret(env, "LLM_API_KEY")
+    key_file = env.get("LLM_API_KEY_FILE", "").strip()
+    api_key_source = f"file {key_file}" if key_file else ("LLM_API_KEY" if api_key else "")
     return {
         # --- Identity ---
         # Name used in answers, reports and Teams cards. A friendly cluster name
         # cannot be discovered reliably from inside the cluster, so it is configured.
         "cluster_name": env.get("CLUSTER_NAME", "unknown-cluster").strip(),
-        # --- MS Foundry model (see docs/foundry-setup.md) ---
-        # Resource endpoint, e.g. https://<resource>.openai.azure.com/ . The client
-        # appends /openai/v1/ when it is missing.
-        "foundry_endpoint": env.get("FOUNDRY_ENDPOINT", "").strip(),
-        # Name of the model *deployment* in Foundry (not the model name).
-        "foundry_deployment": env.get("FOUNDRY_DEPLOYMENT", "").strip(),
-        # API key, from the file in FOUNDRY_API_KEY_FILE (a mounted Secret, which wins)
-        # or FOUNDRY_API_KEY. Empty = Entra ID token (az login locally, Workload
-        # Identity in the cluster), the recommended way for Azure AI Foundry.
-        "foundry_api_key": _secret(env, "FOUNDRY_API_KEY"),
+        # --- Chat model (docs/model-providers.md) ---
+        # Which provider serves the model: foundry, openai, anthropic, ollama or
+        # openai-compatible. It decides the wire API, the default endpoint and the
+        # default reasoning effort. Empty is allowed here and reported as missing.
+        "llm_provider": provider_name,
+        # Base URL of the provider. Empty = the provider's default (foundry and
+        # openai-compatible have none, so it is required there).
+        "llm_endpoint": env.get("LLM_ENDPOINT", "").strip() or (provider.default_endpoint if provider else ""),
+        # Model name; for foundry the name of the *deployment*, not of the model.
+        "llm_model": env.get("LLM_MODEL", "").strip(),
+        # API key, from the file in LLM_API_KEY_FILE (a mounted Secret, which wins)
+        # or LLM_API_KEY. Empty = Entra ID token (az login locally, Workload
+        # Identity in the cluster) where the provider supports it.
+        "llm_api_key": api_key,
+        # Where the key came from, for logs and `doctor`; never the key itself.
+        "llm_api_key_source": api_key_source,
+        # How to authenticate: auto picks the API key when there is one, else Entra ID.
+        "llm_auth": _choice(env, "LLM_AUTH", "auto", ("auto", "entra", "api-key")),
         # OAuth scope requested for the Entra ID token.
-        "foundry_token_scope": env.get("FOUNDRY_TOKEN_SCOPE", "https://ai.azure.com/.default").strip(),
+        "llm_token_scope": env.get("LLM_TOKEN_SCOPE", "https://ai.azure.com/.default").strip(),
         # Per-request timeout; reasoning models can take a while on large contexts.
-        "foundry_timeout_seconds": _int(env, "FOUNDRY_TIMEOUT_SECONDS", 120),
-        # How hard a reasoning model (gpt-5.x) thinks before answering. Without it
+        "llm_timeout_seconds": _int(env, "LLM_TIMEOUT_SECONDS", 120),
+        # Output token limit of one reply (reasoning tokens count against it).
+        "llm_max_output_tokens": _int(env, "LLM_MAX_OUTPUT_TOKENS", 32000),
+        # How hard a reasoning model thinks before answering. Without it
         # gpt-5.4-mini does not reason at all, which made investigations shallow.
-        # Empty = do not send the parameter (for models that reject it).
-        "foundry_reasoning_effort": _choice(
-            env, "FOUNDRY_REASONING_EFFORT", "medium", ("", "none", "minimal", "low", "medium", "high")
-        ),
+        # Empty = do not send the parameter (for models that reject it). The default
+        # depends on the provider; with no provider chosen yet it is empty.
+        "llm_reasoning_effort": _choice(env, "LLM_REASONING_EFFORT", default_effort, REASONING_EFFORTS),
+        # Whether the pod runs with Azure Workload Identity (the webhook injects this
+        # variable); used to explain Entra ID failures.
+        "workload_identity": bool(env.get("AZURE_FEDERATED_TOKEN_FILE", "").strip()),
         # --- Kubernetes access ---
         # kubernetes-mcp-server endpoint (streamable HTTP). In the pod the server is a
         # sidecar on localhost. Empty string = MCP disabled, kubectl only.
@@ -250,9 +281,12 @@ def configure_app(env: Mapping[str, str] | None = None) -> dict:
 
 def missing_model_settings(config: dict) -> list[str]:
     """Return the names of required model variables that are not set."""
+    provider = PROVIDERS.get(config["llm_provider"])
     missing = []
-    if not config["foundry_endpoint"]:
-        missing.append("FOUNDRY_ENDPOINT")
-    if not config["foundry_deployment"]:
-        missing.append("FOUNDRY_DEPLOYMENT")
+    if provider is None:
+        missing.append("LLM_PROVIDER")
+    if not config["llm_model"]:
+        missing.append("LLM_MODEL")
+    if provider is not None and not provider.default_endpoint and not config["llm_endpoint"]:
+        missing.append("LLM_ENDPOINT")
     return missing

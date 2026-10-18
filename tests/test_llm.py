@@ -1,55 +1,17 @@
 import pytest
 from azure.core.exceptions import ClientAuthenticationError
 
-from k8s_servant.llm import build_client, explain_model_error, normalize_endpoint
+from k8s_servant.llm import build_client, explain_model_error
 from k8s_servant.llm.types import ModelOutputTruncated
-
-
-@pytest.mark.parametrize(
-    "raw",
-    [
-        "https://res.openai.azure.com",
-        "https://res.openai.azure.com/",
-        "https://res.openai.azure.com/openai/v1",
-        "https://res.openai.azure.com/openai/v1/",
-        "  https://res.openai.azure.com/  ",
-    ],
-)
-def test_normalize_endpoint(raw):
-    assert normalize_endpoint(raw) == "https://res.openai.azure.com/openai/v1/"
-
-
-def test_normalize_endpoint_rejects_http():
-    with pytest.raises(ValueError, match="https://"):
-        normalize_endpoint("http://res.openai.azure.com")
-
-
-@pytest.mark.parametrize(
-    "raw, expected",
-    [
-        # Any other OpenAI-compatible endpoint: a URL with a path is used as given.
-        ("https://api.openai.com/v1", "https://api.openai.com/v1/"),
-        ("https://llm.example.com/proxy/v1/", "https://llm.example.com/proxy/v1/"),
-        # Plain http only for a model on the same machine or pod (e.g. a local server).
-        ("http://localhost:11434/v1", "http://localhost:11434/v1/"),
-        ("http://127.0.0.1:8000/v1", "http://127.0.0.1:8000/v1/"),
-    ],
-)
-def test_normalize_endpoint_keeps_other_openai_compatible_urls(raw, expected):
-    assert normalize_endpoint(raw) == expected
-
-
-def test_normalize_endpoint_rejects_http_to_a_remote_host():
-    with pytest.raises(ValueError, match="https://"):
-        normalize_endpoint("http://llm.example.com/v1")
 
 
 def test_build_client_with_api_key():
     config = {
-        "foundry_api_key": "k",
-        "foundry_endpoint": "https://res.openai.azure.com",
-        "foundry_timeout_seconds": 10,
-        "foundry_token_scope": "https://ai.azure.com/.default",
+        "llm_api_key": "k",
+        "llm_provider": "foundry",
+        "llm_endpoint": "https://res.openai.azure.com",
+        "llm_timeout_seconds": 10,
+        "llm_token_scope": "https://ai.azure.com/.default",
     }
     client = build_client(config)
     assert str(client.base_url) == "https://res.openai.azure.com/openai/v1/"
@@ -63,7 +25,7 @@ class _HttpError(Exception):
 
 @pytest.mark.parametrize(
     "status, text",
-    [(401, "az login"), (403, "private endpoint"), (404, "FOUNDRY_DEPLOYMENT"), (429, "quota")],
+    [(401, "az login"), (403, "private endpoint"), (404, "LLM_MODEL"), (429, "quota")],
 )
 def test_explain_model_error_by_status(status, text):
     assert text in explain_model_error(_HttpError(status))

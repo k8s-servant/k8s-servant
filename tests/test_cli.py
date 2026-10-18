@@ -6,10 +6,11 @@ from fakes import ScriptedChat, answer, findings_answer
 from k8s_servant import cli
 
 ENV_VARS = (
-    "FOUNDRY_ENDPOINT",
-    "FOUNDRY_DEPLOYMENT",
-    "FOUNDRY_API_KEY",
-    "FOUNDRY_API_KEY_FILE",
+    "LLM_PROVIDER",
+    "LLM_ENDPOINT",
+    "LLM_MODEL",
+    "LLM_API_KEY",
+    "LLM_API_KEY_FILE",
     "KNOWLEDGE_DIR",
     "MAX_ITERATIONS",
     "PROMETHEUS_URL",
@@ -42,8 +43,9 @@ def clean_env(monkeypatch, tmp_path):
 @pytest.fixture
 def scripted_model(monkeypatch):
     """Configure a model and replace it with a scripted fake; returns a setter for the replies."""
-    monkeypatch.setenv("FOUNDRY_ENDPOINT", "https://x.openai.azure.com/")
-    monkeypatch.setenv("FOUNDRY_DEPLOYMENT", "k8s-servant")
+    monkeypatch.setenv("LLM_PROVIDER", "foundry")
+    monkeypatch.setenv("LLM_ENDPOINT", "https://x.openai.azure.com/")
+    monkeypatch.setenv("LLM_MODEL", "k8s-servant")
     monkeypatch.setenv("MCP_URL", "")
     monkeypatch.setenv("CLUSTER_NAME", "my-cluster")
     holder = {}
@@ -77,13 +79,13 @@ def test_parser_collects_values_and_question_words():
 
 def test_ask_without_model_settings_exits_2(capsys):
     assert cli.main(["ask", "hi"]) == 2
-    assert "FOUNDRY_ENDPOINT" in capsys.readouterr().err
+    assert "LLM_PROVIDER" in capsys.readouterr().err
 
 
 @pytest.mark.parametrize("command", [["check"], ["report"], ["serve"]])
 def test_model_commands_need_model_settings(command, capsys):
     assert cli.main(command) == 2
-    assert "FOUNDRY_ENDPOINT" in capsys.readouterr().err
+    assert "LLM_PROVIDER" in capsys.readouterr().err
 
 
 def test_missing_values_file_is_a_configuration_error(tmp_path, capsys):
@@ -247,8 +249,9 @@ def test_ask_is_recorded_in_history(scripted_model, capsys):
 
 
 def test_bad_endpoint_is_a_configuration_error(monkeypatch, capsys):
-    monkeypatch.setenv("FOUNDRY_ENDPOINT", "http://insecure")
-    monkeypatch.setenv("FOUNDRY_DEPLOYMENT", "d")
+    monkeypatch.setenv("LLM_PROVIDER", "foundry")
+    monkeypatch.setenv("LLM_ENDPOINT", "http://insecure")
+    monkeypatch.setenv("LLM_MODEL", "d")
     assert cli.main(["check"]) == 2
     assert "https://" in capsys.readouterr().err
 
@@ -291,7 +294,7 @@ def test_check_model_error_inside_mcp_session_is_explained_not_a_traceback(scrip
     monkeypatch.setattr(cli, "open_agent", agent_inside_task_group)
     assert cli.main(["check"]) == 1
     err = capsys.readouterr().err
-    assert "Model call failed: cannot reach FOUNDRY_ENDPOINT" in err
+    assert "Model call failed: cannot reach LLM_ENDPOINT" in err
     assert "Traceback" not in err
 
 
