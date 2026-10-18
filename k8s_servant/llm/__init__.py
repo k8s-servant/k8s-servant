@@ -9,7 +9,7 @@ import logging
 
 from k8s_servant.llm.auth import ModelAuth, resolve_model_auth
 from k8s_servant.llm.chat_completions import ChatCompletionsChat, build_client
-from k8s_servant.llm.errors import MODEL_ERRORS, explain_model_error, model_error_text
+from k8s_servant.llm.errors import MODEL_ERRORS, model_error_text
 from k8s_servant.llm.messages import MessagesChat, build_messages_client
 from k8s_servant.llm.providers import PROVIDERS, normalize_endpoint
 from k8s_servant.llm.responses import ResponsesChat
@@ -75,7 +75,6 @@ __all__ = [
     "build_chat",
     "build_client",
     "describe_model",
-    "explain_model_error",
     "model_error_text",
     "normalize_endpoint",
 ]

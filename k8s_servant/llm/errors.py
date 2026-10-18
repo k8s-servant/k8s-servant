@@ -64,6 +64,9 @@ _OTHER_HINTS = {
 def explain_model_error(exc: BaseException, provider: str = "", *, endpoint: str = "", auth_method: str = "") -> str:
     """Translate a model-call failure into a short, actionable message.
 
+    The text may contain the provider's error body, which can echo the API key:
+    callers outside this module use model_error_text, which removes it.
+
     Args:
         exc: The exception raised by the model call.
         provider: The LLM_PROVIDER value; picks the API-specific advice.
