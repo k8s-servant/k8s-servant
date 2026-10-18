@@ -36,7 +36,7 @@ runs next to it as a **sidecar** container on `localhost:8080`.
 | Module | What it does | Why it exists |
 |---|---|---|
 | `config.py` | Reads every setting from environment variables into one dict. Sets up logging to stderr. | The same code runs on a laptop and in a pod. Only the environment differs. |
-| `llm/` | `types.py` holds the neutral `Turn`, `ToolCall` and `ToolSpec` the agent speaks. `chat_completions.py` builds the OpenAI SDK client for the Foundry v1 endpoint; `ChatCompletionsChat.complete()` converts the turns and sends one request. `explain_model_error()` turns HTTP errors into advice. | It keeps everything specific to Foundry and authentication in one place. |
+| `llm/` | The model client package. `types.py` holds the neutral `Turn`, `ToolCall` and `ToolSpec` the agent speaks; `providers.py` the provider table (wire API, default endpoint and effort) and endpoint rules; `auth.py` resolves the sign-in (API key, Entra ID or none). One module per wire API converts the turns and sends one request: `responses.py` (Foundry, OpenAI), `messages.py` (Claude, on Anthropic or Foundry) and `chat_completions.py` (Ollama, OpenAI-compatible servers). `build_chat()` picks the client for `LLM_PROVIDER`; `model_error_text()` turns failures into advice without the API key. | It keeps everything specific to a provider, its API and its authentication in one place, so the agent never depends on a model SDK. |
 | `tools/registry.py` | Defines the `Tool` shape (name, description, JSON schema, `run`), the `ToolRegistry` and `truncate_output()`. | The loop handles every tool the same way, wherever the tool comes from. |
 | `tools/mcp_tools.py` | Connects to kubernetes-mcp-server and wraps each of its tools as a `Tool`. | It is the preferred way to read the cluster. |
 | `tools/kubectl_tool.py` | A guarded `kubectl` that only allows read verbs and never touches Secrets. | It is the fallback when MCP is not available. |
@@ -236,7 +236,7 @@ leaves the cluster.
   - an MCP tool reporting an error, or an MCP call failing (too large an answer, a
     timeout). The text then tells the model to narrow the query or use another tool.
 - Model-call failures (401, 403, 404, 429, network, token) stop the command with an
-  explanation from `explain_model_error()`, and the exit code is 1.
+  explanation from `model_error_text()`, and the exit code is 1.
 
 ## Output truncation
 

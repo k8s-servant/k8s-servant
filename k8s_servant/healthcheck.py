@@ -176,7 +176,7 @@ def record_failed_run(memory: Memory, kind: str, started_at: datetime, error: st
         memory: The agent's memory.
         kind: Run kind (`check`, `morning`, `ask`).
         started_at: When the run started (UTC).
-        error: Short, human-readable reason (explain_model_error()).
+        error: Short, human-readable reason (model_error_text()).
 
     Returns:
         The run id.

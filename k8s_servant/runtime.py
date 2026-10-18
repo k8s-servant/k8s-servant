@@ -109,7 +109,7 @@ async def open_agent(
         config: Settings from configure_app().
         knowledge: Loaded knowledge.
         memory: The agent's memory (learned notes, save_note).
-        chat: Model client; by default a ChatCompletionsChat for the configured deployment.
+        chat: Model client; by default build_chat() for the configured provider.
         mcp_server: Override for config["mcp_url"] (tests).
 
     Yields:

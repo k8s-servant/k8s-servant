@@ -23,9 +23,10 @@ from k8s_servant.llm.providers import OLD_SETTINGS, PROVIDERS
 # the package runs from a git checkout (local development) this path points at
 # them, so local runs and the cluster use the same skill files. In the container
 # KNOWLEDGE_DIR is set explicitly to the mounted ConfigMap.
-REASONING_EFFORTS = ("", "none", "minimal", "low", "medium", "high", "xhigh", "max")
-
 DEFAULT_KNOWLEDGE_DIR = Path(__file__).resolve().parent.parent / "charts" / "k8s-servant" / "knowledge"
+
+# The accepted LLM_REASONING_EFFORT values; "" means the parameter is not sent.
+REASONING_EFFORTS = ("", "none", "minimal", "low", "medium", "high", "xhigh", "max")
 
 
 def configure_logging(level: str | None = None) -> None:
@@ -195,7 +196,8 @@ def configure_app(env: Mapping[str, str] | None = None) -> dict:
         # depends on the provider; with no provider chosen yet it is empty.
         "llm_reasoning_effort": _choice(env, "LLM_REASONING_EFFORT", default_effort, REASONING_EFFORTS),
         # Whether the pod runs with Azure Workload Identity (the webhook injects this
-        # variable); used to explain Entra ID failures.
+        # variable); drives the sign-in label and the auto-mode warning when a key
+        # is used although Workload Identity is available.
         "workload_identity": bool(env.get("AZURE_FEDERATED_TOKEN_FILE", "").strip()),
         # --- Kubernetes access ---
         # kubernetes-mcp-server endpoint (streamable HTTP). In the pod the server is a

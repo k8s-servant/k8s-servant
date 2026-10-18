@@ -1,16 +1,15 @@
-"""Chat Completions client for the chat model deployed in MS Foundry.
+"""Chat Completions client for the ollama and openai-compatible providers.
 
-Foundry exposes an OpenAI-compatible "v1" endpoint
-(https://<resource>.openai.azure.com/openai/v1/), so the official `openai` SDK is
-used as-is: no Azure-specific SDK and no api-version parameter are needed. Other
-OpenAI-compatible endpoints (experimental) work too: give their full base URL
-(e.g. https://api.openai.com/v1) and an API key in LLM_API_KEY.
+Why Chat Completions there: it is the one API that self-hosted servers (Ollama,
+vLLM, LM Studio), gateways such as LiteLLM, and partner models offering only that
+API all speak, so any of them works with a base URL and nothing else. Foundry and
+OpenAI use the Responses API (responses.py) and Claude the Messages API
+(messages.py) instead.
 
-Sign-in (key, Entra ID or none) is decided by llm/auth.py and passed in.
-
-We use the Chat Completions API (not the newer Responses API) because every chat
-model in Foundry supports it, OpenAI and non-OpenAI alike, so switching models is
-a configuration change only.
+build_client() also creates the AsyncOpenAI client the Responses API uses: the
+official `openai` SDK talks to OpenAI and to Foundry's OpenAI-compatible "v1"
+endpoint as-is, with no Azure-specific SDK or api-version parameter. Sign-in (key,
+Entra ID or none) is decided by llm/auth.py and passed in.
 
 This module is the only place that converts the neutral Turn / ToolSpec types
 (llm/types.py) to Chat Completions messages and back.
