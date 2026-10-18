@@ -122,7 +122,7 @@ class MessagesChat:
             created = getattr(usage, "cache_creation_input_tokens", None) or 0
             prompt = usage.input_tokens + cached + created
             self.total_tokens += prompt + usage.output_tokens
-            log_usage(prompt, cached, usage.output_tokens, 0, time.monotonic() - started)
+            log_usage(prompt, cached, usage.output_tokens, None, time.monotonic() - started)
         if response.stop_reason == "refusal":
             raise ModelCallFailed("the model declined to answer (refusal)")
         if response.stop_reason == "max_tokens":

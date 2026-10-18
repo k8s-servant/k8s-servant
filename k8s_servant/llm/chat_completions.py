@@ -92,7 +92,7 @@ class ChatCompletionsChat:
         response = await self.client.chat.completions.create(**kwargs)
         usage = getattr(response, "usage", None)
         if usage is not None:
-            reasoning = getattr(getattr(usage, "completion_tokens_details", None), "reasoning_tokens", None) or 0
+            reasoning = getattr(getattr(usage, "completion_tokens_details", None), "reasoning_tokens", None)
             # Prompt tokens served from Foundry's prompt cache are billed at a discount.
             cached = getattr(getattr(usage, "prompt_tokens_details", None), "cached_tokens", None) or 0
             self.total_tokens += usage.prompt_tokens + usage.completion_tokens

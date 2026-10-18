@@ -74,21 +74,23 @@ class ChatModel(Protocol):
         """
 
 
-def log_usage(prompt: int, cached: int, completion: int, reasoning: int, seconds: float) -> None:
+def log_usage(prompt: int, cached: int, completion: int, reasoning: int | None, seconds: float) -> None:
     """Log one INFO line per model call; it shows what a check really costs.
 
     Args:
         prompt: Prompt tokens, including the cached ones.
         cached: Prompt tokens served from the provider's cache (billed at a discount).
         completion: Completion tokens, including the reasoning ones.
-        reasoning: Tokens spent on reasoning.
+        reasoning: Tokens spent on reasoning, or None when the provider does not
+            report them (Anthropic counts thinking inside the completion tokens).
         seconds: Wall-clock duration of the call.
     """
+    shown = "" if reasoning is None else f" ({reasoning} reasoning)"
     logger.info(
-        "model call: %d prompt (%d cached) + %d completion tokens (%d reasoning) in %.1fs",
+        "model call: %d prompt (%d cached) + %d completion tokens%s in %.1fs",
         prompt,
         cached,
         completion,
-        reasoning,
+        shown,
         seconds,
     )

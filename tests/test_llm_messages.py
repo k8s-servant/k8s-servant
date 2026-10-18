@@ -176,7 +176,7 @@ async def test_usage_counts_cache_reads(caplog):
     chat, _ = _chat(_message([TEXT], usage=usage))
     caplog.set_level("INFO")
     await chat.complete([Turn("user", "q")], [])
-    assert "1200 prompt (900 cached) + 300 completion tokens (0 reasoning)" in caplog.text
+    assert "1200 prompt (900 cached) + 300 completion tokens in" in caplog.text
     assert chat.total_tokens == 1500
 
 

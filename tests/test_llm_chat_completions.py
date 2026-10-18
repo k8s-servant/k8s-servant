@@ -104,6 +104,15 @@ async def test_logs_and_counts_tokens(caplog):
     assert chat.total_tokens == 3000
 
 
+async def test_leaves_out_reasoning_tokens_the_server_does_not_report(caplog):
+    # Ollama sends no completion_tokens_details; "0 reasoning" would be a guess.
+    usage = SimpleNamespace(prompt_tokens=100, completion_tokens=50)
+    chat = _chat(_FakeCompletions(usage=usage))
+    caplog.set_level("INFO")
+    await chat.complete([], [])
+    assert "100 prompt (0 cached) + 50 completion tokens in" in caplog.text
+
+
 def test_build_chat_uses_the_configured_deployment_and_effort():
     config = {
         "llm_provider": "openai-compatible",
