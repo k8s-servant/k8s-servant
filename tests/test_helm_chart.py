@@ -284,13 +284,23 @@ def test_endpoint_required_only_for_foundry_and_openai_compatible():
         ("FOUNDRY_TOKEN_SCOPE", "LLM_TOKEN_SCOPE"),
         ("FOUNDRY_TIMEOUT_SECONDS", "LLM_TIMEOUT_SECONDS"),
         ("FOUNDRY_REASONING_EFFORT", "LLM_REASONING_EFFORT"),
-        ("FOUNDRY_API_KEY", "LLM_API_KEY"),
         ("FOUNDRY_ANYTHING", "LLM_*"),
     ],
 )
 def test_old_foundry_key_in_appconfig_fails_with_new_name(old, new):
     error = render_error("--set-string", f"appConfig.{old}=x")
     assert old in error and new in error
+
+
+@pytest.mark.parametrize("old", ["FOUNDRY_API_KEY", "FOUNDRY_API_KEY_FILE"])
+def test_old_foundry_key_settings_point_at_llmapikey_not_appconfig(old):
+    # The chart refuses API keys in appConfig, so the advice must not send users there.
+    error = render_error("--set-string", f"appConfig.{old}=x")
+    assert (
+        f"appConfig.{old} is no longer supported: use llmApiKey.existingSecret or llmApiKey.file "
+        "(the key is mounted from a Secret, never set in appConfig)"
+    ) in error
+    assert "appConfig.LLM_API_KEY" not in error and "appConfig.llmApiKey" not in error
 
 
 # --- MCP sidecar config -------------------------------------------------------------

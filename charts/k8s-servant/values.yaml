@@ -105,9 +105,12 @@ llmApiKey:
 
 # The agent's settings, rendered as environment variables (ConfigMap + envFrom).
 # Any setting from README.md#configuration may be added; empty values are left out,
-# so the code's default applies. Not allowed here: in-cluster paths (KNOWLEDGE_DIR,
-# DATA_DIR, HEARTBEAT_FILE, MCP_URL, KUBECTL_PATH are set by the chart) and anything
-# with WEBHOOK_URL or API_KEY, and the old FOUNDRY_* names (now LLM_*) (credentials: see teamsWebhook and llmApiKey).
+# so the code's default applies. Not allowed here:
+#   - in-cluster paths (KNOWLEDGE_DIR, DATA_DIR, HEARTBEAT_FILE, MCP_URL and
+#     KUBECTL_PATH are set by the chart);
+#   - credentials, i.e. anything with WEBHOOK_URL or API_KEY (see teamsWebhook and
+#     llmApiKey);
+#   - the old FOUNDRY_* names, which became LLM_*.
 appConfig:
   # Cluster name shown in reports and Teams cards; required.
   CLUSTER_NAME: ""

@@ -94,8 +94,6 @@ webhook URL come only from Secrets mounted as files.
 {{- $renamed := dict
   "FOUNDRY_ENDPOINT" "LLM_ENDPOINT"
   "FOUNDRY_DEPLOYMENT" "LLM_MODEL"
-  "FOUNDRY_API_KEY" "LLM_API_KEY (as a Secret: llmApiKey.existingSecret / llmApiKey.file)"
-  "FOUNDRY_API_KEY_FILE" "llmApiKey.existingSecret / llmApiKey.file"
   "FOUNDRY_TOKEN_SCOPE" "LLM_TOKEN_SCOPE"
   "FOUNDRY_TIMEOUT_SECONDS" "LLM_TIMEOUT_SECONDS"
   "FOUNDRY_REASONING_EFFORT" "LLM_REASONING_EFFORT" }}
@@ -103,6 +101,9 @@ webhook URL come only from Secrets mounted as files.
 {{- range $key, $value := .Values.appConfig }}
 {{- if hasKey $fixed $key }}
 {{- fail (printf "appConfig.%s is set by the chart and cannot be overridden" $key) }}
+{{- end }}
+{{- if has $key (list "FOUNDRY_API_KEY" "FOUNDRY_API_KEY_FILE") }}
+{{- fail (printf "appConfig.%s is no longer supported: use llmApiKey.existingSecret or llmApiKey.file (the key is mounted from a Secret, never set in appConfig)" $key) }}
 {{- end }}
 {{- if hasPrefix "FOUNDRY_" $key }}
 {{- fail (printf "appConfig.%s is no longer supported: use appConfig.%s (the FOUNDRY_* settings became LLM_*; see docs/model-providers.md)" $key (get $renamed $key | default "LLM_*")) }}
