@@ -38,7 +38,8 @@ import yaml
 from k8s_servant.config import configure_app, configure_logging, missing_model_settings
 from k8s_servant.healthcheck import CheckResult, record_failed_run, run_health_check
 from k8s_servant.knowledge import load_knowledge
-from k8s_servant.llm import MODEL_ERRORS, build_chat, model_error_text
+from k8s_servant.llm import MODEL_ERRORS, build_chat, describe_model, model_error_text
+from k8s_servant.llm.auth import resolve_model_auth
 from k8s_servant.llm.types import Turn
 from k8s_servant.memory import Memory
 from k8s_servant.report import MorningReport, build_morning_report, format_age
@@ -348,14 +349,25 @@ async def cmd_doctor(args, config: dict, knowledge, memory: Memory) -> int:
 
     # 1. Configuration
     missing = missing_model_settings(config)
+    config_ok = False
     if missing:
         report("FAIL", "config", f"missing {', '.join(missing)} (see docs/model-providers.md)")
     else:
-        report(
-            "OK",
-            "config",
-            f"provider {config['llm_provider']}, endpoint {config['llm_endpoint']}, model {config['llm_model']}",
-        )
+        try:
+            # Resolve once: it validates the combination and logs the auto-mode warning.
+            resolve_model_auth(config)
+        except ValueError as exc:
+            report("FAIL", "config", str(exc))
+        else:
+            config_ok = True
+            report("OK", "config", describe_model(config))
+            if config["llm_auth"] == "auto" and config["workload_identity"] and config["llm_api_key"]:
+                report(
+                    "WARN",
+                    "auth",
+                    "Workload Identity is available but an API key is configured and used; "
+                    "set LLM_AUTH=entra and remove the key to use Workload Identity",
+                )
 
     # 2. Knowledge
     report(
@@ -430,7 +442,7 @@ async def cmd_doctor(args, config: dict, knowledge, memory: Memory) -> int:
         )
 
     # 9. Model: a tiny real completion proves endpoint, auth, deployment and network.
-    if missing:
+    if not config_ok:
         report("SKIP", "model", "configuration incomplete")
     else:
         try:

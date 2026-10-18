@@ -11,6 +11,8 @@ ENV_VARS = (
     "LLM_MODEL",
     "LLM_API_KEY",
     "LLM_API_KEY_FILE",
+    "LLM_AUTH",
+    "AZURE_FEDERATED_TOKEN_FILE",
     "KNOWLEDGE_DIR",
     "MAX_ITERATIONS",
     "PROMETHEUS_URL",
@@ -124,6 +126,49 @@ def test_doctor_reports_missing_model_settings(monkeypatch, tmp_path, capsys):
     assert "[SKIP] model" in out
     assert "[OK  ] memory" in out
     assert "[WARN] prometheus" in out and "[WARN] teams" in out
+
+
+def _doctor_env(monkeypatch, provider, endpoint="", model="claude-sonnet-5-5"):
+    monkeypatch.setenv("MCP_URL", "")
+    monkeypatch.setenv("LLM_PROVIDER", provider)
+    monkeypatch.setenv("LLM_MODEL", model)
+    if endpoint:
+        monkeypatch.setenv("LLM_ENDPOINT", endpoint)
+    monkeypatch.setattr(cli, "build_chat", lambda config: ScriptedChat(answer("OK")))
+
+
+def test_doctor_names_provider_api_and_key_file(monkeypatch, tmp_path, capsys):
+    key_file = tmp_path / "key"
+    key_file.write_text("sk-test-secret\n")
+    _doctor_env(monkeypatch, "anthropic")
+    monkeypatch.setenv("LLM_API_KEY_FILE", str(key_file))
+    assert cli.main(["doctor"]) == 0
+    out = capsys.readouterr().out
+    assert "anthropic / claude-sonnet-5-5 via Messages API, API key (file " in out
+    assert "sk-test-secret" not in out
+    assert "[OK  ] model" in out
+
+
+def test_doctor_fails_config_on_invalid_auth_combo(monkeypatch, capsys):
+    _doctor_env(monkeypatch, "openai", model="gpt-5")
+    monkeypatch.setenv("LLM_AUTH", "entra")
+    assert cli.main(["doctor"]) == 1
+    out = capsys.readouterr().out
+    assert "[FAIL] config" in out and "LLM_AUTH=entra" in out
+    assert "[SKIP] model" in out
+
+
+def test_doctor_warns_when_workload_identity_and_key(monkeypatch, tmp_path, capsys):
+    key_file = tmp_path / "key"
+    key_file.write_text("sk-test-secret\n")
+    _doctor_env(monkeypatch, "foundry", endpoint="https://x.openai.azure.com/")
+    monkeypatch.setenv("LLM_API_KEY_FILE", str(key_file))
+    monkeypatch.setenv("AZURE_FEDERATED_TOKEN_FILE", str(tmp_path / "token"))
+    cli.main(["doctor"])
+    out = capsys.readouterr().out
+    assert "[OK  ] config" in out
+    assert "[WARN] auth" in out and "LLM_AUTH=entra" in out
+    assert "sk-test-secret" not in out
 
 
 def _fake_kubectl(tmp_path, can_i_answer: str, can_i_exit: int) -> str:
