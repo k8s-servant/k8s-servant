@@ -12,9 +12,10 @@
 A **read-only AI SRE** for Kubernetes clusters. It looks at a cluster the way an
 experienced cluster administrator would: it finds what is wrong, explains why with
 evidence, says what to do about it, and remembers what it already told you. **It
-never changes anything.** The language model runs in **Azure AI Foundry** (other
-OpenAI-compatible endpoints are experimental); results go to the terminal and to an
-**MS Teams** channel.
+never changes anything.** The language model is your choice: **Azure AI Foundry**,
+**OpenAI**, **Anthropic**, a self-hosted model through **Ollama**, or any
+OpenAI-compatible server ([choose a provider](#choose-a-model-provider)); results go to
+the terminal and to an **MS Teams** channel.
 
 > [!WARNING]
 > **Early-stage project.** k8s-servant is young and has run on only a few clusters so
@@ -31,6 +32,7 @@ OpenAI-compatible endpoints are experimental); results go to the terminal and to
 - [Repository Structure](#repository-structure)
 - [What You Get](#what-you-get)
 - [How It Works](#how-it-works)
+- [Choose a Model Provider](#choose-a-model-provider)
 - [Quickstart (Local)](#quickstart-local)
 - [Deploying to a Cluster](#deploying-to-a-cluster)
 - [Configuration](#configuration)
@@ -137,7 +139,11 @@ k8s-servant/
 │   ├── knowledge-values.yaml       # Example environment description and cluster notes for a fictional platform
 │   ├── values-azure.yaml           # The complete Azure setup: Foundry + Workload Identity + Key Vault via External Secrets
 │   ├── values-azure-csi.yaml       # Azure without Kubernetes Secrets: Key Vault mounted by the CSI driver
-│   ├── values-minimal.yaml         # Any cluster: API key and Teams webhook from kubectl-created Secrets
+│   ├── values-azure-claude.yaml    # Claude on Foundry with Workload Identity
+│   ├── values-anthropic.yaml       # Claude from Anthropic, key from a Secret
+│   ├── values-openai.yaml          # OpenAI, key from a Secret
+│   ├── values-ollama.yaml          # An in-cluster Ollama, no key
+│   ├── values-minimal.yaml         # Any cluster: OpenAI-compatible endpoint and Teams webhook from kubectl-created Secrets
 │   └── flux-helmrelease.yaml       # Flux HelmRelease installing the OCI chart
 ├── deploy/local/
 │   └── mcp-config.toml             # kubernetes-mcp-server config for local runs (read-only, core toolset)
@@ -221,7 +227,7 @@ Formats, rules and the Teams cards: [docs/reports.md](docs/reports.md).
               (cluster_problems + alerts) ── unchanged? ──▶ "unchanged", done (0 tokens)
                                             │ changed / manual / every 6 h
                                             ▼
-                                       agent loop ──────▶ chat model (Azure AI Foundry)
+                                       agent loop ──────▶ chat model (your LLM_PROVIDER)
                                        │  ▲                (e.g. gpt-5.4-mini, reasoning medium)
                            tool calls  ▼  │ results (cut to 8,000 chars)
  ┌──────────────────┬───────────────┬──────────────┬──────────────┬───────────┬──────────┐
@@ -256,28 +262,46 @@ There is no agent framework: the loop is about 100 commented lines in
 
 ---
 
+## Choose a Model Provider
+
+Set `LLM_PROVIDER`; each provider has a full recipe (laptop `.env`, Helm values file,
+sign-in, expected `doctor` line) in [docs/model-providers.md](docs/model-providers.md),
+which also explains in plain words why the agent speaks three different APIs.
+
+| `LLM_PROVIDER` | Model | Sign-in | Recipe | Helm example |
+|---|---|---|---|---|
+| `foundry` | GPT and others on Azure AI Foundry | Entra ID or API key | [Foundry](docs/model-providers.md#foundry-gpt-and-other-responses-models) | `examples/values-azure.yaml` |
+| `anthropic` (Foundry endpoint) | Claude on Azure AI Foundry | Entra ID | [Claude on Foundry](docs/model-providers.md#claude-on-foundry) | `examples/values-azure-claude.yaml` |
+| `openai` | OpenAI | API key | [OpenAI](docs/model-providers.md#openai) | `examples/values-openai.yaml` |
+| `anthropic` | Claude from Anthropic | API key | [Anthropic](docs/model-providers.md#anthropic) | `examples/values-anthropic.yaml` |
+| `ollama` | A model you host, e.g. in the cluster | none | [Ollama](docs/model-providers.md#ollama-laptop-and-in-cluster) | `examples/values-ollama.yaml` |
+| `openai-compatible` | vLLM, LiteLLM, Gemini, LM Studio, ... | API key (optional) | [OpenAI-compatible](docs/model-providers.md#openai-compatible-vllm-litellm-gemini-) | `examples/values-minimal.yaml` |
+
+---
+
 ## Quickstart (Local)
 
 Prerequisites:
 - Python 3.12+;
 - `kubectl` with a context for the cluster;
-- a chat model with tool calling. Today that is a deployment in **Azure AI Foundry**
-  (run `scripts/setup-foundry.sh`, or follow [docs/foundry-setup.md](docs/foundry-setup.md))
-  plus the `az` CLI for Entra ID sign-in. Other OpenAI-compatible endpoints are
-  experimental (see [Cluster and model](#cluster-and-model));
+- a chat model with tool calling from any provider in
+  [the table above](#choose-a-model-provider): for example an OpenAI or Anthropic API
+  key, a local Ollama, or a deployment in **Azure AI Foundry** (run
+  `scripts/setup-foundry.sh`, or follow [docs/foundry-setup.md](docs/foundry-setup.md))
+  plus the `az` CLI for Entra ID sign-in;
 - optional: Node.js (to run kubernetes-mcp-server with `npx`).
 
 ```bash
 # 1. Install
 python3 -m venv .venv
-.venv/bin/pip install -e '.[dev]'
+.venv/bin/pip install -e '.[dev]'   # add ,azure for Entra ID sign-in: '.[dev,azure]'
 source .venv/bin/activate
 
 # 2. Configure (see the table below)
 cp .env.example .env            # set LLM_PROVIDER, LLM_ENDPOINT, LLM_MODEL, CLUSTER_NAME
                                 #   (no secrets in it: see "Secrets: local vs cluster")
 set -a; source .env; set +a
-az login                        # the agent uses your Entra ID session for Foundry
+az login                        # only for Foundry with Entra ID; other providers use an API key
 kubectl config current-context  # the agent reads the cluster of this context
 
 # 3. Optional but recommended, each in its own terminal:
@@ -322,9 +346,10 @@ OCI artifact. The full guide is [docs/deployment.md](docs/deployment.md). In sho
 | MCP sidecar image | upstream `ghcr.io/containers/kubernetes-mcp-server` |
 | Helm chart | `oci://ghcr.io/k8s-servant/charts/k8s-servant` (source: `charts/k8s-servant/`) |
 
-1. **Model access.** Deploy a chat model (`scripts/setup-foundry.sh` for Azure AI
-   Foundry) and give the pod a way to call it: on AKS, a Workload Identity
-   (`scripts/setup-workload-identity.sh`); elsewhere, an API key in a Secret.
+1. **Model access.** Pick a provider ([recipes](docs/model-providers.md)) and give
+   the pod a way to call it: an API key in a Secret (OpenAI, Anthropic, ...), nothing
+   for an in-cluster Ollama, or for Foundry on AKS a Workload Identity
+   (`scripts/setup-foundry.sh`, `scripts/setup-workload-identity.sh`).
 2. **Credentials.** The chart never creates Secrets. The API key and the Teams webhook
    URL come from a Secret you create (kubectl, External Secrets, Sealed Secrets, ...)
    or from a file you mount (Secrets Store CSI driver), always read as files
@@ -334,8 +359,12 @@ OCI artifact. The full guide is [docs/deployment.md](docs/deployment.md). In sho
 
    | Example | For |
    |---|---|
-   | `examples/values-minimal.yaml` | any cluster: API key and Teams webhook from kubectl-created Secrets |
+   | `examples/values-minimal.yaml` | any cluster: an OpenAI-compatible endpoint with an API key, and the Teams webhook, from kubectl-created Secrets |
+   | `examples/values-openai.yaml` | any cluster: OpenAI, key from a Secret |
+   | `examples/values-anthropic.yaml` | any cluster: Claude from Anthropic, key from a Secret |
+   | `examples/values-ollama.yaml` | any cluster: an in-cluster Ollama, no key |
    | `examples/values-azure.yaml` | AKS: Foundry with Workload Identity, Teams webhook synced from Key Vault by External Secrets |
+   | `examples/values-azure-claude.yaml` | AKS: Claude on Foundry with Workload Identity |
    | `examples/values-azure-csi.yaml` | AKS without Kubernetes Secrets: Teams webhook mounted from Key Vault by the CSI driver |
 4. **Install:**
    ```bash
@@ -449,8 +478,8 @@ Almost nothing in `.env` is secret:
 | Value | Secret? | Local (laptop) | Cluster |
 |---|---|---|---|
 | Endpoints, names, URLs of Prometheus etc., timeouts | No | `.env` | ConfigMap rendered by the Helm chart |
-| **Access to the model (Azure AI Foundry)** | — | your `az login` session; nothing is stored in `.env` | **Workload Identity**: the pod's ServiceAccount is federated with a managed identity that has *Cognitive Services OpenAI User* on the Foundry resource. No key anywhere |
-| `LLM_API_KEY` | **Yes** | leave it empty for Azure AI Foundry (keys only for quick experiments); required for other OpenAI-compatible endpoints | for Azure AI Foundry not used; otherwise a Kubernetes Secret you create, named in `llmApiKey.existingSecret`, mounted as a file (`LLM_API_KEY_FILE`) |
+| **Access to the model (Foundry with Entra ID)** | — | your `az login` session; nothing is stored in `.env` | **Workload Identity**: the pod's ServiceAccount is federated with a managed identity that has *Cognitive Services OpenAI User* on the Foundry resource. No key anywhere |
+| `LLM_API_KEY` | **Yes** | leave it empty for Foundry with Entra ID and for Ollama; required for OpenAI and Anthropic | not used with Entra ID or Ollama; otherwise a Kubernetes Secret you create, named in `llmApiKey.existingSecret`, mounted as a file (`LLM_API_KEY_FILE`) |
 | **`TEAMS_WEBHOOK_URL`** | **Yes**: anyone with it can post to the channel | load it from your secret store into your shell (below) | A Kubernetes Secret you create any way you like (kubectl, External Secrets, Sealed Secrets, ...), named in `teamsWebhook.existingSecret`, mounted as a file and read through `TEAMS_WEBHOOK_URL_FILE`. `examples/values-azure.yaml` syncs it from Azure Key Vault with External Secrets |
 
 In the Azure example, one managed identity does both jobs: it calls the model and
@@ -529,7 +558,7 @@ nothing. Measured on a test cluster (~600 Deployments, ~1,250 pods) with gpt-5.4
 - **Levers:** `CHECK_SKIP_UNCHANGED`, `CHECK_FULL_INTERVAL_HOURS`,
   `CHECK_INTERVAL_MINUTES`, `TOOL_OUTPUT_MAX_CHARS`, `LLM_REASONING_EFFORT`.
 - Every model call is logged with its tokens: `model call: N prompt (M cached) + K
-  completion tokens (R reasoning)`. Set a budget alert on the Foundry resource group.
+  completion tokens (R reasoning)`. Set a budget alert with your provider (on Foundry: the resource group).
 
 More: [docs/foundry-setup.md](docs/foundry-setup.md#9-cost-and-limits),
 [docs/foundry-concepts.md](docs/foundry-concepts.md).
@@ -584,9 +613,10 @@ Honest notes from the first real runs:
 - **Clusters that are recreated regularly** lose their memory with the volume, and a
   new OIDC issuer needs the federated credential re-pointed
   ([docs/deployment.md](docs/deployment.md#when-a-cluster-is-recreated)).
-- **Only Azure AI Foundry is tested.** Other OpenAI-compatible endpoints are
-  experimental; multi-provider support is planned
-  ([#2](https://github.com/k8s-servant/k8s-servant/issues/2)).
+- **Model quality varies by provider and model.** All five providers are supported
+  ([docs/model-providers.md](docs/model-providers.md)), but small self-hosted models find
+  fewer problems than current hosted reasoning models. Bedrock and Vertex AI sign-in
+  are not supported yet.
 - **Notifications go to MS Teams only.** Slack and other channels are planned
   ([#3](https://github.com/k8s-servant/k8s-servant/issues/3),
   [#4](https://github.com/k8s-servant/k8s-servant/issues/4)).
@@ -601,7 +631,8 @@ is no shell. See [docs/security.md](docs/security.md).
 
 **What data leaves the cluster?** Object names, statuses, events, metrics and, when
 it investigates, log lines go to the model endpoint (with Azure AI Foundry: in the data
-zone you choose, not used for training). Findings and summaries go to Teams. Never
+zone you choose, not used for training; with other providers see their data policies,
+linked from [docs/model-providers.md](docs/model-providers.md#data-handling-and-errors)). Findings and summaries go to Teams. Never
 Secrets. Most data is reduced in Python first; log lines are not redacted.
 [docs/security.md](docs/security.md#what-data-leaves-the-cluster),
 [docs/data-processing.md](docs/data-processing.md).
@@ -616,12 +647,11 @@ when something is new or resolved. The morning report is always posted.
 or cluster notes, or let it save a learned note. See
 [Teaching the agent](#teaching-the-agent).
 
-**Can I use another model?** Yes, any chat model in Azure AI Foundry with tool calling:
-change `LLM_MODEL`. For models without reasoning set
-`LLM_REASONING_EFFORT=` (empty). Other providers (OpenAI, a local
-Ollama, any OpenAI-compatible server) work experimentally: set `LLM_PROVIDER`,
-`LLM_MODEL` and, where needed, `LLM_ENDPOINT` (full base URL including its path) and
-`LLM_API_KEY`.
+**Can I use another model?** Yes, any chat model with tool calling: change `LLM_MODEL`,
+or `LLM_PROVIDER` to use OpenAI, Anthropic, Ollama or any OpenAI-compatible server
+(`LLM_ENDPOINT` is then the full base URL including its path). For models without
+reasoning set `LLM_REASONING_EFFORT=` (empty). Recipes:
+[docs/model-providers.md](docs/model-providers.md).
 
 **Does it need AKS?** No. The agent and the chart work on any Kubernetes cluster. The
 Workload Identity and Key Vault parts are optional and AKS-specific.
@@ -651,6 +681,7 @@ See [docs/architecture.md](docs/architecture.md#why-our-own-loop-and-no-framewor
 | [docs/troubleshooting.md](docs/troubleshooting.md) | Symptoms, causes and fixes, from the first real runs |
 | [docs/ci-and-releases.md](docs/ci-and-releases.md) | CI workflows, required checks, PR title rules, release-please and published artifacts |
 | [docs/development.md](docs/development.md) | Working on the code: code map, rules, tests and fakes, recipes (add a setting, a check, a tool, a skill, a command) |
+| [docs/model-providers.md](docs/model-providers.md) | Why three APIs, and a full recipe per provider: Foundry, Claude on Foundry, OpenAI, Anthropic, Ollama, OpenAI-compatible; migrating from `FOUNDRY_*` |
 | [docs/foundry-concepts.md](docs/foundry-concepts.md) | What Azure AI Foundry is: resources, deployments, quota, cost, access, network |
 | [docs/foundry-setup.md](docs/foundry-setup.md) | Setting up the model in Azure AI Foundry, step by step |
 | [docs/roadmap.md](docs/roadmap.md) | What exists, what is next and ideas for later |

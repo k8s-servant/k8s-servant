@@ -180,8 +180,8 @@ shared with other teams.
 **Recommendation: dedicated resources when the agent runs in private clusters.** It
 then needs network rules, access and cost reporting of its own, which a shared resource
 cannot give without affecting other teams. An own deployment on a shared resource is
-fine for quick experiments. Switching between the two only changes `FOUNDRY_ENDPOINT`
-and `FOUNDRY_DEPLOYMENT`.
+fine for quick experiments. Switching between the two only changes `LLM_ENDPOINT`
+and `LLM_MODEL`.
 
 ### Layout: one resource for non-prod, one for prod
 

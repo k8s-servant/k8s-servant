@@ -130,11 +130,17 @@ which is a few dozen lines. If a later stage needs what a framework offers, such
 multi-agent work, only `agent.py` changes. The tools, knowledge and model client are
 separate modules.
 
-## Why the Chat Completions API
+## Why three APIs
 
-Foundry hosts OpenAI and non-OpenAI chat models. All of them support the Chat
-Completions API, so switching models is a configuration change (`FOUNDRY_DEPLOYMENT`).
-We set no `temperature`, because gpt-5.x reasoning models accept only the default.
+Newer reasoning models need their hidden thinking carried from one tool call to the
+next, and the Chat Completions API has no place for it. The model client therefore
+speaks three APIs behind one neutral interface (`k8s_servant/llm/`): the Responses API
+(`foundry`, `openai`), Anthropic's Messages API (`anthropic`) and Chat Completions
+(`ollama`, `openai-compatible`). `LLM_PROVIDER` decides which; the agent loop, health
+check and report never see the difference. Switching models within a provider is a
+configuration change (`LLM_MODEL`). Plain-words explanation and a recipe per provider:
+[model-providers.md](model-providers.md).
+We set no `temperature`, because reasoning models accept only the default.
 
 ## MCP first, kubectl as fallback
 

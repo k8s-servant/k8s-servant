@@ -17,7 +17,7 @@
 #      corrected on an existing deployment.
 #   4. Assigns "Cognitive Services OpenAI User" on the resource to the signed-in
 #      user, so `k8s-servant doctor` / `ask` work from your laptop with `az login`.
-#   5. Prints the FOUNDRY_ENDPOINT / FOUNDRY_DEPLOYMENT values for .env.
+#   5. Prints the LLM_PROVIDER / LLM_ENDPOINT / LLM_MODEL values for .env.
 #
 # What it does NOT do (see docs/foundry-setup.md):
 #   - Networking (private endpoint / firewall) for the private AKS clusters.
@@ -231,9 +231,10 @@ echo "             upgrade policy $UPGRADE_OPTION)"
 echo ""
 echo "1. Put these into your .env (then: set -a; source .env; set +a):"
 echo "----------------------------------------------------------------------"
-echo "  FOUNDRY_ENDPOINT=https://${FOUNDRY_NAME}.openai.azure.com/"
-echo "  FOUNDRY_DEPLOYMENT=${DEPLOYMENT_NAME}"
-echo "  FOUNDRY_API_KEY="
+echo "  LLM_PROVIDER=foundry"
+echo "  LLM_ENDPOINT=https://${FOUNDRY_NAME}.openai.azure.com/"
+echo "  LLM_MODEL=${DEPLOYMENT_NAME}"
+echo "  LLM_AUTH=entra"
 echo ""
 echo "2. Check it end to end:"
 echo "----------------------------------------------------------------------"

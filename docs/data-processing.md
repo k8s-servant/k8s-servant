@@ -15,7 +15,7 @@ The flow:
         ▼
  ② cap the size          every tool result ≤ TOOL_OUTPUT_MAX_CHARS      (agent loop)
         ▼
- ③ the request           system prompt + conversation + tool results ──▶ MS Foundry model
+ ③ the request           system prompt + conversation + tool results ──▶ the model (any provider)
         ▼                                                                    │
  ④ check the answer      findings JSON parsed, validated, normalised  ◀─────┘
         ▼
@@ -125,8 +125,11 @@ Being explicit matters here:
   cap), content filtering does not.
 
 Mitigations: logs are read only when investigating a specific problem, with a tail;
-the model runs in a dedicated Foundry resource in the EU data zone and does not train
-on prompts; Secrets are out of reach; keep credentials out of logs and ConfigMaps
+with Foundry the model runs in a dedicated resource in the EU data zone and does not
+train on prompts; the Responses API (Foundry, OpenAI) is called with `store=false`, so
+no conversation is stored by the provider. For Anthropic and every other provider, read
+their own data and retention terms ([list of links](model-providers.md#data-handling-and-errors)), and
+choose the provider accordingly; Secrets are out of reach; keep credentials out of logs and ConfigMaps
 (good practice anyway). If redaction is needed later, the natural place is the agent
 loop's step ②, where every tool result passes. See [security.md](security.md).
 

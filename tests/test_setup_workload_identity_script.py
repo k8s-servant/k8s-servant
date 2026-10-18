@@ -204,6 +204,8 @@ def test_prints_the_helm_values(fake_az, monkeypatch):
     assert result.returncode == 0, result.stderr
     assert 'clientId: "client-1111"' in result.stdout
     assert 'tenantId: "tenant-0000"' in result.stdout
+    assert "LLM_AUTH: entra" in result.stdout
+    assert "FOUNDRY_" not in result.stdout.replace("FOUNDRY_ID", "")
     assert "k8s-servant release on my-cluster" in result.stdout
     assert "k8s-servant/k8s-servant" in result.stdout
 

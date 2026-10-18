@@ -97,8 +97,8 @@ def test_creates_everything_when_nothing_exists(fake_az, monkeypatch):
         "--model-format OpenAI --sku-name DataZoneStandard --sku-capacity 50"
     ) in calls
     assert "role assignment create" in calls and "Cognitive Services OpenAI User" in calls
-    assert "FOUNDRY_ENDPOINT=https://my-foundry.openai.azure.com/" in result.stdout
-    assert "FOUNDRY_DEPLOYMENT=k8s-servant" in result.stdout
+    assert "LLM_ENDPOINT=https://my-foundry.openai.azure.com/" in result.stdout
+    assert "LLM_MODEL=k8s-servant" in result.stdout
 
 
 def test_rerun_changes_nothing_when_everything_exists(fake_az, monkeypatch):

@@ -7,8 +7,9 @@ tested on 2026-10-12; `pyproject.toml` holds the allowed ranges.
 
 ```
  Python 3.14 program (k8s_servant)                        runs on a laptop and in AKS (one pod)
- ├── openai SDK ──────── HTTPS, OpenAI Chat Completions v1 ──▶ MS Foundry: gpt-5.4-mini (DataZoneStandard)
- │     └── azure-identity: Entra ID token (az login / Workload Identity)
+ ├── openai SDK ──────── HTTPS, Responses API ──────────────▶ Foundry / OpenAI (Chat Completions: Ollama, vLLM, Gemini, ...)
+ │     └── azure-identity (optional extra): Entra ID token (az login / Workload Identity)
+ ├── anthropic SDK ───── HTTPS, Messages API ───────────────▶ Anthropic / Claude on Foundry
  ├── mcp SDK ─────────── MCP, streamable HTTP ──────────────▶ kubernetes-mcp-server (read-only) ─▶ Kubernetes API
  ├── kubectl (subprocess, allow-listed) ─────────────────────────────────────────────────────────▶ Kubernetes API
  ├── httpx2 ──────────── HTTP GET ──────────────────────────▶ Prometheus, Alertmanager
@@ -30,8 +31,9 @@ tested on 2026-10-12; `pyproject.toml` holds the allowed ranges.
 
 | Library | Version | Used for | Why this one |
 |---|---|---|---|
-| **openai** | 3.29 | Calling the model (Chat Completions, tool calling) | Foundry exposes an OpenAI-compatible **v1** endpoint (`https://<resource>.openai.azure.com/openai/v1/`), so the official SDK works without Azure-specific code or `api-version` parameters. It retries 429 and 5xx with backoff |
-| **azure-identity** | 1.26 | Entra ID tokens for Foundry | `DefaultAzureCredential` takes `az login` on a laptop and Workload Identity in the pod, with no code change and no key |
+| **openai** | 3.29 | Calling the model on the Responses and Chat Completions APIs (tool calling) | Foundry exposes an OpenAI-compatible **v1** endpoint (`https://<resource>.openai.azure.com/openai/v1/`), so the official SDK works without Azure-specific code or `api-version` parameters. It retries 429 and 5xx with backoff |
+| **anthropic** | see `pyproject.toml` | Calling Claude on the Messages API | Carries Claude's thinking blocks between tool calls and supports prompt caching; also reaches Claude on Foundry |
+| **azure-identity** | 1.26 | Entra ID tokens for Foundry (optional extra `k8s-servant[azure]`; the image includes it) | `DefaultAzureCredential` takes `az login` on a laptop and Workload Identity in the pod, with no code change and no key |
 | **mcp** | 2.3 | Client for kubernetes-mcp-server | The official Model Context Protocol SDK (v2 API; older v1 examples online do not apply) |
 | **httpx2** | 2.13 | Prometheus, Alertmanager, Teams | The HTTP client both SDKs already use, so no second HTTP stack |
 | **PyYAML** | 6.0 | Skill frontmatter, Helm values files | The knowledge is delivered as Helm values; the CLI reads the very same files |
@@ -42,16 +44,18 @@ No agent framework (LangChain, Semantic Kernel, AutoGen, …): the tool-calling 
 about 100 lines, and owning it keeps behaviour, security checks and tests in our hands.
 Reasons: [architecture.md](architecture.md#why-our-own-loop-and-no-framework).
 
-## The model: MS Foundry
+## The model: Foundry as the worked example
+
+The provider is a setting (`LLM_PROVIDER`; see [model-providers.md](model-providers.md)). The table describes the Azure AI Foundry setup that `scripts/setup-foundry.sh` creates.
 
 | | Choice | Why |
 |---|---|---|
-| Service | **Microsoft Foundry** (Azure AI Services resource) | Models hosted in your own Azure tenant, with Entra ID access and EU data zones. Other OpenAI-compatible endpoints work experimentally; multi-provider support is on the [roadmap](roadmap.md) |
+| Service | **Microsoft Foundry** (Azure AI Services resource) | Models hosted in your own Azure tenant, with Entra ID access and EU data zones. OpenAI, Anthropic, Ollama and any OpenAI-compatible server are supported too ([model-providers.md](model-providers.md)) |
 | Model | **gpt-5.4-mini**, version 2026-03-17 | A reasoning model with tool calling at a low price; gpt-4.1 is closed to new deployments |
 | Deployment type | **DataZoneStandard** | Processing stays in the EU data zone; pay per token |
 | Capacity | 200k tokens per minute | A full check's busiest minute is ~90k tokens |
 | Upgrade policy | OnceCurrentVersionExpired | The tested version stays until its retirement date |
-| API | **Chat Completions** (not the Responses API) | Supported by every chat model in Foundry, so switching models is a setting |
+| API | **Responses** for GPT and similar models (`foundry`); Messages for Claude; Chat Completions for the rest | Current GPT models refuse tools together with reasoning on Chat Completions; the Responses API carries the reasoning between tool calls |
 | Parameters | `reasoning_effort=medium`, no `temperature` | gpt-5.x reasons only when asked; reasoning models accept only the default temperature |
 | Authentication | Entra ID, role *Cognitive Services OpenAI User* | No keys; Workload Identity in the cluster |
 | Resources | One for non-prod, one for prod (e.g. `my-foundry-nonprod`, `my-foundry-prod`) | Dedicated resources: own quota, network rules, cost |
@@ -107,6 +111,6 @@ it runs as a sidecar container on `localhost:8080`, from the upstream image `ghc
 | **HolmesGPT** (open source AI SRE, CNCF) | Covers much of the same ground. A small own agent was chosen to keep the security model, the memory and the Teams flow simple and under the project's control; a fair comparison is planned |
 | An agent framework (LangChain, Semantic Kernel, …) | Hides the loop that most needs to be understood and tested; the loop is small |
 | Microsoft `aks-mcp` | stdio only, documented as not for running inside a cluster |
-| The Responses API | Not supported by every Foundry model |
+| One API for all providers | Chat Completions cannot carry reasoning between tool calls on current models, so there are three API clients behind one interface |
 | A database server (PostgreSQL, …) | One replica and small data: SQLite on a volume is enough |
 | A CronJob instead of a long-running Deployment | Memory, the MCP sidecar and the morning-report schedule are simpler in one long-running process |

@@ -9,15 +9,19 @@ on a large test cluster.
 
 | Symptom | Cause | Fix |
 |---|---|---|
+| `HTTP 401` with a key (any provider) | The key was rejected: wrong key, wrong provider, or a stray newline | Check the file named by `LLM_API_KEY_FILE`; create the Secret with `--from-file=./api-key` |
+| `LLM_AUTH=entra needs an Azure AI Foundry endpoint` | Entra ID is only used for Foundry hosts (`.openai.azure.com`, `.services.ai.azure.com`, `.cognitiveservices.azure.com`) | Use `LLM_AUTH=api-key` with a key, or fix `LLM_ENDPOINT` |
+| `Entra ID sign-in needs azure-identity` | The `azure` extra is missing outside the image | `pip install 'k8s-servant[azure]'` |
+| "the reply hit the output limit" | A reply was cut off by the limit; the run is recorded as failed | Raise `LLM_MAX_OUTPUT_TOKENS` (Messages API) or lower `LLM_REASONING_EFFORT` |
 | `HTTP 401` right after setup | The *Cognitive Services OpenAI User* role takes ~5–10 minutes to apply | Wait, run `doctor` again |
 | `HTTP 401` later | `az login` expired, wrong tenant, or the identity lacks the role | `az login`; check the role on the Foundry resource ([foundry-setup.md](foundry-setup.md#6-step-4--give-access)) |
 | `HTTP 403` | Network rules of the Foundry resource (public access disabled, IP not allowed) | Private endpoint / firewall ([foundry-setup.md](foundry-setup.md#7-step-5--networking)) |
-| `HTTP 404` | `FOUNDRY_DEPLOYMENT` is the model name instead of the deployment name, wrong resource, or a deployment younger than ~5 min | `az cognitiveservices account deployment list -g <rg> -n <resource> -o table` |
+| `HTTP 404` | Foundry: `LLM_MODEL` is the model name instead of the deployment name, wrong resource, or a deployment younger than ~5 min. Other providers: `LLM_MODEL` is not a model the endpoint serves, or `LLM_ENDPOINT` is wrong | `az cognitiveservices account deployment list -g <rg> -n <resource> -o table` |
 | `HTTP 429 ... exceeded token rate limit` | The deployment's tokens-per-minute capacity is too low. A full health check uses 150k–225k tokens, ~90k in its busiest minute | Raise the capacity to 150–200 (Foundry portal → the deployment → Edit). It costs nothing extra: you pay per token |
-| `HTTP 400` mentioning `reasoning_effort` | A model without reasoning rejects the parameter | `FOUNDRY_REASONING_EFFORT=` (empty) |
-| `cannot reach FOUNDRY_ENDPOINT` | DNS, VPN, proxy or private endpoint | `nslookup <resource>.openai.azure.com`; the curl test in [foundry-setup.md](foundry-setup.md#8-step-6--smoke-test) |
-| A check "hangs" for minutes | A request timed out (`FOUNDRY_TIMEOUT_SECONDS`, 120 s) and the SDK retries it up to 3 times | The log shows `Retrying request in ...`. A scheduled job is cancelled after `JOB_TIMEOUT_MINUTES` |
-| Shallow answers, few tool calls, obvious problems missed | Reasoning switched off (gpt-5.x models reason only when asked) | Keep `FOUNDRY_REASONING_EFFORT=medium` (default); `high` for harder clusters |
+| `HTTP 400` mentioning `reasoning_effort` | A model without reasoning rejects the parameter | `LLM_REASONING_EFFORT=` (empty) |
+| `cannot reach LLM_ENDPOINT` | DNS, VPN, proxy or private endpoint | `nslookup <resource>.openai.azure.com`; the curl test in [foundry-setup.md](foundry-setup.md#8-step-6--smoke-test) |
+| A check "hangs" for minutes | A request timed out (`LLM_TIMEOUT_SECONDS`, 120 s) and the SDK retries it up to 3 times | The log shows `Retrying request in ...`. A scheduled job is cancelled after `JOB_TIMEOUT_MINUTES` |
+| Shallow answers, few tool calls, obvious problems missed | Reasoning switched off (gpt-5.x models reason only when asked) | Keep `LLM_REASONING_EFFORT=medium` (default for `foundry`, `openai`, `anthropic`); `high` for harder clusters |
 
 ## Reading the cluster
 
