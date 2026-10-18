@@ -4,6 +4,7 @@ import pytest
 
 from k8s_servant.llm import build_chat, describe_model
 from k8s_servant.llm.chat_completions import ChatCompletionsChat
+from k8s_servant.llm.messages import MessagesChat
 from k8s_servant.llm.responses import ResponsesChat
 
 
@@ -18,6 +19,7 @@ def _config(provider, endpoint, **extra):
         "llm_token_scope": "https://ai.azure.com/.default",
         "llm_reasoning_effort": "",
         "llm_timeout_seconds": 5,
+        "llm_max_output_tokens": 4000,
         "workload_identity": False,
     }
     config.update(extra)
@@ -31,6 +33,7 @@ def _config(provider, endpoint, **extra):
         ("openai-compatible", "https://llm.example.com/v1", ChatCompletionsChat),
         ("foundry", "https://my-foundry.openai.azure.com", ResponsesChat),
         ("openai", "https://api.openai.com/v1", ResponsesChat),
+        ("anthropic", "https://api.anthropic.com", MessagesChat),
     ],
 )
 def test_build_chat_picks_the_client(provider, endpoint, cls):
@@ -43,11 +46,6 @@ def test_chat_completions_client_uses_the_configured_base_url_and_effort():
     chat = build_chat(_config("openai-compatible", "https://llm.example.com/v1", llm_reasoning_effort="low"))
     assert str(chat.client.base_url) == "https://llm.example.com/v1/"
     assert chat.reasoning_effort == "low"
-
-
-def test_clients_still_to_come_say_which_is_missing():
-    with pytest.raises(NotImplementedError, match="not implemented yet"):
-        build_chat(_config("anthropic", "https://api.example.com/v1", llm_api_key="k"))
 
 
 def test_build_chat_rejects_an_invalid_auth_combination():

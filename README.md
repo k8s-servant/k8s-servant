@@ -107,7 +107,8 @@ k8s-servant/
 │   │   ├── auth.py                 # LLM_AUTH: API key, Entra ID or none; Entra tokens only for Foundry endpoints
 │   │   ├── errors.py               # Model errors and their actionable, key-free messages
 │   │   ├── chat_completions.py     # Chat Completions client: reasoning effort, token log
-│   │   └── responses.py            # Responses API client: stateless, encrypted reasoning carried between calls
+│   │   ├── responses.py            # Responses API client: stateless, encrypted reasoning carried between calls
+│   │   └── messages.py             # Messages API client for Claude: signed thinking and prompt caching
 │   ├── runtime.py                  # Wires tools, prompt and model for one run
 │   ├── knowledge.py                # Environment description, cluster notes, skills; load_skill tool
 │   ├── healthcheck.py              # One health check; skipping the model when nothing changed

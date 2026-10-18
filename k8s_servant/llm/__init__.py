@@ -10,6 +10,7 @@ import logging
 from k8s_servant.llm.auth import resolve_model_auth
 from k8s_servant.llm.chat_completions import ChatCompletionsChat, build_client
 from k8s_servant.llm.errors import MODEL_ERRORS, explain_model_error, model_error_text
+from k8s_servant.llm.messages import MessagesChat, build_messages_client
 from k8s_servant.llm.providers import PROVIDERS, normalize_endpoint
 from k8s_servant.llm.responses import ResponsesChat
 from k8s_servant.llm.types import ChatModel, ModelCallFailed, ModelOutputTruncated
@@ -45,7 +46,6 @@ def build_chat(config: dict) -> ChatModel:
 
     Raises:
         ValueError: Invalid sign-in settings, or azure-identity missing for Entra ID.
-        NotImplementedError: The provider's API client is not available yet.
     """
     provider = PROVIDERS[config["llm_provider"]]
     auth = resolve_model_auth(config)
@@ -55,8 +55,12 @@ def build_chat(config: dict) -> ChatModel:
     elif provider.api == "responses":
         chat = ResponsesChat(build_client(config, auth), config["llm_model"], config["llm_reasoning_effort"])
     else:
-        # Replaced by the Messages client (Task 5).
-        raise NotImplementedError(f"{provider.api_label} client not implemented yet (provider {provider.name})")
+        chat = MessagesChat(
+            build_messages_client(config, auth),
+            config["llm_model"],
+            config["llm_reasoning_effort"],
+            config["llm_max_output_tokens"],
+        )
     logger.info("Model: %s", describe_model(config))
     return chat
 
