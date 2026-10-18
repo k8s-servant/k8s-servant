@@ -106,7 +106,8 @@ k8s-servant/
 │   │   ├── providers.py            # The provider table (wire API, default endpoint and effort) and endpoint rules
 │   │   ├── auth.py                 # LLM_AUTH: API key, Entra ID or none; Entra tokens only for Foundry endpoints
 │   │   ├── errors.py               # Model errors and their actionable, key-free messages
-│   │   └── chat_completions.py     # Chat Completions client: reasoning effort, token log
+│   │   ├── chat_completions.py     # Chat Completions client: reasoning effort, token log
+│   │   └── responses.py            # Responses API client: stateless, encrypted reasoning carried between calls
 │   ├── runtime.py                  # Wires tools, prompt and model for one run
 │   ├── knowledge.py                # Environment description, cluster notes, skills; load_skill tool
 │   ├── healthcheck.py              # One health check; skipping the model when nothing changed

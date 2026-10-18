@@ -4,6 +4,7 @@ import pytest
 
 from k8s_servant.llm import build_chat, describe_model
 from k8s_servant.llm.chat_completions import ChatCompletionsChat
+from k8s_servant.llm.responses import ResponsesChat
 
 
 def _config(provider, endpoint, **extra):
@@ -28,10 +29,12 @@ def _config(provider, endpoint, **extra):
     [
         ("ollama", "http://localhost:11434/v1", ChatCompletionsChat),
         ("openai-compatible", "https://llm.example.com/v1", ChatCompletionsChat),
+        ("foundry", "https://my-foundry.openai.azure.com", ResponsesChat),
+        ("openai", "https://api.openai.com/v1", ResponsesChat),
     ],
 )
 def test_build_chat_picks_the_client(provider, endpoint, cls):
-    chat = build_chat(_config(provider, endpoint))
+    chat = build_chat(_config(provider, endpoint, llm_api_key="k"))
     assert isinstance(chat, cls)
     assert chat.model == "my-model"
 
@@ -42,11 +45,9 @@ def test_chat_completions_client_uses_the_configured_base_url_and_effort():
     assert chat.reasoning_effort == "low"
 
 
-@pytest.mark.parametrize("provider", ["foundry", "openai", "anthropic"])
-def test_clients_still_to_come_say_which_is_missing(provider):
-    endpoint = "https://my-foundry.openai.azure.com" if provider == "foundry" else "https://api.example.com/v1"
+def test_clients_still_to_come_say_which_is_missing():
     with pytest.raises(NotImplementedError, match="not implemented yet"):
-        build_chat(_config(provider, endpoint, llm_api_key="k"))
+        build_chat(_config("anthropic", "https://api.example.com/v1", llm_api_key="k"))
 
 
 def test_build_chat_rejects_an_invalid_auth_combination():

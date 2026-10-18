@@ -11,6 +11,7 @@ from k8s_servant.llm.auth import resolve_model_auth
 from k8s_servant.llm.chat_completions import ChatCompletionsChat, build_client
 from k8s_servant.llm.errors import MODEL_ERRORS, explain_model_error, model_error_text
 from k8s_servant.llm.providers import PROVIDERS, normalize_endpoint
+from k8s_servant.llm.responses import ResponsesChat
 from k8s_servant.llm.types import ChatModel, ModelOutputTruncated
 
 logger = logging.getLogger(__name__)
@@ -50,10 +51,11 @@ def build_chat(config: dict) -> ChatModel:
     auth = resolve_model_auth(config)
     normalize_endpoint(provider.name, config["llm_endpoint"])  # fail early on a bad URL
     if provider.api == "chat_completions":
-        client = build_client(config, auth)
-        chat = ChatCompletionsChat(client, config["llm_model"], config["llm_reasoning_effort"])
+        chat = ChatCompletionsChat(build_client(config, auth), config["llm_model"], config["llm_reasoning_effort"])
+    elif provider.api == "responses":
+        chat = ResponsesChat(build_client(config, auth), config["llm_model"], config["llm_reasoning_effort"])
     else:
-        # Replaced by the Responses (Task 4) and Messages (Task 5) clients.
+        # Replaced by the Messages client (Task 5).
         raise NotImplementedError(f"{provider.api_label} client not implemented yet (provider {provider.name})")
     logger.info("Model: %s", describe_model(config))
     return chat
@@ -63,6 +65,7 @@ __all__ = [
     "MODEL_ERRORS",
     "ChatCompletionsChat",
     "ModelOutputTruncated",
+    "ResponsesChat",
     "build_chat",
     "build_client",
     "describe_model",
