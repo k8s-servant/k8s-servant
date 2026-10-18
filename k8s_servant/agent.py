@@ -2,9 +2,9 @@
 
 How one question is answered:
 
-    messages = [system prompt, user question]
+    turns = [system prompt, user question]
     repeat up to MAX_ITERATIONS times:
-        reply = model(messages, tool definitions)
+        reply = model(turns, tool definitions)
         if the reply has no tool calls  -> it is the answer, stop
         run each requested tool, append the (truncated) results, go again
     if the limit is reached: ask once more, without tools, for the best answer so far
@@ -21,11 +21,9 @@ import logging
 import time
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import Protocol
-
-from openai.types.chat import ChatCompletionMessage
 
 from k8s_servant.knowledge import Knowledge, skill_catalog
+from k8s_servant.llm.types import ChatModel, ToolCall, Turn
 from k8s_servant.tools.registry import ToolRegistry, truncate_output
 
 logger = logging.getLogger(__name__)
@@ -113,13 +111,6 @@ def build_system_prompt(
     return "\n\n".join(parts)
 
 
-class ChatModel(Protocol):
-    """Anything that can continue a conversation (FoundryChat, or a fake in tests)."""
-
-    async def complete(self, messages: list[dict], tools: list[dict]) -> ChatCompletionMessage:
-        """Send the conversation and the tool definitions; return the model's next message."""
-
-
 @dataclass
 class AgentResult:
     """Outcome of one question."""
@@ -128,18 +119,7 @@ class AgentResult:
     iterations: int  # model round-trips used (not counting the final limit call)
     tool_calls: int
     hit_limit: bool  # True when MAX_ITERATIONS was reached
-    messages: list[dict] = field(default_factory=list)  # the whole conversation, for follow_up()
-
-
-def _assistant_message(reply: ChatCompletionMessage) -> dict:
-    """Copy only the fields the API accepts back; responses carry extra read-only fields."""
-    message = {"role": "assistant", "content": reply.content}
-    if reply.tool_calls:
-        message["tool_calls"] = [
-            {"id": c.id, "type": "function", "function": {"name": c.function.name, "arguments": c.function.arguments}}
-            for c in reply.tool_calls
-        ]
-    return message
+    messages: list[Turn] = field(default_factory=list)  # the whole conversation, for follow_up()
 
 
 def _short(text: str, limit: int = 200) -> str:
@@ -166,26 +146,25 @@ class Agent:
 
     async def run(self, question: str) -> AgentResult:
         """Answer one question, calling tools as the model requests."""
-        messages: list[dict] = [
-            {"role": "system", "content": self.system_prompt},
-            {"role": "user", "content": question},
-        ]
+        messages = [Turn("system", self.system_prompt), Turn("user", question)]
         tool_calls = 0
         for iteration in range(1, self.max_iterations + 1):
-            reply = await self.chat.complete(messages, self.registry.schemas())
-            messages.append(_assistant_message(reply))
+            reply = await self.chat.complete(messages, self.registry.specs())
+            messages.append(reply)
             if not reply.tool_calls:
-                return AgentResult(reply.content or "", iteration, tool_calls, hit_limit=False, messages=messages)
+                return AgentResult(reply.content, iteration, tool_calls, hit_limit=False, messages=messages)
             for call in reply.tool_calls:
                 tool_calls += 1
                 messages.append(await self._run_tool_call(call))
         logger.warning("Reached MAX_ITERATIONS=%d; asking the model for a final answer", self.max_iterations)
-        messages.append({"role": "user", "content": LIMIT_MESSAGE})
-        reply = await self.chat.complete(messages, [])
-        messages.append(_assistant_message(reply))
-        return AgentResult(reply.content or "", self.max_iterations, tool_calls, hit_limit=True, messages=messages)
+        messages.append(Turn("user", LIMIT_MESSAGE))
+        # The definitions stay in the request (some APIs reject a history with tool
+        # calls but no tools); use_tools=False only forbids calling them.
+        reply = await self.chat.complete(messages, self.registry.specs(), use_tools=False)
+        messages.append(reply)
+        return AgentResult(reply.content, self.max_iterations, tool_calls, hit_limit=True, messages=messages)
 
-    async def follow_up(self, messages: list[dict], text: str) -> str:
+    async def follow_up(self, messages: list[Turn], text: str) -> str:
         """Ask one more question at the end of a finished conversation, without tools.
 
         Args:
@@ -195,20 +174,20 @@ class Agent:
         Returns:
             The model's text reply.
         """
-        reply = await self.chat.complete([*messages, {"role": "user", "content": text}], [])
-        return reply.content or ""
+        reply = await self.chat.complete([*messages, Turn("user", text)], self.registry.specs(), use_tools=False)
+        return reply.content
 
-    async def _run_tool_call(self, call) -> dict:
+    async def _run_tool_call(self, call: ToolCall) -> Turn:
         """Run one tool call and wrap its (truncated) output as a tool message."""
         started = time.monotonic()
-        output = await self.registry.run(call.function.name, call.function.arguments)
+        output = await self.registry.run(call.name, call.arguments)
         output = truncate_output(output, self.tool_output_max_chars)
         logger.info(
             "tool %s(%s) -> %d chars in %.1fs",
-            call.function.name,
-            _short(call.function.arguments),
+            call.name,
+            _short(call.arguments),
             len(output),
             time.monotonic() - started,
         )
-        logger.debug("tool %s output:\n%s", call.function.name, output)
-        return {"role": "tool", "tool_call_id": call.id, "content": output}
+        logger.debug("tool %s output:\n%s", call.name, output)
+        return Turn("tool", output, tool_call_id=call.id)

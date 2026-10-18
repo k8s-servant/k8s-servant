@@ -21,7 +21,7 @@ venv (see [troubleshooting.md](troubleshooting.md#local-setup)).
 | If you want to change ... | Look at |
 |---|---|
 | A setting | `config.py` (and the README table, see below) |
-| How the model is called (endpoint, auth, reasoning, token log) | `llm.py` |
+| How the model is called (endpoint, auth, reasoning, token log) | `llm/` |
 | The system prompt or the tool-calling loop | `agent.py` |
 | Which tools a session gets, and in which order | `runtime.py` |
 | What counts as "unhealthy" in the sweep | `tools/cluster_tools.py` |

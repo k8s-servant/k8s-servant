@@ -1,4 +1,4 @@
-"""Client for the chat model deployed in MS Foundry.
+"""Chat Completions client for the chat model deployed in MS Foundry.
 
 Foundry exposes an OpenAI-compatible "v1" endpoint
 (https://<resource>.openai.azure.com/openai/v1/), so the official `openai` SDK is
@@ -15,6 +15,9 @@ Authentication, in order of preference:
 We use the Chat Completions API (not the newer Responses API) because every chat
 model in Foundry supports it, OpenAI and non-OpenAI alike, so switching models is
 a configuration change only.
+
+This module is the only place that converts the neutral Turn / ToolSpec types
+(llm/types.py) to Chat Completions messages and back.
 """
 
 import asyncio
@@ -26,7 +29,8 @@ import openai
 from azure.core.exceptions import ClientAuthenticationError
 from azure.identity import DefaultAzureCredential, get_bearer_token_provider
 from openai import AsyncOpenAI
-from openai.types.chat import ChatCompletionMessage
+
+from k8s_servant.llm.types import ModelOutputTruncated, ToolCall, ToolSpec, Turn, log_usage
 
 logger = logging.getLogger(__name__)
 
@@ -104,33 +108,36 @@ def build_client(config: dict) -> AsyncOpenAI:
     )
 
 
-class FoundryChat:
-    """The one operation the agent needs from the model: continue a conversation."""
+class ChatCompletionsChat:
+    """A ChatModel on the Chat Completions API."""
 
-    def __init__(self, client: AsyncOpenAI, deployment: str, reasoning_effort: str = ""):
+    def __init__(self, client: AsyncOpenAI, model: str, reasoning_effort: str):
         self.client = client
-        self.deployment = deployment
+        self.model = model
         self.reasoning_effort = reasoning_effort
-        # Tokens used by this client so far (prompt + completion), for the summary
-        # line and for sizing the deployment's tokens-per-minute capacity.
         self.total_tokens = 0
 
-    async def complete(self, messages: list[dict], tools: list[dict]) -> ChatCompletionMessage:
+    async def complete(self, turns: list[Turn], tools: list[ToolSpec], *, use_tools: bool = True) -> Turn:
         """Send the conversation (and tool definitions) and return the model's reply.
 
         No temperature is set on purpose: reasoning models (gpt-5.x) only accept
         the default, and the default is fine for the others.
 
         Args:
-            messages: Chat Completions messages (system, user, assistant, tool).
+            turns: The conversation so far.
             tools: Tool definitions; omitted from the request when empty.
+            use_tools: False omits the definitions, which is how this API forbids
+                tool calls (it has no equivalent of a "none" choice that keeps them).
 
         Returns:
-            The assistant message: text content and/or tool calls.
+            The assistant turn: text content and/or tool calls.
+
+        Raises:
+            ModelOutputTruncated: If the reply hit the output token limit.
         """
-        kwargs = {"model": self.deployment, "messages": messages}
-        if tools:
-            kwargs["tools"] = tools
+        kwargs = {"model": self.model, "messages": [_to_message(t) for t in turns]}
+        if tools and use_tools:
+            kwargs["tools"] = [_to_tool(t) for t in tools]
         if self.reasoning_effort:
             kwargs["reasoning_effort"] = self.reasoning_effort
         started = time.monotonic()
@@ -141,20 +148,40 @@ class FoundryChat:
             # Prompt tokens served from Foundry's prompt cache are billed at a discount.
             cached = getattr(getattr(usage, "prompt_tokens_details", None), "cached_tokens", None) or 0
             self.total_tokens += usage.prompt_tokens + usage.completion_tokens
-            logger.info(
-                "model call: %d prompt (%d cached) + %d completion tokens (%d reasoning) in %.1fs",
-                usage.prompt_tokens,
-                cached,
-                usage.completion_tokens,
-                reasoning,
-                time.monotonic() - started,
-            )
-        return response.choices[0].message
+            log_usage(usage.prompt_tokens, cached, usage.completion_tokens, reasoning, time.monotonic() - started)
+        choice = response.choices[0]
+        if choice.finish_reason == "length":
+            raise ModelOutputTruncated("the reply hit the output token limit (finish_reason=length)")
+        message = choice.message
+        calls = [ToolCall(c.id, c.function.name, c.function.arguments) for c in message.tool_calls or []]
+        return Turn("assistant", message.content or "", calls)
 
 
-def build_chat(config: dict) -> FoundryChat:
+def _to_tool(spec: ToolSpec) -> dict:
+    """A tool definition in the Chat Completions format."""
+    return {
+        "type": "function",
+        "function": {"name": spec.name, "description": spec.description, "parameters": spec.parameters},
+    }
+
+
+def _to_message(turn: Turn) -> dict:
+    """A turn as a Chat Completions message, with only the fields the API accepts back."""
+    if turn.role == "tool":
+        return {"role": "tool", "tool_call_id": turn.tool_call_id, "content": turn.content}
+    message = {"role": turn.role, "content": turn.content}
+    if turn.tool_calls:
+        message["content"] = turn.content or None
+        message["tool_calls"] = [
+            {"id": c.id, "type": "function", "function": {"name": c.name, "arguments": c.arguments}}
+            for c in turn.tool_calls
+        ]
+    return message
+
+
+def build_chat(config: dict) -> ChatCompletionsChat:
     """Create the model client for the configured deployment and reasoning effort."""
-    return FoundryChat(build_client(config), config["foundry_deployment"], config["foundry_reasoning_effort"])
+    return ChatCompletionsChat(build_client(config), config["foundry_deployment"], config["foundry_reasoning_effort"])
 
 
 def explain_model_error(exc: BaseException) -> str:

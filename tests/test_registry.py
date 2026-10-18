@@ -1,3 +1,4 @@
+from k8s_servant.llm.types import ToolSpec
 from k8s_servant.tools.registry import Tool, ToolRegistry, truncate_output
 
 
@@ -13,19 +14,10 @@ def _tool(name, run=_echo, surface="test"):
     return Tool(name, f"{name} tool", {"type": "object", "properties": {}}, run, surface)
 
 
-def test_schemas_use_chat_completions_format():
+def test_specs_are_neutral_tool_specs():
     registry = ToolRegistry()
     registry.add(_tool("pods_list"))
-    assert registry.schemas() == [
-        {
-            "type": "function",
-            "function": {
-                "name": "pods_list",
-                "description": "pods_list tool",
-                "parameters": {"type": "object", "properties": {}},
-            },
-        }
-    ]
+    assert registry.specs() == [ToolSpec("pods_list", "pods_list tool", {"type": "object", "properties": {}})]
 
 
 def test_first_tool_wins_and_invalid_names_are_skipped():

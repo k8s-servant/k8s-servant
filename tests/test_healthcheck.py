@@ -33,7 +33,7 @@ async def test_check_records_findings_and_renders_a_report(tmp_path):
     assert "  Fix the DB URL." in result.report_md  # detail lines indented under the item
     run = memory.run(result.run_id)
     assert (run.kind, run.status, run.new_count, run.open_count) == ("check", "ok", 1, 1)
-    assert "cluster-health-check" in chat.calls[0]["messages"][1]["content"]
+    assert "cluster-health-check" in chat.calls[0]["turns"][1].content
 
 
 async def test_open_findings_are_given_to_the_model_and_resolved_when_gone(tmp_path):
@@ -41,7 +41,7 @@ async def test_open_findings_are_given_to_the_model_and_resolved_when_gone(tmp_p
     memory.apply_check([Finding("pending/web/deployment/web", "warning", "web pending", "")], now=T0)
     chat = ScriptedChat(answer(findings_answer("All good now.", [])))
     result = await run_check(_agent(chat), memory, "my-cluster", clock=lambda: T0)
-    assert "`pending/web/deployment/web`" in chat.calls[0]["messages"][1]["content"]
+    assert "`pending/web/deployment/web`" in chat.calls[0]["turns"][1].content
     assert [f.fingerprint for f in result.diff.resolved] == ["pending/web/deployment/web"]
     assert "## Resolved" in result.report_md and "No problems found." not in result.report_md
     assert memory.open_findings() == []
@@ -57,8 +57,8 @@ async def test_missing_json_gets_one_follow_up(tmp_path):
     chat = ScriptedChat(answer("I looked around and all is fine."), answer(findings_answer("All fine.", [])))
     result = await run_check(_agent(chat), memory, "my-cluster", clock=lambda: T0)
     assert result.ok and result.summary == "All fine."
-    assert chat.calls[1]["tools"] == []
-    assert "JSON" in chat.calls[1]["messages"][-1]["content"]
+    assert chat.calls[1]["use_tools"] is False
+    assert "JSON" in chat.calls[1]["turns"][-1].content
     assert "No problems found." in result.report_md
 
 

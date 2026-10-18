@@ -14,7 +14,7 @@ and Teams cards in [reports.md](reports.md); what goes wrong and how to fix it i
 
 ```
                          ┌───────────────────────── k8s-servant (Python) ─────────────────────────┐
-  question ─────────────▶│ cli.py ──▶ agent.py (loop) ──▶ llm.py ─────────────────────────────────┼──▶ Foundry   
+  question ─────────────▶│ cli.py ──▶ agent.py (loop) ──▶ llm/ ──────────────────────────────────┼──▶ Foundry   
                          │               │                                                       │    chat model
                          │               ▼ tool calls                                            │
                          │          tools/registry.py                                            │
@@ -36,7 +36,7 @@ runs next to it as a **sidecar** container on `localhost:8080`.
 | Module | What it does | Why it exists |
 |---|---|---|
 | `config.py` | Reads every setting from environment variables into one dict. Sets up logging to stderr. | The same code runs on a laptop and in a pod. Only the environment differs. |
-| `llm.py` | Builds the OpenAI SDK client for the Foundry v1 endpoint. `FoundryChat.complete()` sends one request. `explain_model_error()` turns HTTP errors into advice. | It keeps everything specific to Foundry and authentication in one place. |
+| `llm/` | `types.py` holds the neutral `Turn`, `ToolCall` and `ToolSpec` the agent speaks. `chat_completions.py` builds the OpenAI SDK client for the Foundry v1 endpoint; `ChatCompletionsChat.complete()` converts the turns and sends one request. `explain_model_error()` turns HTTP errors into advice. | It keeps everything specific to Foundry and authentication in one place. |
 | `tools/registry.py` | Defines the `Tool` shape (name, description, JSON schema, `run`), the `ToolRegistry` and `truncate_output()`. | The loop handles every tool the same way, wherever the tool comes from. |
 | `tools/mcp_tools.py` | Connects to kubernetes-mcp-server and wraps each of its tools as a `Tool`. | It is the preferred way to read the cluster. |
 | `tools/kubectl_tool.py` | A guarded `kubectl` that only allows read verbs and never touches Secrets. | It is the fallback when MCP is not available. |

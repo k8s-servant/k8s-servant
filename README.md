@@ -101,7 +101,9 @@ k8s-servant/
 │   ├── cli.py                      # Commands: ask, check, report, serve, findings, history, notes, tools, doctor
 │   ├── config.py                   # Every setting, from environment variables; logging
 │   ├── agent.py                    # System prompt + tool-calling loop
-│   ├── llm.py                      # Model client: Entra ID or API key, reasoning effort, token log, error advice
+│   ├── llm/                        # Model client
+│   │   ├── types.py                # Neutral Turn, ToolCall, ToolSpec; the agent depends only on these
+│   │   └── chat_completions.py     # Chat Completions client: Entra ID or API key, reasoning effort, token log, error advice
 │   ├── runtime.py                  # Wires tools, prompt and model for one run
 │   ├── knowledge.py                # Environment description, cluster notes, skills; load_skill tool
 │   ├── healthcheck.py              # One health check; skipping the model when nothing changed

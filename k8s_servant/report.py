@@ -35,6 +35,7 @@ from zoneinfo import ZoneInfo
 from k8s_servant.findings import StoredFinding
 from k8s_servant.healthcheck import SKIPPED_SUMMARY_PREFIX, record_failed_run, run_check
 from k8s_servant.llm import explain_model_error
+from k8s_servant.llm.types import Turn
 from k8s_servant.memory import Memory
 from k8s_servant.tools.prometheus_tool import fetch_alerts_fired_since, fetch_firing_alerts, format_alerts
 
@@ -321,13 +322,10 @@ async def build_morning_report(
     # 4. The overview in plain words, from these facts only (no tools).
     try:
         reply = await session.chat.complete(
-            [
-                {"role": "system", "content": OVERVIEW_PROMPT},
-                {"role": "user", "content": f"Cluster: {cluster}\n\n{facts_md}"},
-            ],
+            [Turn("system", OVERVIEW_PROMPT), Turn("user", f"Cluster: {cluster}\n\n{facts_md}")],
             [],
         )
-        report.overview = (reply.content or "").strip() or "(no overview)"
+        report.overview = reply.content.strip() or "(no overview)"
     except Exception as exc:
         logger.error("Could not write the morning overview: %s", type(exc).__name__)
         report.overview = f"(overview not available: {type(exc).__name__})"

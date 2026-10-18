@@ -1,22 +1,19 @@
 """Test doubles shared by several test files (imported as `from fakes import ...`)."""
 
 import json
+from dataclasses import replace
 
-from openai.types.chat import ChatCompletionMessage
+from k8s_servant.llm.types import ToolCall, Turn
 
 
-def answer(text: str) -> ChatCompletionMessage:
+def answer(text: str) -> Turn:
     """A model reply with text and no tool calls."""
-    return ChatCompletionMessage(role="assistant", content=text)
+    return Turn("assistant", text)
 
 
-def tool_call(name: str, args: dict, call_id: str = "c1") -> ChatCompletionMessage:
+def tool_call(name: str, args: dict, call_id: str = "c1") -> Turn:
     """A model reply asking for one tool call."""
-    return ChatCompletionMessage(
-        role="assistant",
-        content=None,
-        tool_calls=[{"id": call_id, "type": "function", "function": {"name": name, "arguments": json.dumps(args)}}],
-    )
+    return Turn("assistant", tool_calls=[ToolCall(call_id, name, json.dumps(args))])
 
 
 def findings_answer(summary: str, findings: list[dict]) -> str:
@@ -38,8 +35,10 @@ class ScriptedChat:
         self.replies = list(replies)
         self.calls = []
 
-    async def complete(self, messages, tools):
-        self.calls.append({"messages": [dict(m) for m in messages], "tools": tools})
+    total_tokens = 0
+
+    async def complete(self, turns, tools, *, use_tools=True):
+        self.calls.append({"turns": [replace(t) for t in turns], "tools": tools, "use_tools": use_tools})
         reply = self.replies.pop(0)
         if isinstance(reply, BaseException):
             raise reply

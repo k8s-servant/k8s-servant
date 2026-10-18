@@ -267,7 +267,7 @@ FOUNDRY_DEPLOYMENT=gpt-5-4-mini
   `*.cognitiveservices.azure.com` URL, build the `openai.azure.com` one from your
   custom subdomain.
 - **You do not need to add `/openai/v1/`.** The agent appends it (see
-  `normalize_endpoint` in `k8s_servant/llm.py`). The endpoint must start with `https://`.
+  `normalize_endpoint` in `k8s_servant/llm/chat_completions.py`). The endpoint must start with `https://`.
 - `FOUNDRY_DEPLOYMENT` is the **deployment name** from Step 2, not the model name.
 
 ## 6. Step 4 – Give access
@@ -470,7 +470,7 @@ Sources: [Default safety policies](https://learn.microsoft.com/azure/foundry/gua
 
 ## 11. Troubleshooting
 
-`k8s-servant` turns these into one-line advice (`explain_model_error` in `k8s_servant/llm.py`).
+`k8s-servant` turns these into one-line advice (`explain_model_error` in `k8s_servant/llm/chat_completions.py`).
 
 | Symptom | Likely cause | Fix |
 |---|---|---|

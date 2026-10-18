@@ -20,9 +20,10 @@ import logging
 from contextlib import AsyncExitStack, asynccontextmanager
 from dataclasses import dataclass
 
-from k8s_servant.agent import Agent, ChatModel, build_system_prompt
+from k8s_servant.agent import Agent, build_system_prompt
 from k8s_servant.knowledge import Knowledge, build_load_skill_tool
 from k8s_servant.llm import build_chat
+from k8s_servant.llm.types import ChatModel
 from k8s_servant.memory import Memory, build_save_note_tool
 from k8s_servant.tools.cluster_tools import build_cluster_tools
 from k8s_servant.tools.kubectl_tool import build_kubectl_tool
@@ -108,7 +109,7 @@ async def open_agent(
         config: Settings from configure_app().
         knowledge: Loaded knowledge.
         memory: The agent's memory (learned notes, save_note).
-        chat: Model client; by default a FoundryChat for the configured deployment.
+        chat: Model client; by default a ChatCompletionsChat for the configured deployment.
         mcp_server: Override for config["mcp_url"] (tests).
 
     Yields:

@@ -41,6 +41,7 @@ from k8s_servant.config import configure_app, configure_logging, missing_model_s
 from k8s_servant.healthcheck import CheckResult, record_failed_run, run_health_check
 from k8s_servant.knowledge import load_knowledge
 from k8s_servant.llm import build_chat, explain_model_error
+from k8s_servant.llm.types import Turn
 from k8s_servant.memory import Memory
 from k8s_servant.report import MorningReport, build_morning_report, format_age
 from k8s_servant.runtime import open_agent, open_runtime
@@ -436,10 +437,8 @@ async def cmd_doctor(args, config: dict, knowledge, memory: Memory) -> int:
         try:
             chat = build_chat(config)
             started = time.monotonic()
-            reply = await chat.complete([{"role": "user", "content": "Reply with the single word OK."}], [])
-            report(
-                "OK", "model", f"answered {(reply.content or '').strip()[:40]!r} in {time.monotonic() - started:.1f}s"
-            )
+            reply = await chat.complete([Turn("user", "Reply with the single word OK.")], [])
+            report("OK", "model", f"answered {reply.content.strip()[:40]!r} in {time.monotonic() - started:.1f}s")
         except (*MODEL_ERRORS, ValueError) as exc:
             report("FAIL", "model", explain_model_error(exc))
 

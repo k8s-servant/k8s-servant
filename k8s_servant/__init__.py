@@ -3,7 +3,7 @@
 The package is split into small modules, each with one job:
 
     config.py      settings from environment variables
-    llm.py         the MS Foundry chat model client
+    llm/           the chat model client (neutral types, one module per API)
     tools/         everything the model can call (MCP, kubectl)
     knowledge.py   environment description and skills (+ the load_skill tool)
     agent.py       the system prompt and the tool-calling loop
