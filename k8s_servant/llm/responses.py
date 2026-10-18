@@ -19,7 +19,7 @@ import time
 
 from openai import AsyncOpenAI
 
-from k8s_servant.llm.types import ModelCallFailed, ModelOutputTruncated, ToolCall, ToolSpec, Turn, log_usage
+from k8s_servant.llm.types import NO_ANSWER, ModelCallFailed, ModelOutputTruncated, ToolCall, ToolSpec, Turn, log_usage
 
 logger = logging.getLogger(__name__)
 
@@ -110,13 +110,18 @@ def _to_items(turn: Turn) -> list[dict]:
         return [{"type": "function_call_output", "call_id": turn.tool_call_id, "output": turn.content}]
     if turn.role == "assistant":
         if turn.provider_state is not None:
-            return list(turn.provider_state)
-        items: list[dict] = []
-        if turn.content:  # a tool-only turn must not send an empty message
-            items.append({"role": "assistant", "content": turn.content})
-        items += [
-            {"type": "function_call", "call_id": c.id, "name": c.name, "arguments": c.arguments}
-            for c in turn.tool_calls
-        ]
+            items = list(turn.provider_state)
+        else:
+            items = []
+            if turn.content:  # a tool-only turn must not send an empty message
+                items.append({"role": "assistant", "content": turn.content})
+            items += [
+                {"type": "function_call", "call_id": c.id, "name": c.name, "arguments": c.arguments}
+                for c in turn.tool_calls
+            ]
+        # A reply with neither a message nor a call (e.g. only a reasoning item) would
+        # leave the next request without the assistant's answer: send a placeholder.
+        if not any(item.get("type") in ("message", "function_call") or "role" in item for item in items):
+            items.append({"role": "assistant", "content": NO_ANSWER})
         return items
     return [{"role": turn.role, "content": turn.content}]

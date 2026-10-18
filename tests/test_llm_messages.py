@@ -206,3 +206,20 @@ def test_other_endpoint_uses_the_plain_client_with_the_key():
     client = build_messages_client(config, ModelAuth("api-key", "", "API key"))
     assert isinstance(client, AsyncAnthropic) and not isinstance(client, AsyncAnthropicFoundry)
     assert client.api_key == "k"
+
+
+async def test_empty_reply_is_sent_back_as_a_placeholder_text_block():
+    # An end_turn reply with no content must not come back as "content": [] (the API
+    # rejects it); this is the health check's JSON retry case.
+    chat, fake = _chat(_message([]), _message([TEXT]))
+    first = await chat.complete([Turn("user", "q")], [])
+    await chat.complete([Turn("user", "q"), first, Turn("user", "again")], [])
+    assistant = fake.calls[1]["messages"][1]
+    assert assistant == {"role": "assistant", "content": [{"type": "text", "text": "(no answer)"}]}
+    TypeAdapter(MessageParam).validate_python(assistant)
+
+
+async def test_assistant_turn_without_content_or_calls_sends_a_placeholder():
+    chat, fake = _chat(_message([TEXT]))
+    await chat.complete([Turn("user", "q"), Turn("assistant", ""), Turn("user", "again")], [])
+    assert fake.calls[0]["messages"][1]["content"] == [{"type": "text", "text": "(no answer)"}]

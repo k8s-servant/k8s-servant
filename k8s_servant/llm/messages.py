@@ -22,7 +22,7 @@ from anthropic import AsyncAnthropic, AsyncAnthropicFoundry
 
 from k8s_servant.llm.auth import ModelAuth, entra_token_provider
 from k8s_servant.llm.providers import is_foundry_endpoint, normalize_endpoint
-from k8s_servant.llm.types import ModelCallFailed, ModelOutputTruncated, ToolCall, ToolSpec, Turn, log_usage
+from k8s_servant.llm.types import NO_ANSWER, ModelCallFailed, ModelOutputTruncated, ToolCall, ToolSpec, Turn, log_usage
 
 logger = logging.getLogger(__name__)
 
@@ -159,13 +159,19 @@ def _to_messages(turns: list[Turn]) -> list[dict]:
 
 
 def _assistant_blocks(turn: Turn) -> list[dict]:
-    """An assistant turn as content blocks."""
+    """An assistant turn as content blocks.
+
+    An empty reply (end_turn with no content) still needs one block: the API rejects
+    an assistant message with empty content, and the health check's JSON retry sends
+    exactly that history back.
+    """
     if turn.provider_state is not None:
-        return list(turn.provider_state)
-    blocks: list[dict] = []
-    if turn.content:  # a tool-only turn must not send an empty text block
-        blocks.append({"type": "text", "text": turn.content})
-    blocks += [
-        {"type": "tool_use", "id": c.id, "name": c.name, "input": json.loads(c.arguments)} for c in turn.tool_calls
-    ]
-    return blocks
+        blocks = list(turn.provider_state)
+    else:
+        blocks = []
+        if turn.content:  # a tool-only turn must not send an empty text block
+            blocks.append({"type": "text", "text": turn.content})
+        blocks += [
+            {"type": "tool_use", "id": c.id, "name": c.name, "input": json.loads(c.arguments)} for c in turn.tool_calls
+        ]
+    return blocks or [{"type": "text", "text": NO_ANSWER}]

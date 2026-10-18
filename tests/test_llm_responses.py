@@ -173,3 +173,27 @@ async def test_incomplete_for_content_filter_is_a_failure_not_truncation():
     chat, _ = _chat(_response([], status="incomplete", incomplete_details={"reason": "max_output_tokens"}))
     with pytest.raises(ModelOutputTruncated):
         await chat.complete([Turn("user", "q")], [])
+
+
+async def test_reasoning_only_reply_gets_a_placeholder_message_on_the_next_call():
+    # Output with only a reasoning item would leave the next request without the
+    # assistant's answer; a placeholder message keeps it valid.
+    chat, fake = _chat(_response([REASONING]), _response([MESSAGE]))
+    first = await chat.complete([Turn("user", "q")], [])
+    await chat.complete([Turn("user", "q"), first, Turn("user", "again")], [])
+    items = fake.calls[1]["input"]
+    assert items[1:3] == [REASONING, {"role": "assistant", "content": "(no answer)"}]
+    assert items[3] == {"role": "user", "content": "again"}
+
+
+async def test_reply_with_a_message_or_call_gets_no_placeholder():
+    chat, fake = _chat(_response([REASONING, CALL]), _response([MESSAGE]))
+    first = await chat.complete([Turn("user", "q")], [SPEC])
+    await chat.complete([Turn("user", "q"), first, Turn("tool", "out", tool_call_id="call_1")], [SPEC])
+    assert {"role": "assistant", "content": "(no answer)"} not in fake.calls[1]["input"]
+
+
+async def test_empty_assistant_turn_sends_a_placeholder_message():
+    chat, fake = _chat(_response([MESSAGE]))
+    await chat.complete([Turn("user", "q"), Turn("assistant", ""), Turn("user", "again")], [])
+    assert fake.calls[0]["input"][1] == {"role": "assistant", "content": "(no answer)"}

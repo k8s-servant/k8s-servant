@@ -12,6 +12,11 @@ from typing import Any, Literal, Protocol
 
 logger = logging.getLogger(__name__)
 
+# Stands in for an empty assistant reply when it is sent back: the APIs reject an
+# assistant message with no content, and an empty reply is exactly what the health
+# check's JSON retry sends back.
+NO_ANSWER = "(no answer)"
+
 
 @dataclass(frozen=True)
 class ToolCall:
