@@ -2,6 +2,7 @@ import pytest
 from azure.core.exceptions import ClientAuthenticationError
 
 from k8s_servant.llm import build_client, explain_model_error, normalize_endpoint
+from k8s_servant.llm.types import ModelOutputTruncated
 
 
 @pytest.mark.parametrize(
@@ -80,3 +81,7 @@ def test_401_hint_mentions_missing_role():
     # Foundry reports a missing data-plane role as 401 "PermissionDenied ... lacks
     # the required data action", not 403 (Microsoft Learn: troubleshoot-errors).
     assert "Cognitive Services OpenAI User" in explain_model_error(_HttpError(401))
+
+
+def test_explain_truncated_reply():
+    assert "output limit" in explain_model_error(ModelOutputTruncated("cut"))

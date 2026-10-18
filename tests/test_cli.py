@@ -210,6 +210,26 @@ def test_failed_check_exits_1(scripted_model, capsys):
     assert "Health check failed" in capsys.readouterr().out
 
 
+def test_truncated_reply_fails_the_check_with_a_hint(scripted_model, capsys):
+    # A reply cut off by the token limit must be a recorded failure, not a traceback.
+    from k8s_servant.llm.types import ModelOutputTruncated
+
+    scripted_model(ModelOutputTruncated("cut"))
+    assert cli.main(["check"]) == 1
+    err = capsys.readouterr().err
+    assert "output limit" in err and "Traceback" not in err
+    cli.main(["history"])
+    assert "output limit" in capsys.readouterr().out  # recorded as a failed run
+
+
+def test_truncated_reply_fails_ask_with_a_hint(scripted_model, capsys):
+    from k8s_servant.llm.types import ModelOutputTruncated
+
+    scripted_model(ModelOutputTruncated("cut"))
+    assert cli.main(["ask", "why?"]) == 1
+    assert "output limit" in capsys.readouterr().err
+
+
 def test_report_command(scripted_model, capsys):
     scripted_model(answer(findings_answer("Fine.", [])), answer("All calm this morning."))
     assert cli.main(["report"]) == 0

@@ -40,7 +40,7 @@ from azure.core.exceptions import ClientAuthenticationError
 from k8s_servant.config import configure_app, configure_logging, missing_model_settings
 from k8s_servant.healthcheck import CheckResult, record_failed_run, run_health_check
 from k8s_servant.knowledge import load_knowledge
-from k8s_servant.llm import build_chat, explain_model_error
+from k8s_servant.llm import ModelOutputTruncated, build_chat, explain_model_error
 from k8s_servant.llm.types import Turn
 from k8s_servant.memory import Memory
 from k8s_servant.report import MorningReport, build_morning_report, format_age
@@ -60,7 +60,7 @@ from k8s_servant.tools.prometheus_tool import check_ready
 logger = logging.getLogger(__name__)
 
 # Errors a model call can end with that we explain instead of printing a traceback.
-MODEL_ERRORS = (openai.OpenAIError, ClientAuthenticationError)
+MODEL_ERRORS = (openai.OpenAIError, ClientAuthenticationError, ModelOutputTruncated)
 
 
 def build_parser() -> argparse.ArgumentParser:

@@ -189,6 +189,8 @@ def explain_model_error(exc: BaseException) -> str:
     status = getattr(exc, "status_code", None)
     if status in _STATUS_HINTS:
         return f"HTTP {status} {_STATUS_HINTS[status]}"
+    if isinstance(exc, ModelOutputTruncated):
+        return "the reply hit the output limit: lower the reasoning effort or shorten the question."
     if isinstance(exc, ClientAuthenticationError):
         return (
             "could not get an Entra ID token: run `az login` locally, "

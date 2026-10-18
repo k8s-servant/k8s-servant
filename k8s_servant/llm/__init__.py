@@ -12,5 +12,13 @@ from k8s_servant.llm.chat_completions import (
     explain_model_error,
     normalize_endpoint,
 )
+from k8s_servant.llm.types import ModelOutputTruncated
 
-__all__ = ["ChatCompletionsChat", "build_chat", "build_client", "explain_model_error", "normalize_endpoint"]
+__all__ = [
+    "ChatCompletionsChat",
+    "ModelOutputTruncated",
+    "build_chat",
+    "build_client",
+    "explain_model_error",
+    "normalize_endpoint",
+]
