@@ -265,14 +265,45 @@ async def cmd_serve(args, config: dict, knowledge, memory: Memory) -> int:
     for signum in (signal.SIGTERM, signal.SIGINT):
         loop.add_signal_handler(signum, stop.set)
 
+    await Scheduler(config, memory, *serve_jobs(config, knowledge, memory, chat)).run(stop)
+    return 0
+
+
+def serve_jobs(config: dict, knowledge, memory: Memory, chat):
+    """The health check and morning report jobs that `serve` hands to the Scheduler.
+
+    A model failure is logged here as model_error_text (one line, key redacted) and
+    swallowed, so the scheduler never logs the provider's error body: some providers
+    echo the API key in it. check_and_post has already recorded the failed run.
+
+    Args:
+        config: Settings.
+        knowledge: Loaded knowledge for the system prompt.
+        memory: The agent's memory.
+        chat: Model client.
+
+    Returns:
+        (check_job, morning_job), coroutine functions without arguments.
+    """
+
+    async def run_logged(name: str, job) -> None:
+        reason = ""
+        try:
+            await job
+        except MODEL_ERRORS as exc:
+            reason = model_error_text(exc, config)
+        # Logged outside the except block: a failing log handler prints the exception
+        # being handled, and that would be the provider's unredacted body.
+        if reason:
+            logger.error("The %s failed: %s", name, reason)
+
     async def check_job():
-        await check_and_post(config, knowledge, memory, chat, post=True, scheduled=True)
+        await run_logged("health check", check_and_post(config, knowledge, memory, chat, post=True, scheduled=True))
 
     async def morning_job():
-        await report_and_post(config, knowledge, memory, chat, post=True)
+        await run_logged("morning report", report_and_post(config, knowledge, memory, chat, post=True))
 
-    await Scheduler(config, memory, check_job, morning_job).run(stop)
-    return 0
+    return check_job, morning_job
 
 
 async def cmd_findings(args, config: dict, knowledge, memory: Memory) -> int:

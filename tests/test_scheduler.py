@@ -80,6 +80,20 @@ async def test_a_failing_job_does_not_stop_the_scheduler(tmp_path):
     assert [kind for kind, _ in calls] == ["check", "check"]
 
 
+async def test_a_model_error_that_escapes_a_job_is_logged_without_its_text(tmp_path, caplog):
+    # cli.serve_jobs logs model errors redacted; should one still escape, the provider's
+    # body (which may echo the API key) must not reach the log through a traceback.
+    import httpx2
+    import openai
+
+    response = httpx2.Response(401, request=httpx2.Request("POST", "https://api.openai.com/v1/responses"))
+    error = openai.AuthenticationError("Incorrect API key provided: sk-test-secret.", response=response, body=None)
+    scheduler, _, _, _ = _harness(tmp_path, SATURDAY_10, timedelta(minutes=30), check_error=error)
+    await scheduler.run(asyncio.Event())
+    assert "sk-test-secret" not in caplog.text
+    assert "AuthenticationError" in caplog.text
+
+
 async def test_wait_or_stop_returns_early_when_stopped():
     stop = asyncio.Event()
     stop.set()

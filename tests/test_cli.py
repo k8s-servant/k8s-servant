@@ -384,3 +384,42 @@ def test_scheduled_checks_skip_the_model_when_nothing_changed(scripted_model):
     third = scripted_model(answer(findings_answer("One problem.", [CRASH])))
     asyncio.run(cli.check_and_post(config, Knowledge(), memory, third, post=False))
     assert len(third.calls) == 1
+
+
+def test_scheduled_check_logs_the_redacted_model_error_not_the_provider_body(
+    scripted_model, monkeypatch, caplog, capsys
+):
+    # OpenAI echoes the key in its 401 body; serve mode must not put it in the pod log.
+    import asyncio
+    import logging
+
+    import httpx2
+    import openai
+
+    from k8s_servant.config import configure_app
+    from k8s_servant.knowledge import Knowledge
+    from k8s_servant.memory import Memory
+    from k8s_servant.scheduler import Scheduler
+
+    monkeypatch.setenv("LLM_PROVIDER", "openai")
+    monkeypatch.setenv("LLM_ENDPOINT", "")
+    monkeypatch.setenv("LLM_API_KEY", "sk-test-secret")
+    config = configure_app()
+    memory = Memory(config["data_dir"])
+    response = httpx2.Response(401, request=httpx2.Request("POST", "https://api.openai.com/v1/responses"))
+    body = {"error": {"message": "Incorrect API key provided: sk-test-secret."}}
+    error = openai.AuthenticationError("Incorrect API key provided: sk-test-secret.", response=response, body=body)
+    chat = scripted_model(error)
+    jobs = cli.serve_jobs(config, Knowledge(), memory, chat)
+    scheduler = Scheduler(config, memory, *jobs)
+
+    with caplog.at_level(logging.DEBUG):
+        asyncio.run(scheduler._run_job("health check", jobs[0], asyncio.Event()))
+
+    logged = caplog.text + capsys.readouterr().err
+    assert "sk-test-secret" not in logged
+    assert "check LLM_API_KEY_FILE" in logged
+    assert not any(record.exc_info for record in caplog.records)
+    # The failed run is still recorded, with the redacted reason.
+    run = memory.runs(1)[0]
+    assert run.kind == "check" and run.status != "ok" and "sk-test-secret" not in run.summary
