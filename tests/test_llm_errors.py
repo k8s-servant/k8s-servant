@@ -1,6 +1,5 @@
 import openai
 import pytest
-from azure.core.exceptions import ClientAuthenticationError
 
 from k8s_servant.llm.errors import MODEL_ERRORS, explain_model_error, model_error_text
 from k8s_servant.llm.types import ModelOutputTruncated
@@ -64,6 +63,8 @@ def test_truncated_hint_names_the_settings():
 
 
 def test_token_error_hint():
+    # azure-core comes with the optional azure extra.
+    ClientAuthenticationError = pytest.importorskip("azure.core.exceptions").ClientAuthenticationError
     assert "Entra ID token" in explain_model_error(ClientAuthenticationError("no credential"), "foundry")
 
 
@@ -74,4 +75,5 @@ def test_explain_unknown_error():
 def test_model_errors_cover_the_sdks_and_truncation():
     assert issubclass(openai.OpenAIError, MODEL_ERRORS[0]) or openai.OpenAIError in MODEL_ERRORS
     assert ModelOutputTruncated in MODEL_ERRORS
+    ClientAuthenticationError = pytest.importorskip("azure.core.exceptions").ClientAuthenticationError
     assert ClientAuthenticationError in MODEL_ERRORS
