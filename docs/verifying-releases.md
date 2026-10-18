@@ -146,6 +146,7 @@ for SIG in $(oras discover "$ARTIFACT" --format json | jq -r '.referrers[].diges
     | jq -r '.layers[]? | select(.mediaType | startswith("application/vnd.dev.sigstore.bundle")) | .digest')
   [ -n "$BUNDLE" ] && break
 done
+[ -n "$BUNDLE" ] || echo "no signature bundle found on $ARTIFACT" >&2
 
 # The certificate inside the bundle.
 oras blob fetch "$REPO@$BUNDLE" --output - \
