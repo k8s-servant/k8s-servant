@@ -70,28 +70,34 @@ Pure refactor: behaviour and settings unchanged (still `FOUNDRY_*`), but nothing
 class ToolCall:
     id: str
     name: str
-    arguments: str            # JSON text, exactly as the model produced it
+    arguments: str  # JSON text, exactly as the model produced it
+
 
 @dataclass(frozen=True)
 class ToolSpec:
     name: str
     description: str
-    parameters: dict          # JSON schema
+    parameters: dict  # JSON schema
+
 
 @dataclass
 class Turn:
     role: Literal["system", "user", "assistant", "tool"]
     content: str = ""
     tool_calls: list[ToolCall] = field(default_factory=list)
-    tool_call_id: str = ""    # set on role="tool"
+    tool_call_id: str = ""  # set on role="tool"
     provider_state: Any = None  # opaque; only the API client that produced it reads it
+
 
 class ModelOutputTruncated(Exception):
     """The reply was cut off by a token limit; never treated as an answer."""
 
+
 class ChatModel(Protocol):
     total_tokens: int
+
     async def complete(self, turns: list[Turn], tools: list[ToolSpec], *, use_tools: bool = True) -> Turn: ...
+
 
 def log_usage(prompt: int, cached: int, completion: int, reasoning: int, seconds: float) -> None:
     """One INFO line per model call, same wording as today's FoundryChat line."""
@@ -109,27 +115,40 @@ async def test_limit_call_passes_tools_but_forbids_using_them():
     chat = ScriptedChat(*[tool_call("t", {})] * 2, answer("done"))
     result = await make_agent(chat, max_iterations=2).run("q")
     last = chat.calls[-1]
-    assert last["use_tools"] is False and last["tools"]   # definitions still sent
+    assert last["use_tools"] is False and last["tools"]  # definitions still sent
     assert result.hit_limit
+
 
 async def test_follow_up_sends_tools_with_use_tools_false():
     ...
     assert chat.calls[-1]["use_tools"] is False and chat.calls[-1]["tools"]
 
+
 # tests/test_llm_chat_completions.py
-async def test_use_tools_false_omits_tools():           # today's behaviour on this API
+async def test_use_tools_false_omits_tools():  # today's behaviour on this API
     ...
     assert "tools" not in client.last_kwargs
 
+
 async def test_turns_convert_to_chat_messages():
-    turns = [Turn("system", "S"), Turn("user", "Q"),
-             Turn("assistant", "", [ToolCall("c1", "t", "{}")]), Turn("tool", "out", tool_call_id="c1")]
+    turns = [
+        Turn("system", "S"),
+        Turn("user", "Q"),
+        Turn("assistant", "", [ToolCall("c1", "t", "{}")]),
+        Turn("tool", "out", tool_call_id="c1"),
+    ]
     ...
     assert client.last_kwargs["messages"] == [
-        {"role": "system", "content": "S"}, {"role": "user", "content": "Q"},
-        {"role": "assistant", "content": None, "tool_calls": [
-            {"id": "c1", "type": "function", "function": {"name": "t", "arguments": "{}"}}]},
-        {"role": "tool", "tool_call_id": "c1", "content": "out"}]
+        {"role": "system", "content": "S"},
+        {"role": "user", "content": "Q"},
+        {
+            "role": "assistant",
+            "content": None,
+            "tool_calls": [{"id": "c1", "type": "function", "function": {"name": "t", "arguments": "{}"}}],
+        },
+        {"role": "tool", "tool_call_id": "c1", "content": "out"},
+    ]
+
 
 async def test_length_finish_reason_raises_truncated():
     ...
@@ -174,9 +193,10 @@ git commit -m "refactor: give the agent neutral model types (#2)"
 class Provider:
     name: str
     api: Literal["responses", "messages", "chat_completions"]
-    api_label: str            # "Responses API" | "Messages API" | "Chat Completions API"
-    default_endpoint: str     # "" = LLM_ENDPOINT required
+    api_label: str  # "Responses API" | "Messages API" | "Chat Completions API"
+    default_endpoint: str  # "" = LLM_ENDPOINT required
     default_effort: str
+
 
 PROVIDERS: dict[str, Provider] = {
     "foundry": Provider("foundry", "responses", "Responses API", "", "medium"),
@@ -186,6 +206,7 @@ PROVIDERS: dict[str, Provider] = {
     "openai-compatible": Provider("openai-compatible", "chat_completions", "Chat Completions API", "", ""),
 }
 OLD_SETTINGS: dict[str, str]  # FOUNDRY_ENDPOINT -> LLM_ENDPOINT, FOUNDRY_DEPLOYMENT -> LLM_MODEL, ... (all seven)
+
 
 def is_foundry_endpoint(endpoint: str) -> bool: ...
 def normalize_endpoint(provider: str, endpoint: str) -> str:
@@ -207,48 +228,84 @@ def test_old_foundry_setting_fails_with_the_new_name():
     with pytest.raises(ValueError, match="FOUNDRY_DEPLOYMENT.*LLM_MODEL"):
         configure_app({"FOUNDRY_DEPLOYMENT": "x"})
 
-@pytest.mark.parametrize("provider,effort", [("foundry", "medium"), ("openai", "medium"),
-    ("anthropic", "medium"), ("ollama", ""), ("openai-compatible", "")])
+
+@pytest.mark.parametrize(
+    "provider,effort",
+    [("foundry", "medium"), ("openai", "medium"), ("anthropic", "medium"), ("ollama", ""), ("openai-compatible", "")],
+)
 def test_reasoning_effort_default_depends_on_provider(provider, effort):
     assert configure_app({"LLM_PROVIDER": provider})["llm_reasoning_effort"] == effort
+
 
 def test_unknown_provider_is_rejected():
     with pytest.raises(ValueError, match="LLM_PROVIDER"):
         configure_app({"LLM_PROVIDER": "bedrock"})
 
+
 def test_provider_default_endpoint_is_applied():
     assert configure_app({"LLM_PROVIDER": "ollama"})["llm_endpoint"] == "http://localhost:11434/v1"
 
-@pytest.mark.parametrize("env,missing", [
-    ({}, ["LLM_PROVIDER", "LLM_MODEL"]),
-    ({"LLM_PROVIDER": "foundry", "LLM_MODEL": "m"}, ["LLM_ENDPOINT"]),
-    ({"LLM_PROVIDER": "anthropic", "LLM_MODEL": "m"}, [])])
+
+@pytest.mark.parametrize(
+    "env,missing",
+    [
+        ({}, ["LLM_PROVIDER", "LLM_MODEL"]),
+        ({"LLM_PROVIDER": "foundry", "LLM_MODEL": "m"}, ["LLM_ENDPOINT"]),
+        ({"LLM_PROVIDER": "anthropic", "LLM_MODEL": "m"}, []),
+    ],
+)
 def test_missing_model_settings(env, missing):
     assert missing_model_settings(configure_app(env)) == missing
 
-def test_key_source_names_the_file(tmp_path): ...   # == f"file {path}"
+
+def test_key_source_names_the_file(tmp_path): ...  # == f"file {path}"
 def test_workload_identity_detected(): ...
 
+
 # tests/test_llm_providers.py
-@pytest.mark.parametrize("host,expected", [("my-foundry.openai.azure.com", True),
-    ("my-foundry.services.ai.azure.com", True), ("my-foundry.cognitiveservices.azure.com", True),
-    ("openai.azure.com.example.com", False), ("api.anthropic.com", False)])
+@pytest.mark.parametrize(
+    "host,expected",
+    [
+        ("my-foundry.openai.azure.com", True),
+        ("my-foundry.services.ai.azure.com", True),
+        ("my-foundry.cognitiveservices.azure.com", True),
+        ("openai.azure.com.example.com", False),
+        ("api.anthropic.com", False),
+    ],
+)
 def test_is_foundry_endpoint(host, expected):
     assert is_foundry_endpoint(f"https://{host}/") is expected
 
-@pytest.mark.parametrize("provider,url,expected", [
-    ("foundry", "https://my-foundry.openai.azure.com", "https://my-foundry.openai.azure.com/openai/v1/"),
-    ("anthropic", "https://my-foundry.services.ai.azure.com", "https://my-foundry.services.ai.azure.com/anthropic/"),
-    ("anthropic", "https://api.anthropic.com", "https://api.anthropic.com/"),
-    ("ollama", "http://ollama.ollama.svc:11434/v1", "http://ollama.ollama.svc:11434/v1/"),
-    ("openai-compatible", "http://vllm:8000/v1", "http://vllm:8000/v1/"),
-    ("openai-compatible", "http://vllm.ai.svc.cluster.local:8000/v1", "http://vllm.ai.svc.cluster.local:8000/v1/")])
+
+@pytest.mark.parametrize(
+    "provider,url,expected",
+    [
+        ("foundry", "https://my-foundry.openai.azure.com", "https://my-foundry.openai.azure.com/openai/v1/"),
+        (
+            "anthropic",
+            "https://my-foundry.services.ai.azure.com",
+            "https://my-foundry.services.ai.azure.com/anthropic/",
+        ),
+        ("anthropic", "https://api.anthropic.com", "https://api.anthropic.com/"),
+        ("ollama", "http://ollama.ollama.svc:11434/v1", "http://ollama.ollama.svc:11434/v1/"),
+        ("openai-compatible", "http://vllm:8000/v1", "http://vllm:8000/v1/"),
+        ("openai-compatible", "http://vllm.ai.svc.cluster.local:8000/v1", "http://vllm.ai.svc.cluster.local:8000/v1/"),
+    ],
+)
 def test_normalize_endpoint(provider, url, expected): ...
 
-@pytest.mark.parametrize("provider,url", [("foundry", "http://vllm:8000/v1"),
-    ("openai-compatible", "http://models.example.com/v1"), ("anthropic", "http://localhost.example.com")])
+
+@pytest.mark.parametrize(
+    "provider,url",
+    [
+        ("foundry", "http://vllm:8000/v1"),
+        ("openai-compatible", "http://models.example.com/v1"),
+        ("anthropic", "http://localhost.example.com"),
+    ],
+)
 def test_normalize_endpoint_rejects_remote_http(provider, url):
-    with pytest.raises(ValueError, match="LLM_ENDPOINT"): normalize_endpoint(provider, url)
+    with pytest.raises(ValueError, match="LLM_ENDPOINT"):
+        normalize_endpoint(provider, url)
 ```
 
 - [ ] **Step 2: Run and see them fail**
@@ -279,26 +336,36 @@ Expected: FAIL.
 @dataclass(frozen=True)
 class ModelAuth:
     method: Literal["api-key", "entra", "none"]
-    source: str   # "file /var/run/secrets/llm/api-key" | "LLM_API_KEY" | "Workload Identity" | "az login / DefaultAzureCredential" | ""
-    label: str    # for doctor: "API key (file ...)", "Entra ID (Workload Identity)", "no key"
+    source: str  # "file /var/run/secrets/llm/api-key" | "LLM_API_KEY" | "Workload Identity" | "az login / DefaultAzureCredential" | ""
+    label: str  # for doctor: "API key (file ...)", "Entra ID (Workload Identity)", "no key"
+
 
 def resolve_model_auth(config: dict) -> ModelAuth:
     """Apply LLM_AUTH rules from spec §2. ValueError naming the setting on an invalid
     combination. Logs one WARNING under auto when workload_identity and a key are both
     present (never the key)."""
 
+
 def entra_token_provider(scope: str) -> Callable[[], Awaitable[str]]:
     """Async cached token provider (azure-identity in a worker thread, as today).
     ValueError "install k8s-servant[azure]" when azure-identity is missing."""
 
+
 # errors.py
-MODEL_ERRORS: tuple[type[BaseException], ...]  # openai.OpenAIError, anthropic.AnthropicError, ModelOutputTruncated, and azure ClientAuthenticationError when importable
+MODEL_ERRORS: tuple[
+    type[BaseException], ...
+]  # openai.OpenAIError, anthropic.AnthropicError, ModelOutputTruncated, and azure ClientAuthenticationError when importable
+
+
 def explain_model_error(exc: BaseException, provider: str = "") -> str: ...
 def model_error_text(exc: BaseException, config: dict) -> str:
     """explain_model_error with the provider from config, with config["llm_api_key"] redacted."""
 
+
 # __init__.py
-def build_chat(config: dict) -> ChatModel: ...   # resolve auth, pick client by PROVIDERS[...].api, log describe_model once
+def build_chat(
+    config: dict,
+) -> ChatModel: ...  # resolve auth, pick client by PROVIDERS[...].api, log describe_model once
 def describe_model(config: dict) -> str:
     """e.g. "foundry / my-deployment via Responses API, Entra ID (Workload Identity)"."""
 ```
@@ -313,21 +380,33 @@ Hints: Foundry keeps today's 401/403/404/429 texts with `LLM_*` names; other pro
 
 ```python
 # tests/test_llm_auth.py
-@pytest.mark.parametrize("provider,endpoint", [("anthropic", "https://my-foundry.services.ai.azure.com"),
-    ("openai-compatible", "https://my-foundry.openai.azure.com/openai/v1"), ("foundry", "https://my-foundry.openai.azure.com")])
-def test_auto_without_key_on_foundry_endpoints_is_entra(provider, endpoint): ...   # method == "entra"
+@pytest.mark.parametrize(
+    "provider,endpoint",
+    [
+        ("anthropic", "https://my-foundry.services.ai.azure.com"),
+        ("openai-compatible", "https://my-foundry.openai.azure.com/openai/v1"),
+        ("foundry", "https://my-foundry.openai.azure.com"),
+    ],
+)
+def test_auto_without_key_on_foundry_endpoints_is_entra(provider, endpoint): ...  # method == "entra"
+
 
 def test_entra_rejected_for_anthropic_direct():
-    with pytest.raises(ValueError, match="LLM_AUTH=entra"): ...
+    with pytest.raises(ValueError, match="LLM_AUTH=entra"):
+        ...
+
 
 def test_entra_rejected_when_a_key_is_set(): ...
 def test_api_key_mode_without_key_fails(): ...
 def test_openai_without_key_fails_under_auto(): ...
-def test_ollama_and_openai_compatible_run_without_key(): ...         # method == "none"
+def test_ollama_and_openai_compatible_run_without_key(): ...  # method == "none"
 def test_auto_warns_when_workload_identity_and_key(caplog):
     ...
     assert "Workload Identity" in caplog.text and "sk-test-secret" not in caplog.text
+
+
 def test_label_names_the_key_file_not_the_key(tmp_path): ...
+
 
 # tests/test_llm_errors.py
 @pytest.mark.parametrize("status", [400, 401, 403, 404, 429, 500])
@@ -335,14 +414,24 @@ def test_model_error_text_never_contains_the_key(status):
     exc = make_status_error(status, body="Incorrect API key provided: sk-test-secret")
     assert "sk-test-secret" not in model_error_text(exc, {"llm_provider": "openai", "llm_api_key": "sk-test-secret"})
 
+
 def test_foundry_401_hint_mentions_the_role(): ...
 def test_truncated_hint_names_the_settings(): ...
 
+
 # tests/test_llm_factory.py
-@pytest.mark.parametrize("provider,cls", [("foundry", ResponsesChat), ("openai", ResponsesChat),
-    ("anthropic", MessagesChat), ("ollama", ChatCompletionsChat), ("openai-compatible", ChatCompletionsChat)])
+@pytest.mark.parametrize(
+    "provider,cls",
+    [
+        ("foundry", ResponsesChat),
+        ("openai", ResponsesChat),
+        ("anthropic", MessagesChat),
+        ("ollama", ChatCompletionsChat),
+        ("openai-compatible", ChatCompletionsChat),
+    ],
+)
 def test_build_chat_picks_the_client(provider, cls): ...
-def test_describe_model_examples(): ...   # the three strings in spec §6.4
+def test_describe_model_examples(): ...  # the three strings in spec §6.4
 def test_entra_without_azure_identity_says_install_the_extra(monkeypatch): ...
 ```
 In this task the parametrization lists only `ollama` and `openai-compatible`; Tasks 4 and 5 add their providers' cases. Until then `build_chat` raises `NotImplementedError` for `foundry`, `openai` and `anthropic` (removed in Tasks 4 and 5, so no commit after Task 5 contains it).
@@ -378,17 +467,21 @@ async def test_request_is_stateless_and_carries_encrypted_reasoning():
     assert kw["store"] is False and kw["include"] == ["reasoning.encrypted_content"]
     assert "temperature" not in kw
 
+
 async def test_tools_are_sent_non_strict():
     ...
-    assert kw["tools"] == [{"type": "function", "name": "t", "description": "d",
-                            "parameters": {"type": "object"}, "strict": False}]
+    assert kw["tools"] == [
+        {"type": "function", "name": "t", "description": "d", "parameters": {"type": "object"}, "strict": False}
+    ]
+
 
 async def test_reasoning_items_are_sent_back_on_the_next_call():
-    first = await chat.complete([Turn("user", "q")], specs)            # reply: reasoning item + function_call
+    first = await chat.complete([Turn("user", "q")], specs)  # reply: reasoning item + function_call
     await chat.complete([Turn("user", "q"), first, Turn("tool", "out", tool_call_id="call_1")], specs)
     second_input = client.calls[1]["input"]
     assert any(i.get("type") == "reasoning" and i.get("encrypted_content") == "ENC" for i in second_input)
     assert second_input[-1] == {"type": "function_call_output", "call_id": "call_1", "output": "out"}
+
 
 async def test_use_tools_false_sends_tool_choice_none(): ...
 async def test_assistant_turn_without_text_sends_no_empty_message(): ...
@@ -423,12 +516,21 @@ Request shape: `model`, `max_tokens=max_output_tokens`, `system` = all system tu
 
 ```python
 async def test_parallel_tool_results_become_one_user_message():
-    turns = [Turn("user", "q"), Turn("assistant", "", [ToolCall("a", "t", "{}"), ToolCall("b", "t", "{}")]),
-             Turn("tool", "A", tool_call_id="a"), Turn("tool", "B", tool_call_id="b")]
+    turns = [
+        Turn("user", "q"),
+        Turn("assistant", "", [ToolCall("a", "t", "{}"), ToolCall("b", "t", "{}")]),
+        Turn("tool", "A", tool_call_id="a"),
+        Turn("tool", "B", tool_call_id="b"),
+    ]
     ...
-    assert kw["messages"][-1] == {"role": "user", "content": [
-        {"type": "tool_result", "tool_use_id": "a", "content": "A"},
-        {"type": "tool_result", "tool_use_id": "b", "content": "B"}]}
+    assert kw["messages"][-1] == {
+        "role": "user",
+        "content": [
+            {"type": "tool_result", "tool_use_id": "a", "content": "A"},
+            {"type": "tool_result", "tool_use_id": "b", "content": "B"},
+        ],
+    }
+
 
 async def test_thinking_blocks_are_sent_back_with_signatures(): ...
 async def test_system_is_top_level_and_caching_is_on():
@@ -436,16 +538,25 @@ async def test_system_is_top_level_and_caching_is_on():
     assert kw["system"] == "S" and kw["cache_control"] == {"type": "ephemeral"}
     assert all(m["role"] != "system" for m in kw["messages"]) and "temperature" not in kw
 
-@pytest.mark.parametrize("effort,thinking,output_config", [
-    ("", None, None), ("none", {"type": "disabled"}, None), ("minimal", {"type": "adaptive"}, {"effort": "low"}),
-    ("medium", {"type": "adaptive"}, {"effort": "medium"}), ("max", {"type": "adaptive"}, {"effort": "max"})])
+
+@pytest.mark.parametrize(
+    "effort,thinking,output_config",
+    [
+        ("", None, None),
+        ("none", {"type": "disabled"}, None),
+        ("minimal", {"type": "adaptive"}, {"effort": "low"}),
+        ("medium", {"type": "adaptive"}, {"effort": "medium"}),
+        ("max", {"type": "adaptive"}, {"effort": "max"}),
+    ],
+)
 async def test_effort_mapping(effort, thinking, output_config): ...
+
 
 async def test_use_tools_false_keeps_tools_with_choice_none(): ...
 async def test_no_empty_text_block_for_tool_only_turn(): ...
 async def test_max_tokens_stop_raises_truncated(): ...
 async def test_usage_counts_cache_reads(caplog): ...
-def test_foundry_endpoint_uses_the_foundry_client_with_entra(): ...    # isinstance AsyncAnthropicFoundry
+def test_foundry_endpoint_uses_the_foundry_client_with_entra(): ...  # isinstance AsyncAnthropicFoundry
 ```
 
 - [ ] **Step 2: Run and see them fail.** `.venv/bin/pytest tests/test_llm_messages.py -q` → FAIL.
@@ -498,16 +609,17 @@ Examples: `values-azure.yaml`, `values-azure-csi.yaml` → `LLM_PROVIDER: foundr
 
 ```python
 # tests/test_helm_chart.py
-def test_old_foundry_key_in_appconfig_fails_with_new_name(): ...      # helm template fails, stderr mentions LLM_MODEL
+def test_old_foundry_key_in_appconfig_fails_with_new_name(): ...  # helm template fails, stderr mentions LLM_MODEL
 def test_llm_api_key_in_appconfig_is_rejected(): ...
 def test_endpoint_required_only_for_foundry_and_openai_compatible(): ...  # anthropic without LLM_ENDPOINT renders
 def test_existing_secret_sets_llm_api_key_file(): ...
+
 
 # tests/test_examples.py
 @pytest.mark.parametrize("name", ["anthropic", "openai", "ollama", "azure-claude"])
 def test_new_example_renders_without_creating_secrets(name): ...
 def test_azure_claude_uses_entra_and_workload_identity(): ...
-def test_key_examples_mount_the_key_file(): ...                       # anthropic, openai
+def test_key_examples_mount_the_key_file(): ...  # anthropic, openai
 def test_ollama_example_has_no_key_and_no_workload_identity(): ...
 ```
 
@@ -535,6 +647,7 @@ def test_model_providers_page_has_a_recipe_per_provider():
         assert re.search(rf"^## .*{re.escape(heading)}", page, re.MULTILINE), heading
     for old, new in OLD_SETTINGS.items():
         assert f"`{old}`" in page and f"`{new}`" in page
+
 
 def test_every_example_values_file_is_listed_in_the_readme(): ...
 def test_no_doc_mentions_old_foundry_settings_outside_the_migration_table(): ...
