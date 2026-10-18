@@ -27,6 +27,7 @@ default and the core.
 |---|---|---|
 | 0 | Multi-provider LLM support (Anthropic, OpenAI, Ollama, ...; Azure AI Foundry stays the main example) and provider-neutral docs | [#2](https://github.com/k8s-servant/k8s-servant/issues/2), [#11](https://github.com/k8s-servant/k8s-servant/issues/11) |
 | 0b | **Documentation site** (Zensical on GitHub Pages), once the docs are provider-neutral, before the Teams launch | [#5](https://github.com/k8s-servant/k8s-servant/issues/5) |
+| 0c | **Initial scan**: the agent onboards itself (platform, installed components, what's normal here) and drafts the environment description for a human to review | [#35](https://github.com/k8s-servant/k8s-servant/issues/35) |
 | 1 | **Two-way MS Teams bot for the whole fleet**: @mention questions, interactive cards, platform-team allow-list, per-day budget (opt-in component) | [#27](https://github.com/k8s-servant/k8s-servant/issues/27) |
 | 2 | **Scoreboard**: answers graded by the asker, the platform team and the bot's own verification; accuracy per task type; the offline evaluation set | [#28](https://github.com/k8s-servant/k8s-servant/issues/28) |
 | 3 | **Cost meter and budgets** | [#29](https://github.com/k8s-servant/k8s-servant/issues/29) |
@@ -34,7 +35,8 @@ default and the core.
 | 5 | **Developer self-service** with per-person scoping, through the developer portal and chat | [#31](https://github.com/k8s-servant/k8s-servant/issues/31) |
 | 6 | **Make existing strengths known**: memory, skip-unchanged (benchmarked), the morning report | [#32](https://github.com/k8s-servant/k8s-servant/issues/32) |
 
-On their own tracks, not blocking the order above: Slack and other notification
+On their own tracks, not blocking the order above: a configurable persona (tone,
+humour, length, language; [#36](https://github.com/k8s-servant/k8s-servant/issues/36)), Slack and other notification
 channels ([#3](https://github.com/k8s-servant/k8s-servant/issues/3),
 [#4](https://github.com/k8s-servant/k8s-servant/issues/4)), Key Vault references
 ([#20](https://github.com/k8s-servant/k8s-servant/issues/20)) and CI/image hardening

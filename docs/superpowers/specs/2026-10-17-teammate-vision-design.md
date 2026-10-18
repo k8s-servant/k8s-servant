@@ -76,6 +76,16 @@ and fit the "teammate" idea:
 - **G6. Make the existing strengths known.** Document and benchmark the memory and
   skip-unchanged behaviour (cost per cluster per month), the morning report, and the
   read-only guarantees.
+- **G7. The teammate onboards itself (#35).** On first run it looks around the cluster
+  read-only (platform, installed components, how namespaces are organised, and above
+  all *what is normal here*: recurring warnings and always-firing alerts) and drafts the
+  environment description for a human to review and approve. It turns the biggest
+  setup effort into the first five minutes' "wow", and improves accuracy for everything
+  that follows. Optional re-scans suggest additions when the cluster changes.
+- **G8. A configurable persona (#36).** Tone, humour, answer length, language and name
+  are configurable through Helm values. Guard rails: no humour on critical findings,
+  incidents or actions; style never changes facts, the finding format or fingerprints;
+  no extra model calls; defaults behave like today.
 
 ## 4. Non-goals
 
@@ -141,6 +151,7 @@ issue.
 | # | Step | Builds on | Notes |
 |---|---|---|---|
 | 0 | Multi-provider LLM (#2), provider-neutral docs (#11) | n/a | Already planned; prerequisite for "any model" |
+| 0c (#35) | **Initial scan** (G7): `onboard` drafts the environment description from what the agent discovers; a human approves it | the summary tools, knowledge layer | Before Teams: first impression and accuracy |
 | 1 (#27) | **Two-way Teams for the fleet** (G1): one bot for all clusters, @mention questions, "which cluster?" in the conversation, interactive cards, follow-ups; platform-team allow-list; per-day budget | an HTTP API in each cluster's agent; a central, opt-in bot component that routes questions to the right cluster's agent | First visible differentiator; also brings multi-cluster routing forward |
 | 2 (#28) | **Scoreboard** (G2): grading buttons on cards, self-verification from memory, accuracy per task type, plus the offline evaluation set already on the roadmap | 1 (the buttons), memory | The evaluation set gates step 4: no action is promoted without measured accuracy |
 | 3 (#29) | **Cost meter and budgets** (G5): full version (per-run and per-day reporting, downgrade to a cheaper model) | the simple cap from step 1 | Can run in parallel with 2 |
@@ -148,14 +159,17 @@ issue.
 | 5 (#31) | **Developer self-service** (G4): scoped answers, a Backstage plugin or API integration | the HTTP API, per-asker impersonation | Opens the project to a second audience |
 | 6 (#32) | **Make strengths known** (G6) | n/a | Ongoing; benchmarks for the skip-unchanged cost model |
 
-Slack, other notifiers (#3, #4), Key Vault references (#20) and the docs site (#5) stay
-on their own tracks and don't block this order.
+The persona (#36), Slack and other notifiers (#3, #4) and Key Vault references (#20)
+stay on their own tracks and don't block this order. The docs site (#5) comes after the
+provider-neutral docs (#11) and before Teams.
 
 ## 8. Decided by the maintainer
 
 - The identity: "one more person on the team" (explain what, why and how to fix).
 - Audiences: platform and SRE teams first, developers through the portal later.
-- Two-way Teams comes first.
+- Two-way Teams comes first among the new capabilities, preceded by the initial scan
+  (#35), which should come **before** the Teams bot.
+- The teammate's behaviour (tone, humour, ...) is configurable (#36).
 - **One Teams bot for the whole fleet**, with the cluster chosen in the conversation, not
   one bot per cluster.
 - **Azure Bot Service and a public inbound endpoint are acceptable**, as an opt-in
