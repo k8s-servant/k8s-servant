@@ -92,7 +92,9 @@ azureWorkloadIdentity:
 # Sealed Secrets, ...). Mounted as a file (LLM_API_KEY_FILE), never an environment
 # variable. Leave empty to use Entra ID tokens through Workload Identity (recommended
 # on AKS) or for a provider without a key (Ollama). Needed for Anthropic, OpenAI and
-# other keyed endpoints; see docs/model-providers.md.
+# other keyed endpoints; see docs/model-providers.md. With a plain http:// LLM_ENDPOINT
+# (allowed for in-cluster Ollama and openai-compatible servers) the key travels
+# unencrypted inside the cluster network: use https, or no key.
 #   kubectl -n k8s-servant create secret generic my-llm-key --from-literal=api-key=...
 llmApiKey:
   # Name of the Secret in the release namespace; empty = no API key.
