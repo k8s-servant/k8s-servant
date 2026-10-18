@@ -139,10 +139,13 @@ it is in the signature bundle attached to the artifact. With
 ARTIFACT=ghcr.io/k8s-servant/k8s-servant:<version>   # or ghcr.io/k8s-servant/charts/k8s-servant:<version>
 REPO=${ARTIFACT%:*}
 
-# The signature is attached to the artifact's digest as an OCI referrer.
-SIG=$(oras discover "$ARTIFACT" --format json | jq -r '.referrers[0].digest')
-BUNDLE=$(oras manifest fetch "$REPO@$SIG" \
-  | jq -r '.layers[] | select(.mediaType | startswith("application/vnd.dev.sigstore.bundle")) | .digest')
+# The signature is attached to the artifact's digest as an OCI referrer. Other
+# referrers may sit next to it, so pick the one that holds a Sigstore bundle.
+for SIG in $(oras discover "$ARTIFACT" --format json | jq -r '.referrers[].digest'); do
+  BUNDLE=$(oras manifest fetch "$REPO@$SIG" \
+    | jq -r '.layers[]? | select(.mediaType | startswith("application/vnd.dev.sigstore.bundle")) | .digest')
+  [ -n "$BUNDLE" ] && break
+done
 
 # The certificate inside the bundle.
 oras blob fetch "$REPO@$BUNDLE" --output - \
