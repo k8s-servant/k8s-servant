@@ -85,12 +85,17 @@ def log_usage(prompt: int, cached: int, completion: int, reasoning: int | None, 
             report them (Anthropic counts thinking inside the completion tokens).
         seconds: Wall-clock duration of the call.
     """
-    shown = "" if reasoning is None else f" ({reasoning} reasoning)"
-    logger.info(
-        "model call: %d prompt (%d cached) + %d completion tokens%s in %.1fs",
-        prompt,
-        cached,
-        completion,
-        shown,
-        seconds,
-    )
+    # Integer placeholders only: these values come from the provider's reply.
+    if reasoning is None:
+        logger.info(
+            "model call: %d prompt (%d cached) + %d completion tokens in %.1fs", prompt, cached, completion, seconds
+        )
+    else:
+        logger.info(
+            "model call: %d prompt (%d cached) + %d completion tokens (%d reasoning) in %.1fs",
+            prompt,
+            cached,
+            completion,
+            reasoning,
+            seconds,
+        )
