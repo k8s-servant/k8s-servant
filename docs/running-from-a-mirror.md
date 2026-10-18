@@ -99,6 +99,11 @@ doesn't, verify upstream before copying and sign the copy with your own identity
 Run this from a pipeline in your configuration repository, so every mirrored version
 has a log.
 
+A security review that wants to know exactly which commit and build run produced a
+mirrored version can read it from the copied signature, using the commands in
+[verifying-releases.md](verifying-releases.md#what-the-certificate-tells-you) with the
+mirror's reference.
+
 ## Install from the mirror
 
 Point both images at the mirror in your values file. Leave the tags alone: the agent
