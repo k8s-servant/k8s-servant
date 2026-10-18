@@ -97,7 +97,11 @@ and fit the "teammate" idea:
   comes in two stages: first low-risk changes (approve the onboarding draft and
   learned notes, change the persona), then an approval queue for cluster actions
   with a full audit log. Guard rails:
-  - it has no cluster access of its own and talks only to the agent's API;
+  - it is an **opt-in component**, like the Teams bot: a default install stays
+    outbound-only;
+  - it has no cluster access of its own and talks only to the per-cluster agent API
+    that the Teams bot also uses (where the fleet-wide view is assembled is left to
+    its design);
   - every action goes through the same approval and audit path as Teams;
   - login goes through the organisation's identity provider, with viewer, approver
     and admin roles;
@@ -171,7 +175,7 @@ issue.
 | 0b (#5) | **Documentation site** (Zensical on GitHub Pages) | 0 (neutral docs) | Before the Teams launch is announced |
 | 0c (#35) | **Initial scan** (G7): `onboard` drafts the environment description from what the agent discovers; a human approves it | the summary tools, knowledge layer | Before Teams: first impression and accuracy |
 | 1 (#27) | **Two-way Teams for the fleet** (G1): one bot for all clusters, @mention questions, "which cluster?" in the conversation, interactive cards, follow-ups; platform-team allow-list; per-day budget | an HTTP API in each cluster's agent; a central, opt-in bot component that routes questions to the right cluster's agent | First visible differentiator; also brings multi-cluster routing forward |
-| 1b (#38) | **Command centre, phase 1: look** (G9): read-only pages for findings, history, conversations and cost, with OIDC login | 1 (the HTTP API) | Phases 2 and 3 (low-risk changes, then approving cluster actions) arrive with step 4 |
+| 1b (#38) | **Command centre, phase 1: look** (G9): read-only pages for findings, history, conversations and cost, with OIDC login | 1 (the HTTP API) | Opt-in component. Phase 2 (low-risk changes such as approving the onboarding draft) follows once login and roles exist; phase 3 (approving cluster actions) arrives with step 4 |
 | 2 (#28) | **Scoreboard** (G2): grading buttons on cards, self-verification from memory, accuracy per task type, plus the offline evaluation set already on the roadmap | 1 (the buttons), memory | The evaluation set gates step 4: no action is promoted without measured accuracy |
 | 3 (#29) | **Cost meter and budgets** (G5): full version (per-run and per-day reporting, downgrade to a cheaper model) | the simple cap from step 1 | Can run in parallel with 2 |
 | 4 (#30) | **Runbooks with the trust ladder** (G3): first restarting a crashing pod, then rolling node restarts after patching | 1 (approval in Teams), 2 (scores and evaluation set) | A separate action component with its own identity and audit trail from day one |
@@ -224,8 +228,8 @@ provider-neutral docs (#11) and before Teams.
 - **The offline evaluation set belongs to step 2** and gates step 4, not step 1: the first
   Teams users are the platform team, who can judge answers themselves.
 - **A simple per-day budget cap ships with step 1**; the full cost meter stays step 3.
-- **The command centre comes after the Teams bot**, because it reuses the bot's HTTP
-  API. It talks only to that API and never to the cluster directly, so the read-only
+- **The command centre comes after the Teams bot**, because it reuses the agent's HTTP
+  API that step 1 introduces. It talks only to that API and never to the cluster directly, so the read-only
   agent and the separate action component stay the only things with cluster access.
 - No hosted SaaS for the core, ever. The project stays self-hosted.
 - `docs/roadmap.md` follows this order.
