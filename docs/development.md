@@ -8,7 +8,7 @@ short form.
 ## Setup
 
 ```bash
-python3.14 -m venv .venv && .venv/bin/pip install -e '.[dev]'
+python3.14 -m venv .venv && .venv/bin/pip install -e '.[dev,azure]'
 .venv/bin/pytest                    # the whole suite, ~10 s, no cluster and no model needed
 set -a; source .env; set +a         # for manual runs against a real cluster and model
 ```
@@ -21,7 +21,7 @@ venv (see [troubleshooting.md](troubleshooting.md#local-setup)).
 | If you want to change ... | Look at |
 |---|---|
 | A setting | `config.py` (and the README table, see below) |
-| How the model is called (endpoint, auth, reasoning, token log) | `llm.py` |
+| How the model is called (endpoint, auth, reasoning, token log) | `llm/` |
 | The system prompt or the tool-calling loop | `agent.py` |
 | Which tools a session gets, and in which order | `runtime.py` |
 | What counts as "unhealthy" in the sweep | `tools/cluster_tools.py` |

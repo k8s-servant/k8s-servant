@@ -3,10 +3,10 @@
 `k8s-servant` is how you talk to the agent, and in the cluster it is also the agent's
 main process (`k8s-servant serve`). One command works in two places:
 
-| Where | How the agent reaches the cluster | How it reaches Foundry | Memory | Available |
+| Where | How the agent reaches the cluster | How it reaches the model | Memory | Available |
 |---|---|---|---|---|
-| **Your laptop** | your current kubeconfig context (and a local kubernetes-mcp-server, if you start one) | `az login`, or `FOUNDRY_API_KEY` | `./.data` | now |
-| **Inside the agent's pod** | the pod's read-only ServiceAccount and the MCP sidecar | Workload Identity | `/data` (shared with the scheduler) | now ([deployment.md](deployment.md)) |
+| **Your laptop** | your current kubeconfig context (and a local kubernetes-mcp-server, if you start one) | `az login` (Foundry), or `LLM_API_KEY` / `LLM_API_KEY_FILE`; none for Ollama | `./.data` | now |
+| **Inside the agent's pod** | the pod's read-only ServiceAccount and the MCP sidecar | Workload Identity (Foundry), or an API key from a mounted Secret | `/data` (shared with the scheduler) | now ([deployment.md](deployment.md)) |
 
 Settings come from environment variables; see the table in the [README](../README.md#configuration).
 On a laptop, put them in `.env` and load it into your shell with `set -a; source .env; set +a`.
@@ -254,7 +254,7 @@ $ k8s-servant --values examples/knowledge-values.yaml --values my-values.yaml do
 
 | Check | What it proves | When it is not OK |
 |---|---|---|
-| `config` | `FOUNDRY_ENDPOINT` and `FOUNDRY_DEPLOYMENT` are set | Set them; see [foundry-setup.md](foundry-setup.md) |
+| `config` | `LLM_PROVIDER`, `LLM_MODEL` (and `LLM_ENDPOINT` where required) are set and the sign-in settings are valid. The line names the provider, API and sign-in, for example `anthropic / claude-sonnet-5-5 via Messages API, API key (file /var/run/secrets/llm/api-key)`, plus a warning when Workload Identity is available but a key is configured | Set them; see [model-providers.md](model-providers.md) |
 | `knowledge` | Environment description, cluster notes and skills were loaded | WARN only: without them the agent knows nothing site-specific. Pass `--values` |
 | `memory` | `DATA_DIR` is usable | An unwritable folder is a configuration error (exit 2) before doctor runs |
 | `mcp` | The MCP server answered | WARN only: the kubectl fallback is used |

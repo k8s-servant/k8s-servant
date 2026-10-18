@@ -1,0 +1,24 @@
+# Example values: Claude through the Anthropic API with an API key, on any cluster.
+# The key is a credential: keep it in a Secret you create first, which the chart
+# mounts as a file. See docs/model-providers.md. All names below are placeholders.
+#
+#   kubectl create namespace k8s-servant
+#   kubectl -n k8s-servant create secret generic k8s-servant-llm --from-file=./api-key
+#   rm ./api-key
+#   helm install k8s-servant oci://ghcr.io/k8s-servant/charts/k8s-servant \
+#     -n k8s-servant -f examples/values-anthropic.yaml
+
+# Agent settings for this cluster.
+appConfig:
+  # Shown in reports and Teams cards.
+  CLUSTER_NAME: my-cluster
+  LLM_PROVIDER: anthropic
+  # The Claude model to use.
+  LLM_MODEL: claude-sonnet-5-5
+  # Authenticate with the API key below.
+  LLM_AUTH: api-key
+
+# The API key, mounted as a file.
+llmApiKey:
+  # Secret created above.
+  existingSecret: k8s-servant-llm

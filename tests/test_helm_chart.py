@@ -28,7 +28,9 @@ pytestmark = pytest.mark.skipif(shutil.which("helm") is None, reason="helm is no
 # The minimum a render needs: values without a site default are required on purpose.
 REQUIRED = {
     "appConfig.CLUSTER_NAME": "aks-test",
-    "appConfig.FOUNDRY_ENDPOINT": "https://example.openai.azure.com/openai/v1/",
+    "appConfig.LLM_PROVIDER": "foundry",
+    "appConfig.LLM_ENDPOINT": "https://example.openai.azure.com/openai/v1/",
+    "appConfig.LLM_MODEL": "my-deployment",
 }
 
 # Azure Workload Identity is opt-in; these arguments turn it on with test IDs.
@@ -218,23 +220,29 @@ def test_webhook_url_can_never_be_a_plain_setting():
     assert "TEAMS_WEBHOOK_URL" in error
 
 
-def test_api_key_can_never_be_a_plain_setting():
+def test_llm_api_key_in_appconfig_is_rejected():
     # A credential: it may only come from a Secret (llmApiKey.existingSecret).
-    assert "FOUNDRY_API_KEY" in render_error("--set-string", "appConfig.FOUNDRY_API_KEY=k")
+    error = render_error("--set-string", "appConfig.LLM_API_KEY=k")
+    assert "LLM_API_KEY" in error and "llmApiKey.existingSecret" in error and "llmApiKey.file" in error
 
 
 def test_no_api_key_by_default():
     docs = render()
-    assert "FOUNDRY_API_KEY_FILE" not in app_config(docs)
+    assert "LLM_API_KEY_FILE" not in app_config(docs)
     assert "/var/run/secrets/llm" not in {m["mountPath"] for m in containers(docs)["agent"]["volumeMounts"]}
 
 
+def test_existing_secret_sets_llm_api_key_file():
+    docs = render("--set-string", "llmApiKey.existingSecret=my-llm-key")
+    assert app_config(docs)["LLM_API_KEY_FILE"] == "/var/run/secrets/llm/api-key"
+
+
 def test_api_key_is_a_file_from_an_existing_secret():
-    # A credential: mounted as a file (FOUNDRY_API_KEY_FILE), never an environment variable.
+    # A credential: mounted as a file (LLM_API_KEY_FILE), never an environment variable.
     docs = render("--set-string", "llmApiKey.existingSecret=my-llm-key")
     agent = containers(docs)["agent"]
     assert not any("API_KEY" in e["name"] for e in agent.get("env", []))
-    assert app_config(docs)["FOUNDRY_API_KEY_FILE"] == "/var/run/secrets/llm/api-key"
+    assert app_config(docs)["LLM_API_KEY_FILE"] == "/var/run/secrets/llm/api-key"
     mounts = {m["mountPath"]: m for m in agent["volumeMounts"]}
     assert mounts["/var/run/secrets/llm"]["readOnly"] is True
     volume = volumes(docs)[mounts["/var/run/secrets/llm"]["name"]]["secret"]
@@ -249,12 +257,50 @@ def test_api_key_secret_key_is_a_value():
 
 
 def test_api_key_file_is_set_by_the_chart():
-    assert "FOUNDRY_API_KEY_FILE" in render_error("--set-string", "appConfig.FOUNDRY_API_KEY_FILE=/x")
+    assert "LLM_API_KEY_FILE" in render_error("--set-string", "appConfig.LLM_API_KEY_FILE=/x")
 
 
-@pytest.mark.parametrize("key", ["appConfig.CLUSTER_NAME", "appConfig.FOUNDRY_ENDPOINT"])
-def test_cluster_name_and_foundry_endpoint_are_required(key):
-    assert key.split(".")[1] in render_error("--set-string", f"{key}=")
+@pytest.mark.parametrize("key", ["CLUSTER_NAME", "LLM_PROVIDER", "LLM_MODEL", "LLM_ENDPOINT"])
+def test_cluster_name_provider_model_and_endpoint_are_required(key):
+    assert key in render_error("--set-string", f"appConfig.{key}=")
+
+
+def test_endpoint_required_only_for_foundry_and_openai_compatible():
+    # Anthropic and OpenAI have a default endpoint; the other two providers need one.
+    base = ["--set-string", "appConfig.LLM_ENDPOINT="]
+    for provider in ("anthropic", "openai", "ollama"):
+        docs = render(*base, "--set-string", f"appConfig.LLM_PROVIDER={provider}")
+        assert "LLM_ENDPOINT" not in app_config(docs)
+    for provider in ("foundry", "openai-compatible"):
+        error = render_error(*base, "--set-string", f"appConfig.LLM_PROVIDER={provider}")
+        assert "LLM_ENDPOINT" in error
+
+
+@pytest.mark.parametrize(
+    ("old", "new"),
+    [
+        ("FOUNDRY_ENDPOINT", "LLM_ENDPOINT"),
+        ("FOUNDRY_DEPLOYMENT", "LLM_MODEL"),
+        ("FOUNDRY_TOKEN_SCOPE", "LLM_TOKEN_SCOPE"),
+        ("FOUNDRY_TIMEOUT_SECONDS", "LLM_TIMEOUT_SECONDS"),
+        ("FOUNDRY_REASONING_EFFORT", "LLM_REASONING_EFFORT"),
+        ("FOUNDRY_ANYTHING", "LLM_*"),
+    ],
+)
+def test_old_foundry_key_in_appconfig_fails_with_new_name(old, new):
+    error = render_error("--set-string", f"appConfig.{old}=x")
+    assert old in error and new in error
+
+
+@pytest.mark.parametrize("old", ["FOUNDRY_API_KEY", "FOUNDRY_API_KEY_FILE"])
+def test_old_foundry_key_settings_point_at_llmapikey_not_appconfig(old):
+    # The chart refuses API keys in appConfig, so the advice must not send users there.
+    error = render_error("--set-string", f"appConfig.{old}=x")
+    assert (
+        f"appConfig.{old} is no longer supported: use llmApiKey.existingSecret or llmApiKey.file "
+        "(the key is mounted from a Secret, never set in appConfig)"
+    ) in error
+    assert "appConfig.LLM_API_KEY" not in error and "appConfig.llmApiKey" not in error
 
 
 # --- MCP sidecar config -------------------------------------------------------------
@@ -590,7 +636,7 @@ def test_extra_objects_are_rendered_with_templates(tmp_path):
 @pytest.mark.parametrize(
     "name",
     [
-        "FOUNDRY_API_KEY",
+        "LLM_API_KEY",
         "TEAMS_WEBHOOK_URL",
         "SLACK_WEBHOOK_URL",
         "GITHUB_TOKEN",
@@ -604,9 +650,7 @@ def test_extra_env_cannot_carry_a_credential_as_plain_text(tmp_path, name):
     assert name in error
 
 
-@pytest.mark.parametrize(
-    "name", ["KNOWLEDGE_DIR", "DATA_DIR", "MCP_URL", "FOUNDRY_API_KEY_FILE", "TEAMS_WEBHOOK_URL_FILE"]
-)
+@pytest.mark.parametrize("name", ["KNOWLEDGE_DIR", "DATA_DIR", "MCP_URL", "LLM_API_KEY_FILE", "TEAMS_WEBHOOK_URL_FILE"])
 def test_extra_env_cannot_override_what_the_chart_sets(tmp_path, name):
     error = render_error(*values_file(tmp_path, {"extraEnv": [{"name": name, "value": "/x"}]}))
     assert name in error
@@ -626,7 +670,7 @@ def test_chart_settings_win_over_extra_env_from(tmp_path):
 
 def test_api_key_can_come_from_a_file_mounted_by_you():
     docs = render("--set-string", "llmApiKey.file=/mnt/secrets/llm-api-key")
-    assert app_config(docs)["FOUNDRY_API_KEY_FILE"] == "/mnt/secrets/llm-api-key"
+    assert app_config(docs)["LLM_API_KEY_FILE"] == "/mnt/secrets/llm-api-key"
     # The chart mounts nothing itself: the volume comes from extraVolumes.
     assert "llm-api-key" not in volumes(docs)
 

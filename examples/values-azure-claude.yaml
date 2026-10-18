@@ -1,0 +1,30 @@
+# Example values for one AKS cluster: Claude served by Azure AI Foundry, reached with
+# Workload Identity (Entra ID tokens, no API key). Prerequisite: the identity, its
+# federated credential and the 'Cognitive Services User' role on the Foundry resource
+# (Claude is not covered by 'Cognitive Services OpenAI User'), from
+#   MODEL_ROLE="Cognitive Services User" scripts/setup-workload-identity.sh ...
+# See docs/model-providers.md.
+# All names below are placeholders.
+#
+#   helm install k8s-servant oci://ghcr.io/k8s-servant/charts/k8s-servant \
+#     -n k8s-servant --create-namespace -f examples/values-azure-claude.yaml
+
+# Managed identity for Foundry, created by scripts/setup-workload-identity.sh.
+azureWorkloadIdentity:
+  # Off by default in the chart; this example uses it.
+  enabled: true
+  # Client ID printed by the script.
+  clientId: "00000000-0000-0000-0000-000000000000"
+  # Your Entra ID tenant.
+  tenantId: "00000000-0000-0000-0000-000000000000"
+
+# Agent settings for this cluster.
+appConfig:
+  # Shown in reports and Teams cards.
+  CLUSTER_NAME: my-cluster
+  LLM_PROVIDER: anthropic
+  # Your Foundry resource (the Anthropic API is served below this URL).
+  LLM_ENDPOINT: https://my-foundry.services.ai.azure.com
+  LLM_MODEL: claude-sonnet-5-5
+  # Entra ID tokens through Workload Identity; no key.
+  LLM_AUTH: entra

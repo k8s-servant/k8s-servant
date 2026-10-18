@@ -16,9 +16,11 @@ appConfig:
   # Shown in reports and Teams cards.
   CLUSTER_NAME: my-cluster
   # Any OpenAI-compatible endpoint: the full base URL, including its path.
-  FOUNDRY_ENDPOINT: https://api.example.com/v1
+  LLM_PROVIDER: openai-compatible
+  LLM_ENDPOINT: https://api.example.com/v1
   # The model name at that endpoint.
-  FOUNDRY_DEPLOYMENT: my-model
+  LLM_MODEL: my-model
+  LLM_AUTH: api-key
 
 # The endpoint's API key, mounted as a file.
 llmApiKey:

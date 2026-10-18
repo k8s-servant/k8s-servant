@@ -8,6 +8,8 @@ every variable in the table must still exist.
 import re
 from pathlib import Path
 
+from k8s_servant.llm.providers import OLD_SETTINGS
+
 ROOT = Path(__file__).resolve().parent.parent
 CONFIG = (ROOT / "k8s_servant" / "config.py").read_text()
 README = (ROOT / "README.md").read_text()
@@ -35,7 +37,7 @@ def test_the_readme_lists_no_removed_settings():
 
 def test_the_code_side_of_this_check_finds_the_settings():
     # Guards the regex: if config.py's style changes, the checks above must not pass vacuously.
-    assert {"FOUNDRY_ENDPOINT", "EVENTS_EXCLUDE_REASONS", "CHECK_SKIP_UNCHANGED"} <= _settings_in_code()
+    assert {"LLM_ENDPOINT", "EVENTS_EXCLUDE_REASONS", "CHECK_SKIP_UNCHANGED"} <= _settings_in_code()
 
 
 def _slug(heading: str) -> str:
@@ -61,6 +63,48 @@ def test_links_between_docs_point_to_existing_files_and_headings():
                 if anchor not in slugs:
                     broken.append(f"{page.name}: {target} (no such heading)")
     assert not broken, "\n".join(broken)
+
+
+# --- model providers page ------------------------------------------------------------
+
+PROVIDERS_PAGE = ROOT / "docs" / "model-providers.md"
+MIGRATION_HEADING = "Migrating from FOUNDRY_* settings"
+
+
+def test_model_providers_page_has_a_recipe_per_provider():
+    page = PROVIDERS_PAGE.read_text()
+    for heading in ["Foundry", "Claude on Foundry", "OpenAI", "Anthropic", "Ollama", "OpenAI-compatible"]:
+        assert re.search(rf"^## .*{re.escape(heading)}", page, re.MULTILINE), heading
+    for old, new in OLD_SETTINGS.items():
+        assert f"`{old}`" in page and f"`{new}`" in page
+
+
+def test_every_example_values_file_is_listed_in_the_readme():
+    missing = [f.name for f in sorted((ROOT / "examples").glob("values-*.yaml")) if f.name not in README]
+    assert not missing, f"list in the README examples table: {missing}"
+
+
+def test_no_doc_mentions_old_foundry_settings_outside_the_migration_table():
+    pages = [ROOT / "README.md", *sorted((ROOT / "docs").glob("*.md"))]
+    offenders = []
+    for page in pages:
+        text = page.read_text()
+        if page == PROVIDERS_PAGE:
+            # The migration section is the one place the old names belong.
+            text = text.split(f"## {MIGRATION_HEADING}")[0]
+        offenders += [f"{page.name}: {old}" for old in OLD_SETTINGS if re.search(rf"\b{old}\b", text)]
+    assert not offenders, "\n".join(offenders)
+
+
+def test_model_providers_page_explains_the_apis_and_privacy():
+    page = PROVIDERS_PAGE.read_text()
+    for needle in ["Why three APIs", "Chat Completions", "Responses", "Messages", "store=false", "unencrypted"]:
+        assert needle in page, needle
+    assert "https://generativelanguage.googleapis.com/v1beta/openai/" in page
+
+
+def test_the_providers_page_is_linked_from_the_readme():
+    assert "docs/model-providers.md" in README
 
 
 # --- code documentation --------------------------------------------------------------

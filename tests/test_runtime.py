@@ -80,4 +80,4 @@ async def test_open_agent_puts_learned_notes_in_the_prompt(tmp_path):
         assert session.chat is chat and not session.mcp_available
         assert "save_note" in [t.name for t in session.registry.tools()]
     assert result.answer == "hello"
-    assert "CronJob backup fails on Sundays by design" in chat.calls[0]["messages"][0]["content"]
+    assert "CronJob backup fails on Sundays by design" in chat.calls[0]["turns"][0].content

@@ -34,7 +34,8 @@ from zoneinfo import ZoneInfo
 
 from k8s_servant.findings import StoredFinding
 from k8s_servant.healthcheck import SKIPPED_SUMMARY_PREFIX, record_failed_run, run_check
-from k8s_servant.llm import explain_model_error
+from k8s_servant.llm import model_error_text
+from k8s_servant.llm.types import Turn
 from k8s_servant.memory import Memory
 from k8s_servant.tools.prometheus_tool import fetch_alerts_fired_since, fetch_firing_alerts, format_alerts
 
@@ -256,7 +257,7 @@ async def build_morning_report(
         check = await run_check(session.agent, memory, cluster, clock=clock)
         check_ok, check_error = check.ok, check.error
     except Exception as exc:  # the report must still go out when the model or a tool fails
-        check_error = explain_model_error(exc)
+        check_error = model_error_text(exc, config)
         logger.error("Health check for the morning report failed: %s", check_error)
         record_failed_run(memory, "check", started, check_error)
 
@@ -321,13 +322,10 @@ async def build_morning_report(
     # 4. The overview in plain words, from these facts only (no tools).
     try:
         reply = await session.chat.complete(
-            [
-                {"role": "system", "content": OVERVIEW_PROMPT},
-                {"role": "user", "content": f"Cluster: {cluster}\n\n{facts_md}"},
-            ],
+            [Turn("system", OVERVIEW_PROMPT), Turn("user", f"Cluster: {cluster}\n\n{facts_md}")],
             [],
         )
-        report.overview = (reply.content or "").strip() or "(no overview)"
+        report.overview = reply.content.strip() or "(no overview)"
     except Exception as exc:
         logger.error("Could not write the morning overview: %s", type(exc).__name__)
         report.overview = f"(overview not available: {type(exc).__name__})"

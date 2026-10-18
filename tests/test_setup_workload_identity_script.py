@@ -72,6 +72,7 @@ def fake_az(tmp_path, monkeypatch):
     log.write_text("")
     monkeypatch.setenv("PATH", f"{bin_dir}{os.pathsep}{os.environ['PATH']}")
     monkeypatch.setenv("AZ_LOG", str(log))
+    monkeypatch.delenv("MODEL_ROLE", raising=False)
     return log
 
 
@@ -204,6 +205,8 @@ def test_prints_the_helm_values(fake_az, monkeypatch):
     assert result.returncode == 0, result.stderr
     assert 'clientId: "client-1111"' in result.stdout
     assert 'tenantId: "tenant-0000"' in result.stdout
+    assert "LLM_AUTH: entra" in result.stdout
+    assert "FOUNDRY_" not in result.stdout.replace("FOUNDRY_ID", "")
     assert "k8s-servant release on my-cluster" in result.stdout
     assert "k8s-servant/k8s-servant" in result.stdout
 
@@ -251,3 +254,32 @@ def test_no_rerun_reminder_for_a_long_lived_cluster(fake_az, monkeypatch):
     monkeypatch.setenv("AZ_EXISTS", "1")
     result = _run(*ARGS)
     assert "EPHEMERAL_CLUSTER" not in result.stdout
+
+
+def test_default_model_role_is_printed(fake_az, monkeypatch):
+    monkeypatch.setenv("AZ_EXISTS", "0")
+    result = _run(*ARGS)
+    assert result.returncode == 0, result.stderr
+    assert "Foundry: 'Cognitive Services OpenAI User'" in result.stdout
+
+
+@pytest.mark.parametrize("role", ["Cognitive Services User", "Foundry User"])
+def test_model_role_can_be_chosen_for_non_openai_models(fake_az, monkeypatch, role):
+    # Cognitive Services OpenAI User covers only OpenAI models; Claude and other
+    # non-OpenAI models on Foundry need Cognitive Services User (or Foundry User).
+    monkeypatch.setenv("AZ_EXISTS", "0")
+    monkeypatch.setenv("MODEL_ROLE", role)
+    result = _run(*ARGS)
+    assert result.returncode == 0, result.stderr
+    calls = fake_az.read_text()
+    assert f"--role {role} --scope {FOUNDRY_ID}" in calls
+    assert "Cognitive Services OpenAI User" not in calls
+    assert f"Foundry: '{role}'" in result.stdout
+
+
+def test_other_model_roles_are_refused_before_any_azure_call(fake_az, monkeypatch):
+    monkeypatch.setenv("MODEL_ROLE", "Owner")
+    result = _run(*ARGS)
+    assert result.returncode == 1
+    assert "MODEL_ROLE" in result.stderr and "Cognitive Services User" in result.stderr
+    assert fake_az.read_text() == ""

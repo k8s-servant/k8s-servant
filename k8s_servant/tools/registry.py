@@ -18,6 +18,8 @@ import re
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 
+from k8s_servant.llm.types import ToolSpec
+
 logger = logging.getLogger(__name__)
 
 # OpenAI-compatible APIs only accept tool names matching this pattern.
@@ -81,15 +83,9 @@ class ToolRegistry:
         """The distinct sources the registered tools come from."""
         return {tool.surface for tool in self._tools.values()}
 
-    def schemas(self) -> list[dict]:
-        """Tool definitions in the format the Chat Completions API expects."""
-        return [
-            {
-                "type": "function",
-                "function": {"name": t.name, "description": t.description, "parameters": t.parameters},
-            }
-            for t in self._tools.values()
-        ]
+    def specs(self) -> list[ToolSpec]:
+        """Tool definitions in the provider-neutral shape; each API client converts them."""
+        return [ToolSpec(t.name, t.description, t.parameters) for t in self._tools.values()]
 
     async def run(self, name: str, arguments_json: str) -> str:
         """Run a tool with the JSON-encoded arguments the model produced.

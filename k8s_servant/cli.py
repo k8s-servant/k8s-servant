@@ -33,14 +33,14 @@ import sys
 import time
 from datetime import UTC, datetime, timedelta
 
-import openai
 import yaml
-from azure.core.exceptions import ClientAuthenticationError
 
 from k8s_servant.config import configure_app, configure_logging, missing_model_settings
 from k8s_servant.healthcheck import CheckResult, record_failed_run, run_health_check
 from k8s_servant.knowledge import load_knowledge
-from k8s_servant.llm import build_chat, explain_model_error
+from k8s_servant.llm import MODEL_ERRORS, build_chat, describe_model, model_error_text
+from k8s_servant.llm.auth import resolve_model_auth
+from k8s_servant.llm.types import Turn
 from k8s_servant.memory import Memory
 from k8s_servant.report import MorningReport, build_morning_report, format_age
 from k8s_servant.runtime import open_agent, open_runtime
@@ -57,9 +57,6 @@ from k8s_servant.tools.kubectl_tool import run_kubectl
 from k8s_servant.tools.prometheus_tool import check_ready
 
 logger = logging.getLogger(__name__)
-
-# Errors a model call can end with that we explain instead of printing a traceback.
-MODEL_ERRORS = (openai.OpenAIError, ClientAuthenticationError)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -98,7 +95,7 @@ def _make_chat(config: dict):
     """Build the model client. Returns (chat, None), or (None, exit_code) after printing why not."""
     missing = missing_model_settings(config)
     if missing:
-        print(f"Missing settings: {', '.join(missing)}. See docs/foundry-setup.md.", file=sys.stderr)
+        print(f"Missing settings: {', '.join(missing)}. See docs/model-providers.md.", file=sys.stderr)
         return None, 2
     try:
         return build_chat(config), None
@@ -158,7 +155,7 @@ async def check_and_post(
                 ignore_alerts=config["alerts_ignore_names"],
             )
         except MODEL_ERRORS as exc:
-            record_failed_run(memory, "check", started, explain_model_error(exc))
+            record_failed_run(memory, "check", started, model_error_text(exc, config))
             error = exc
     # Raised only after the session is closed: inside it, the MCP client's task group
     # would wrap the error in an ExceptionGroup that callers do not expect.
@@ -213,8 +210,8 @@ async def cmd_ask(args, config: dict, knowledge, memory: Memory) -> int:
         try:
             result = await session.agent.run(question)
         except MODEL_ERRORS as exc:
-            print(f"Model call failed: {explain_model_error(exc)}", file=sys.stderr)
-            record_failed_run(memory, "ask", started, explain_model_error(exc))
+            print(f"Model call failed: {model_error_text(exc, config)}", file=sys.stderr)
+            record_failed_run(memory, "ask", started, model_error_text(exc, config))
             return 1
     memory.record_run(
         "ask",
@@ -242,7 +239,7 @@ async def cmd_check(args, config: dict, knowledge, memory: Memory) -> int:
     try:
         result = await check_and_post(config, knowledge, memory, chat, post=args.post)
     except MODEL_ERRORS as exc:
-        print(f"Model call failed: {explain_model_error(exc)}", file=sys.stderr)
+        print(f"Model call failed: {model_error_text(exc, config)}", file=sys.stderr)
         return 1
     print(result.report_md)
     return 0 if result.ok else 1
@@ -268,14 +265,45 @@ async def cmd_serve(args, config: dict, knowledge, memory: Memory) -> int:
     for signum in (signal.SIGTERM, signal.SIGINT):
         loop.add_signal_handler(signum, stop.set)
 
+    await Scheduler(config, memory, *serve_jobs(config, knowledge, memory, chat)).run(stop)
+    return 0
+
+
+def serve_jobs(config: dict, knowledge, memory: Memory, chat):
+    """The health check and morning report jobs that `serve` hands to the Scheduler.
+
+    A model failure is logged here as model_error_text (one line, key redacted) and
+    swallowed, so the scheduler never logs the provider's error body: some providers
+    echo the API key in it. check_and_post has already recorded the failed run.
+
+    Args:
+        config: Settings.
+        knowledge: Loaded knowledge for the system prompt.
+        memory: The agent's memory.
+        chat: Model client.
+
+    Returns:
+        (check_job, morning_job), coroutine functions without arguments.
+    """
+
+    async def run_logged(name: str, job) -> None:
+        reason = ""
+        try:
+            await job
+        except MODEL_ERRORS as exc:
+            reason = model_error_text(exc, config)
+        # Logged outside the except block: a failing log handler prints the exception
+        # being handled, and that would be the provider's unredacted body.
+        if reason:
+            logger.error("The %s failed: %s", name, reason)
+
     async def check_job():
-        await check_and_post(config, knowledge, memory, chat, post=True, scheduled=True)
+        await run_logged("health check", check_and_post(config, knowledge, memory, chat, post=True, scheduled=True))
 
     async def morning_job():
-        await report_and_post(config, knowledge, memory, chat, post=True)
+        await run_logged("morning report", report_and_post(config, knowledge, memory, chat, post=True))
 
-    await Scheduler(config, memory, check_job, morning_job).run(stop)
-    return 0
+    return check_job, morning_job
 
 
 async def cmd_findings(args, config: dict, knowledge, memory: Memory) -> int:
@@ -352,10 +380,20 @@ async def cmd_doctor(args, config: dict, knowledge, memory: Memory) -> int:
 
     # 1. Configuration
     missing = missing_model_settings(config)
+    config_ok = False
     if missing:
-        report("FAIL", "config", f"missing {', '.join(missing)} (see docs/foundry-setup.md)")
+        report("FAIL", "config", f"missing {', '.join(missing)} (see docs/model-providers.md)")
     else:
-        report("OK", "config", f"endpoint {config['foundry_endpoint']}, deployment {config['foundry_deployment']}")
+        try:
+            # Resolve once: it validates the combination and logs the auto-mode warning.
+            auth = resolve_model_auth(config)
+        except ValueError as exc:
+            report("FAIL", "config", str(exc))
+        else:
+            config_ok = True
+            report("OK", "config", describe_model(config, auth))
+            if auth.warning:
+                report("WARN", "auth", auth.warning)
 
     # 2. Knowledge
     report(
@@ -430,18 +468,16 @@ async def cmd_doctor(args, config: dict, knowledge, memory: Memory) -> int:
         )
 
     # 9. Model: a tiny real completion proves endpoint, auth, deployment and network.
-    if missing:
+    if not config_ok:
         report("SKIP", "model", "configuration incomplete")
     else:
         try:
             chat = build_chat(config)
             started = time.monotonic()
-            reply = await chat.complete([{"role": "user", "content": "Reply with the single word OK."}], [])
-            report(
-                "OK", "model", f"answered {(reply.content or '').strip()[:40]!r} in {time.monotonic() - started:.1f}s"
-            )
+            reply = await chat.complete([Turn("user", "Reply with the single word OK.")], [])
+            report("OK", "model", f"answered {reply.content.strip()[:40]!r} in {time.monotonic() - started:.1f}s")
         except (*MODEL_ERRORS, ValueError) as exc:
-            report("FAIL", "model", explain_model_error(exc))
+            report("FAIL", "model", model_error_text(exc, config))
 
     return 1 if "FAIL" in statuses else 0
 

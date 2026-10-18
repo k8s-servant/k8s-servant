@@ -38,7 +38,7 @@ RUN curl -fsSLO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/${TARGET
 WORKDIR /build
 COPY pyproject.toml README.md LICENSE NOTICE ./
 COPY k8s_servant ./k8s_servant
-RUN pip install --no-cache-dir --prefix=/install .
+RUN pip install --no-cache-dir --prefix=/install '.[azure]'
 
 # ========================
 # Runtime stage

@@ -115,7 +115,9 @@ The script does the following:
   Azure RBAC, the role is scoped to that secret only. A vault with access policies
   cannot limit access to one secret, so the script stops there. It continues only
   when you accept vault-wide read access with `ALLOW_VAULT_WIDE_SECRET_READ=yes`;
-- gives the identity *Cognitive Services OpenAI User* on the Foundry resource;
+- gives the identity *Cognitive Services OpenAI User* on the Foundry resource, which
+  covers OpenAI models only; for Claude and other non-OpenAI models set
+  `MODEL_ROLE="Cognitive Services User"` when running the script;
 - prints the values snippet (client ID, tenant ID) and an equivalent Terraform snippet.
 
 For a second cluster, run the same command with that cluster's resource group and name
@@ -151,9 +153,15 @@ Start from the examples in this repository:
 | `examples/knowledge-values.yaml` | an example platform description and cluster notes: copy and describe *your* platform |
 | `examples/values-azure.yaml` | **The complete Azure setup:** Azure AI Foundry with Workload Identity, and the Teams webhook synced from Key Vault by External Secrets (its objects installed through `extraObjects`) |
 | `examples/values-azure-csi.yaml` | Azure **without any Kubernetes Secret**: Workload Identity, and the Teams webhook mounted straight from Key Vault by the Secrets Store CSI driver |
-| `examples/values-minimal.yaml` | Any cluster: an API key and the Teams webhook from Secrets created with kubectl, nothing cloud-specific |
+| `examples/values-minimal.yaml` | Any cluster: `openai-compatible` with an API key and the Teams webhook from Secrets created with kubectl, nothing cloud-specific |
+| `examples/values-azure-claude.yaml` | AKS: Claude on Foundry with Workload Identity (`anthropic`, Foundry endpoint) |
+| `examples/values-anthropic.yaml` | Any cluster: Claude from Anthropic, key from a Secret |
+| `examples/values-openai.yaml` | Any cluster: OpenAI, key from a Secret |
+| `examples/values-ollama.yaml` | Any cluster: an in-cluster Ollama, no key |
 
-The chart requires only `appConfig.CLUSTER_NAME` and `appConfig.FOUNDRY_ENDPOINT`.
+Every provider has a full recipe in [model-providers.md](model-providers.md).
+
+The chart requires `appConfig.CLUSTER_NAME`, `appConfig.LLM_MODEL`, plus `appConfig.LLM_ENDPOINT` for `foundry` and `openai-compatible`. The app requires `LLM_PROVIDER`; the chart's `values.yaml` sets it to `foundry` by default, so set `appConfig.LLM_PROVIDER` yourself for any other provider.
 Workload Identity is off in the chart defaults, so the Azure example turns it on
 explicitly; with it enabled, the chart refuses to render with an empty client ID.
 
@@ -175,7 +183,7 @@ example through `extraEnvFrom`, that is your choice; the chart's own wiring neve
 
 | Credential | Values | Read by the agent from |
 |---|---|---|
-| Model API key (not needed with Workload Identity) | `llmApiKey.existingSecret` (key `llmApiKey.secretKey`, default `api-key`) or `llmApiKey.file` | `FOUNDRY_API_KEY_FILE` |
+| Model API key (not needed with Workload Identity) | `llmApiKey.existingSecret` (key `llmApiKey.secretKey`, default `api-key`) or `llmApiKey.file` | `LLM_API_KEY_FILE` |
 | Teams webhook URL | `teamsWebhook.existingSecret` (key `teamsWebhook.secretKey`, default `webhook-url`) or `teamsWebhook.file` | `TEAMS_WEBHOOK_URL_FILE` |
 
 How the Secret gets there is your choice:

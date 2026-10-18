@@ -25,13 +25,14 @@ requires-python = ">=3.12"
 dependencies = [
   "openai>=3.27,<4",        # chat model client (Foundry exposes an OpenAI-compatible v1 endpoint)
   "mcp>=2.3,<3",            # Model Context Protocol client for kubernetes-mcp-server
-  "azure-identity>=1.26,<2",# Entra ID tokens: Workload Identity in the cluster, az login locally
+  "anthropic>=1.15,<2",     # Claude client (Messages API); small and pure Python, so always installed
   "pyyaml>=6,<7",           # skill frontmatter and Helm values files
   "httpx2>=2.13,<3",        # Prometheus, Alertmanager and Teams HTTP calls (same client the SDKs use)
   "tzdata>=2025.1",         # time zone data for the daily report; Alpine images have none
 ]
 
 [project.optional-dependencies]
+azure = ["azure-identity>=1.26,<2"] # Entra ID tokens for Foundry: Workload Identity in the cluster, az login locally
 dev = ["pytest>=9,<10", "pytest-asyncio>=1.4,<2", "pytest-cov>=7", "ruff>=0.17", "pre-commit>=4"]
 
 [project.urls]

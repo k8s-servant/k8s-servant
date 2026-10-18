@@ -48,10 +48,10 @@ Neither appConfig nor extraEnv may override them.
   "HEARTBEAT_FILE" "/tmp/heartbeat"
   "MCP_URL" "http://127.0.0.1:8080/mcp"
   "KUBECTL_PATH" "/usr/local/bin/kubectl"
-  "FOUNDRY_API_KEY_FILE" ""
+  "LLM_API_KEY_FILE" ""
   "TEAMS_WEBHOOK_URL_FILE" "" -}}
 {{- $credentials := list
-  (list "llmApiKey" .Values.llmApiKey "FOUNDRY_API_KEY_FILE" "/var/run/secrets/llm/api-key")
+  (list "llmApiKey" .Values.llmApiKey "LLM_API_KEY_FILE" "/var/run/secrets/llm/api-key")
   (list "teamsWebhook" .Values.teamsWebhook "TEAMS_WEBHOOK_URL_FILE" "/var/run/secrets/teams/webhook-url") }}
 {{- range $credentials }}
 {{- $name := index . 0 }}{{- $values := index . 1 }}{{- $env := index . 2 }}{{- $mounted := index . 3 }}
@@ -82,19 +82,34 @@ webhook URL come only from Secrets mounted as files.
 */}}
 {{- define "k8s-servant.appConfig" -}}
 {{- $fixed := include "k8s-servant.fixedEnv" . | fromYaml }}
-{{- $required := list "CLUSTER_NAME" "FOUNDRY_ENDPOINT" "FOUNDRY_DEPLOYMENT" }}
+{{- $required := list "CLUSTER_NAME" "LLM_PROVIDER" "LLM_MODEL" }}
+{{- if has (toString (index $.Values.appConfig "LLM_PROVIDER")) (list "foundry" "openai-compatible") }}
+{{- $required = append $required "LLM_ENDPOINT" }}
+{{- end }}
 {{- range $required }}
 {{- if not (toString (index $.Values.appConfig .) ) }}
 {{- fail (printf "appConfig.%s is required" .) }}
 {{- end }}
 {{- end }}
+{{- $renamed := dict
+  "FOUNDRY_ENDPOINT" "LLM_ENDPOINT"
+  "FOUNDRY_DEPLOYMENT" "LLM_MODEL"
+  "FOUNDRY_TOKEN_SCOPE" "LLM_TOKEN_SCOPE"
+  "FOUNDRY_TIMEOUT_SECONDS" "LLM_TIMEOUT_SECONDS"
+  "FOUNDRY_REASONING_EFFORT" "LLM_REASONING_EFFORT" }}
 {{- $config := dict }}
 {{- range $key, $value := .Values.appConfig }}
 {{- if hasKey $fixed $key }}
 {{- fail (printf "appConfig.%s is set by the chart and cannot be overridden" $key) }}
 {{- end }}
-{{- if eq $key "FOUNDRY_API_KEY" }}
-{{- fail "appConfig.FOUNDRY_API_KEY is not allowed: the API key is a credential and comes only from a Secret or a mounted file (llmApiKey.existingSecret / llmApiKey.file)" }}
+{{- if has $key (list "FOUNDRY_API_KEY" "FOUNDRY_API_KEY_FILE") }}
+{{- fail (printf "appConfig.%s is no longer supported: use llmApiKey.existingSecret or llmApiKey.file (the key is mounted from a Secret, never set in appConfig)" $key) }}
+{{- end }}
+{{- if hasPrefix "FOUNDRY_" $key }}
+{{- fail (printf "appConfig.%s is no longer supported: use appConfig.%s (the FOUNDRY_* settings became LLM_*; see docs/model-providers.md)" $key (get $renamed $key | default "LLM_*")) }}
+{{- end }}
+{{- if contains "API_KEY" $key }}
+{{- fail (printf "appConfig.%s is not allowed: the API key is a credential and comes only from a Secret or a mounted file (llmApiKey.existingSecret / llmApiKey.file)" $key) }}
 {{- end }}
 {{- if contains "WEBHOOK_URL" $key }}
 {{- fail (printf "appConfig.%s is not allowed: the Teams webhook URL is a credential and comes only from a Secret or a mounted file (teamsWebhook.existingSecret / teamsWebhook.file)" $key) }}

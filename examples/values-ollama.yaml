@@ -1,0 +1,16 @@
+# Example values: a local model served by Ollama inside the same cluster. No API key
+# and no cloud identity. The endpoint is plain http to an in-cluster Service, so
+# nothing secret may travel to it; see docs/model-providers.md. Names are placeholders.
+#
+#   helm install k8s-servant oci://ghcr.io/k8s-servant/charts/k8s-servant \
+#     -n k8s-servant --create-namespace -f examples/values-ollama.yaml
+
+# Agent settings for this cluster.
+appConfig:
+  # Shown in reports and Teams cards.
+  CLUSTER_NAME: my-cluster
+  LLM_PROVIDER: ollama
+  # Ollama's OpenAI-compatible API on its in-cluster Service.
+  LLM_ENDPOINT: http://ollama.ollama.svc:11434/v1
+  # A model pulled into that Ollama; it must support tool calling.
+  LLM_MODEL: qwen3

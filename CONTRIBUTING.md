@@ -15,7 +15,7 @@ Thanks for your interest! Bug reports, docs fixes, new skills and code are all w
 
 ```bash
 python3 -m venv .venv
-.venv/bin/pip install -e '.[dev]'
+.venv/bin/pip install -e '.[dev,azure]'
 .venv/bin/pre-commit install      # ruff + gitleaks on every commit
 .venv/bin/pytest                  # tests
 .venv/bin/ruff check . && .venv/bin/ruff format --check .

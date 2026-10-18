@@ -6,10 +6,13 @@ from fakes import ScriptedChat, answer, findings_answer
 from k8s_servant import cli
 
 ENV_VARS = (
-    "FOUNDRY_ENDPOINT",
-    "FOUNDRY_DEPLOYMENT",
-    "FOUNDRY_API_KEY",
-    "FOUNDRY_API_KEY_FILE",
+    "LLM_PROVIDER",
+    "LLM_ENDPOINT",
+    "LLM_MODEL",
+    "LLM_API_KEY",
+    "LLM_API_KEY_FILE",
+    "LLM_AUTH",
+    "AZURE_FEDERATED_TOKEN_FILE",
     "KNOWLEDGE_DIR",
     "MAX_ITERATIONS",
     "PROMETHEUS_URL",
@@ -42,8 +45,9 @@ def clean_env(monkeypatch, tmp_path):
 @pytest.fixture
 def scripted_model(monkeypatch):
     """Configure a model and replace it with a scripted fake; returns a setter for the replies."""
-    monkeypatch.setenv("FOUNDRY_ENDPOINT", "https://x.openai.azure.com/")
-    monkeypatch.setenv("FOUNDRY_DEPLOYMENT", "k8s-servant")
+    monkeypatch.setenv("LLM_PROVIDER", "foundry")
+    monkeypatch.setenv("LLM_ENDPOINT", "https://x.openai.azure.com/")
+    monkeypatch.setenv("LLM_MODEL", "k8s-servant")
     monkeypatch.setenv("MCP_URL", "")
     monkeypatch.setenv("CLUSTER_NAME", "my-cluster")
     holder = {}
@@ -77,13 +81,13 @@ def test_parser_collects_values_and_question_words():
 
 def test_ask_without_model_settings_exits_2(capsys):
     assert cli.main(["ask", "hi"]) == 2
-    assert "FOUNDRY_ENDPOINT" in capsys.readouterr().err
+    assert "LLM_PROVIDER" in capsys.readouterr().err
 
 
 @pytest.mark.parametrize("command", [["check"], ["report"], ["serve"]])
 def test_model_commands_need_model_settings(command, capsys):
     assert cli.main(command) == 2
-    assert "FOUNDRY_ENDPOINT" in capsys.readouterr().err
+    assert "LLM_PROVIDER" in capsys.readouterr().err
 
 
 def test_missing_values_file_is_a_configuration_error(tmp_path, capsys):
@@ -122,6 +126,72 @@ def test_doctor_reports_missing_model_settings(monkeypatch, tmp_path, capsys):
     assert "[SKIP] model" in out
     assert "[OK  ] memory" in out
     assert "[WARN] prometheus" in out and "[WARN] teams" in out
+
+
+def _doctor_env(monkeypatch, provider, endpoint="", model="claude-sonnet-5-5"):
+    monkeypatch.setenv("MCP_URL", "")
+    monkeypatch.setenv("LLM_PROVIDER", provider)
+    monkeypatch.setenv("LLM_MODEL", model)
+    if endpoint:
+        monkeypatch.setenv("LLM_ENDPOINT", endpoint)
+    monkeypatch.setattr(cli, "build_chat", lambda config: ScriptedChat(answer("OK")))
+
+
+def test_doctor_names_provider_api_and_key_file(monkeypatch, tmp_path, capsys):
+    key_file = tmp_path / "key"
+    key_file.write_text("sk-test-secret\n")
+    _doctor_env(monkeypatch, "anthropic")
+    monkeypatch.setenv("LLM_API_KEY_FILE", str(key_file))
+    assert cli.main(["doctor"]) == 0
+    out = capsys.readouterr().out
+    assert "anthropic / claude-sonnet-5-5 via Messages API, API key (file " in out
+    assert "sk-test-secret" not in out
+    assert "[OK  ] model" in out
+
+
+def test_doctor_fails_config_on_invalid_auth_combo(monkeypatch, capsys):
+    _doctor_env(monkeypatch, "openai", model="gpt-5")
+    monkeypatch.setenv("LLM_AUTH", "entra")
+    assert cli.main(["doctor"]) == 1
+    out = capsys.readouterr().out
+    assert "[FAIL] config" in out and "LLM_AUTH=entra" in out
+    assert "[SKIP] model" in out
+
+
+def test_doctor_warns_when_workload_identity_and_key(monkeypatch, tmp_path, capsys):
+    key_file = tmp_path / "key"
+    key_file.write_text("sk-test-secret\n")
+    _doctor_env(monkeypatch, "foundry", endpoint="https://x.openai.azure.com/")
+    monkeypatch.setenv("LLM_API_KEY_FILE", str(key_file))
+    monkeypatch.setenv("AZURE_FEDERATED_TOKEN_FILE", str(tmp_path / "token"))
+    cli.main(["doctor"])
+    out = capsys.readouterr().out
+    assert "[OK  ] config" in out
+    assert out.count("[WARN] auth") == 1 and "LLM_AUTH=entra" in out
+    assert "sk-test-secret" not in out
+
+
+@pytest.mark.parametrize("provider,endpoint", [("anthropic", ""), ("openai", "")])
+def test_doctor_no_auth_warning_on_a_public_api_with_workload_identity(
+    monkeypatch, tmp_path, capsys, provider, endpoint
+):
+    key_file = tmp_path / "key"
+    key_file.write_text("sk-test-secret\n")
+    _doctor_env(monkeypatch, provider, endpoint)
+    monkeypatch.setenv("LLM_API_KEY_FILE", str(key_file))
+    monkeypatch.setenv("AZURE_FEDERATED_TOKEN_FILE", str(tmp_path / "token"))
+    assert cli.main(["doctor"]) == 0
+    assert "[WARN] auth" not in capsys.readouterr().out
+
+
+def test_doctor_logs_the_auth_warning_once(monkeypatch, tmp_path, capsys):
+    key_file = tmp_path / "key"
+    key_file.write_text("sk-test-secret\n")
+    _doctor_env(monkeypatch, "foundry", endpoint="https://x.openai.azure.com/")
+    monkeypatch.setenv("LLM_API_KEY_FILE", str(key_file))
+    monkeypatch.setenv("AZURE_FEDERATED_TOKEN_FILE", str(tmp_path / "token"))
+    cli.main(["doctor"])
+    assert capsys.readouterr().err.count("Workload Identity is available") == 1
 
 
 def _fake_kubectl(tmp_path, can_i_answer: str, can_i_exit: int) -> str:
@@ -210,6 +280,26 @@ def test_failed_check_exits_1(scripted_model, capsys):
     assert "Health check failed" in capsys.readouterr().out
 
 
+def test_truncated_reply_fails_the_check_with_a_hint(scripted_model, capsys):
+    # A reply cut off by the token limit must be a recorded failure, not a traceback.
+    from k8s_servant.llm.types import ModelOutputTruncated
+
+    scripted_model(ModelOutputTruncated("cut"))
+    assert cli.main(["check"]) == 1
+    err = capsys.readouterr().err
+    assert "output limit" in err and "Traceback" not in err
+    cli.main(["history"])
+    assert "output limit" in capsys.readouterr().out  # recorded as a failed run
+
+
+def test_truncated_reply_fails_ask_with_a_hint(scripted_model, capsys):
+    from k8s_servant.llm.types import ModelOutputTruncated
+
+    scripted_model(ModelOutputTruncated("cut"))
+    assert cli.main(["ask", "why?"]) == 1
+    assert "output limit" in capsys.readouterr().err
+
+
 def test_report_command(scripted_model, capsys):
     scripted_model(answer(findings_answer("Fine.", [])), answer("All calm this morning."))
     assert cli.main(["report"]) == 0
@@ -227,8 +317,9 @@ def test_ask_is_recorded_in_history(scripted_model, capsys):
 
 
 def test_bad_endpoint_is_a_configuration_error(monkeypatch, capsys):
-    monkeypatch.setenv("FOUNDRY_ENDPOINT", "http://insecure")
-    monkeypatch.setenv("FOUNDRY_DEPLOYMENT", "d")
+    monkeypatch.setenv("LLM_PROVIDER", "foundry")
+    monkeypatch.setenv("LLM_ENDPOINT", "http://insecure")
+    monkeypatch.setenv("LLM_MODEL", "d")
     assert cli.main(["check"]) == 2
     assert "https://" in capsys.readouterr().err
 
@@ -271,7 +362,7 @@ def test_check_model_error_inside_mcp_session_is_explained_not_a_traceback(scrip
     monkeypatch.setattr(cli, "open_agent", agent_inside_task_group)
     assert cli.main(["check"]) == 1
     err = capsys.readouterr().err
-    assert "Model call failed: cannot reach FOUNDRY_ENDPOINT" in err
+    assert "Model call failed: cannot reach LLM_ENDPOINT" in err
     assert "Traceback" not in err
 
 
@@ -293,3 +384,42 @@ def test_scheduled_checks_skip_the_model_when_nothing_changed(scripted_model):
     third = scripted_model(answer(findings_answer("One problem.", [CRASH])))
     asyncio.run(cli.check_and_post(config, Knowledge(), memory, third, post=False))
     assert len(third.calls) == 1
+
+
+def test_scheduled_check_logs_the_redacted_model_error_not_the_provider_body(
+    scripted_model, monkeypatch, caplog, capsys
+):
+    # OpenAI echoes the key in its 401 body; serve mode must not put it in the pod log.
+    import asyncio
+    import logging
+
+    import httpx2
+    import openai
+
+    from k8s_servant.config import configure_app
+    from k8s_servant.knowledge import Knowledge
+    from k8s_servant.memory import Memory
+    from k8s_servant.scheduler import Scheduler
+
+    monkeypatch.setenv("LLM_PROVIDER", "openai")
+    monkeypatch.setenv("LLM_ENDPOINT", "")
+    monkeypatch.setenv("LLM_API_KEY", "sk-test-secret")
+    config = configure_app()
+    memory = Memory(config["data_dir"])
+    response = httpx2.Response(401, request=httpx2.Request("POST", "https://api.openai.com/v1/responses"))
+    body = {"error": {"message": "Incorrect API key provided: sk-test-secret."}}
+    error = openai.AuthenticationError("Incorrect API key provided: sk-test-secret.", response=response, body=body)
+    chat = scripted_model(error)
+    jobs = cli.serve_jobs(config, Knowledge(), memory, chat)
+    scheduler = Scheduler(config, memory, *jobs)
+
+    with caplog.at_level(logging.DEBUG):
+        asyncio.run(scheduler._run_job("health check", jobs[0], asyncio.Event()))
+
+    logged = caplog.text + capsys.readouterr().err
+    assert "sk-test-secret" not in logged
+    assert "check LLM_API_KEY_FILE" in logged
+    assert not any(record.exc_info for record in caplog.records)
+    # The failed run is still recorded, with the redacted reason.
+    run = memory.runs(1)[0]
+    assert run.kind == "check" and run.status != "ok" and "sk-test-secret" not in run.summary

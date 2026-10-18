@@ -4,6 +4,7 @@ from fakes import ScriptedChat, answer, tool_call
 
 from k8s_servant.agent import Agent, build_system_prompt
 from k8s_servant.knowledge import Knowledge, parse_skill
+from k8s_servant.llm.types import ToolCall, ToolSpec, Turn
 from k8s_servant.tools.registry import Tool, ToolRegistry
 
 
@@ -24,38 +25,30 @@ async def test_direct_answer():
     chat = ScriptedChat(answer("All good"))
     result = await _agent(chat, _registry()).run("Is the cluster healthy?")
     assert (result.answer, result.iterations, result.tool_calls, result.hit_limit) == ("All good", 1, 0, False)
-    assert chat.calls[0]["messages"][:2] == [
-        {"role": "system", "content": "SYSTEM"},
-        {"role": "user", "content": "Is the cluster healthy?"},
-    ]
-    assert chat.calls[0]["tools"][0]["function"]["name"] == "pods_list"
+    assert chat.calls[0]["turns"][:2] == [Turn("system", "SYSTEM"), Turn("user", "Is the cluster healthy?")]
+    assert chat.calls[0]["tools"] == [ToolSpec("pods_list", "List pods", {"type": "object", "properties": {}})]
+    assert chat.calls[0]["use_tools"] is True
 
 
 async def test_tool_call_then_answer():
     chat = ScriptedChat(tool_call("pods_list", {"namespace": "x"}), answer("pod-a is crashing"))
     result = await _agent(chat, _registry()).run("Any broken pods?")
     assert (result.answer, result.iterations, result.tool_calls) == ("pod-a is crashing", 2, 1)
-    second = chat.calls[1]["messages"]
-    assert second[2] == {
-        "role": "assistant",
-        "content": None,
-        "tool_calls": [
-            {"id": "c1", "type": "function", "function": {"name": "pods_list", "arguments": '{"namespace": "x"}'}}
-        ],
-    }
-    assert second[3] == {"role": "tool", "tool_call_id": "c1", "content": "pod-a CrashLoopBackOff"}
+    second = chat.calls[1]["turns"]
+    assert second[2] == Turn("assistant", "", [ToolCall("c1", "pods_list", '{"namespace": "x"}')])
+    assert second[3] == Turn("tool", "pod-a CrashLoopBackOff", tool_call_id="c1")
 
 
 async def test_unknown_tool_is_reported_to_the_model():
     chat = ScriptedChat(tool_call("delete_everything", {}), answer("I cannot do that"))
     await _agent(chat, _registry()).run("x")
-    assert chat.calls[1]["messages"][3]["content"].startswith("ERROR: unknown tool 'delete_everything'")
+    assert chat.calls[1]["turns"][3].content.startswith("ERROR: unknown tool 'delete_everything'")
 
 
 async def test_tool_output_is_truncated():
     chat = ScriptedChat(tool_call("pods_list", {}), answer("done"))
     await _agent(chat, _registry(output="x" * 5000), max_chars=300).run("x")
-    content = chat.calls[1]["messages"][3]["content"]
+    content = chat.calls[1]["turns"][3].content
     assert len(content) < 500 and "characters omitted" in content
 
 
@@ -63,15 +56,16 @@ async def test_iteration_limit_asks_for_a_final_answer_without_tools():
     chat = ScriptedChat(tool_call("pods_list", {}, "c1"), tool_call("pods_list", {}, "c2"), answer("partial answer"))
     result = await _agent(chat, _registry(), max_iterations=2).run("x")
     assert (result.answer, result.tool_calls, result.hit_limit) == ("partial answer", 2, True)
-    assert chat.calls[-1]["tools"] == []
-    assert "limit" in chat.calls[-1]["messages"][-1]["content"]
+    last = chat.calls[-1]
+    assert last["use_tools"] is False and last["tools"]  # definitions still sent
+    assert "limit" in last["turns"][-1].content
 
 
 async def test_result_contains_the_whole_conversation():
     chat = ScriptedChat(tool_call("pods_list", {}), answer("done"))
     result = await _agent(chat, _registry()).run("q")
-    assert [m["role"] for m in result.messages] == ["system", "user", "assistant", "tool", "assistant"]
-    assert result.messages[-1] == {"role": "assistant", "content": "done"}
+    assert [m.role for m in result.messages] == ["system", "user", "assistant", "tool", "assistant"]
+    assert result.messages[-1] == Turn("assistant", "done")
 
 
 async def test_follow_up_continues_the_conversation_without_tools():
@@ -79,9 +73,9 @@ async def test_follow_up_continues_the_conversation_without_tools():
     agent = _agent(chat, _registry())
     result = await agent.run("q")
     assert await agent.follow_up(result.messages, "Only the JSON, please") == '{"findings": []}'
-    assert chat.calls[-1]["tools"] == []
-    assert chat.calls[-1]["messages"][-1] == {"role": "user", "content": "Only the JSON, please"}
-    assert chat.calls[-1]["messages"][-2] == {"role": "assistant", "content": "prose"}
+    assert chat.calls[-1]["use_tools"] is False and chat.calls[-1]["tools"]
+    assert chat.calls[-1]["turns"][-1] == Turn("user", "Only the JSON, please")
+    assert chat.calls[-1]["turns"][-2] == Turn("assistant", "prose")
 
 
 def test_system_prompt_contains_knowledge_and_surfaces():

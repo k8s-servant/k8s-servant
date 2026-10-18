@@ -110,7 +110,7 @@ async def test_morning_report_combines_a_fresh_check_memory_and_alerts(tmp_path)
     assert "KubeNodeNotReady" in report.report_md and "open 2 d 0 h" in report.report_md
     overview_request = chat.calls[-1]
     assert overview_request["tools"] == []
-    assert "node n1 NotReady" in overview_request["messages"][1]["content"]
+    assert "node n1 NotReady" in overview_request["turns"][1].content
     assert memory.run(report.run_id).kind == "morning"
 
 
@@ -280,6 +280,6 @@ async def test_morning_report_tells_the_story_of_the_night(tmp_path):
     assert "## Came and went overnight" in md and "blip at 02:00" in md
     assert "## Alerts that fired overnight and stopped" in md and "KubePodNotReady" in md
     assert "InfoInhibitor" not in md and "CPUThrottlingHigh" not in md
-    overview_request = chat.calls[-1]["messages"]
-    assert "since the previous report" in overview_request[0]["content"]
-    assert "blip at 02:00" in overview_request[1]["content"]
+    overview_request = chat.calls[-1]["turns"]
+    assert "since the previous report" in overview_request[0].content
+    assert "blip at 02:00" in overview_request[1].content

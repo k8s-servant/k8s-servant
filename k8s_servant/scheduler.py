@@ -8,7 +8,9 @@ Every loop (at least once a minute):
   4. sleep until the next check, at most 60 seconds, or until asked to stop.
 
 One job runs at a time. A failing job is logged and the loop keeps going: one bad
-run (model timeout, network glitch) must not take the agent down. While a job runs:
+run (model timeout, network glitch) must not take the agent down. A model error is
+logged by type only, never with a traceback, because provider error bodies can echo
+the API key (the jobs log the redacted explanation themselves). While a job runs:
   - the heartbeat keeps being touched by a small background task, so the liveness
     probe sees a living process, not a busy loop;
   - a job that exceeds JOB_TIMEOUT_MINUTES is cancelled and logged;
@@ -29,6 +31,7 @@ from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+from k8s_servant.llm.errors import MODEL_ERRORS
 from k8s_servant.memory import Memory
 from k8s_servant.report import LAST_REPORT_KEY, local_date, report_due
 
@@ -133,7 +136,11 @@ class Scheduler:
             )
             if job_task in done:
                 error = job_task.exception()
-                if error is not None:
+                if error is not None and _involves_model_error(error):
+                    # The jobs log model errors redacted; a traceback would print the
+                    # provider's body, which may echo the API key, so name the type only.
+                    logger.error("The %s failed (%s); the scheduler keeps running", name, type(error).__name__)
+                elif error is not None:
                     logger.error("The %s failed; the scheduler keeps running", name, exc_info=error)
             elif stop_task in done:
                 logger.info("Stop requested: cancelling the running %s", name)
@@ -143,3 +150,14 @@ class Scheduler:
             for task in (job_task, stop_task, beat_task):
                 task.cancel()
             await asyncio.gather(job_task, stop_task, beat_task, return_exceptions=True)
+
+
+def _involves_model_error(error: BaseException) -> bool:
+    """Whether `error`, or an exception it was raised from or during, is a model-call failure."""
+    seen: set[int] = set()
+    while error is not None and id(error) not in seen:
+        if isinstance(error, MODEL_ERRORS):
+            return True
+        seen.add(id(error))
+        error = error.__cause__ or error.__context__
+    return False

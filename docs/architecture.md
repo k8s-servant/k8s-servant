@@ -14,7 +14,7 @@ and Teams cards in [reports.md](reports.md); what goes wrong and how to fix it i
 
 ```
                          ┌───────────────────────── k8s-servant (Python) ─────────────────────────┐
-  question ─────────────▶│ cli.py ──▶ agent.py (loop) ──▶ llm.py ─────────────────────────────────┼──▶ Foundry   
+  question ─────────────▶│ cli.py ──▶ agent.py (loop) ──▶ llm/ ──────────────────────────────────┼──▶ Foundry   
                          │               │                                                       │    chat model
                          │               ▼ tool calls                                            │
                          │          tools/registry.py                                            │
@@ -36,7 +36,7 @@ runs next to it as a **sidecar** container on `localhost:8080`.
 | Module | What it does | Why it exists |
 |---|---|---|
 | `config.py` | Reads every setting from environment variables into one dict. Sets up logging to stderr. | The same code runs on a laptop and in a pod. Only the environment differs. |
-| `llm.py` | Builds the OpenAI SDK client for the Foundry v1 endpoint. `FoundryChat.complete()` sends one request. `explain_model_error()` turns HTTP errors into advice. | It keeps everything specific to Foundry and authentication in one place. |
+| `llm/` | The model client package. `types.py` holds the neutral `Turn`, `ToolCall` and `ToolSpec` the agent speaks; `providers.py` the provider table (wire API, default endpoint and effort) and endpoint rules; `auth.py` resolves the sign-in (API key, Entra ID or none). One module per wire API converts the turns and sends one request: `responses.py` (Foundry, OpenAI), `messages.py` (Claude, on Anthropic or Foundry) and `chat_completions.py` (Ollama, OpenAI-compatible servers). `build_chat()` picks the client for `LLM_PROVIDER`; `model_error_text()` turns failures into advice without the API key. | It keeps everything specific to a provider, its API and its authentication in one place, so the agent never depends on a model SDK. |
 | `tools/registry.py` | Defines the `Tool` shape (name, description, JSON schema, `run`), the `ToolRegistry` and `truncate_output()`. | The loop handles every tool the same way, wherever the tool comes from. |
 | `tools/mcp_tools.py` | Connects to kubernetes-mcp-server and wraps each of its tools as a `Tool`. | It is the preferred way to read the cluster. |
 | `tools/kubectl_tool.py` | A guarded `kubectl` that only allows read verbs and never touches Secrets. | It is the fallback when MCP is not available. |
@@ -122,19 +122,26 @@ multi-agent orchestration. We chose not to use one:
   on one can break on an upgrade.
 - **Debugging.** When the agent misbehaves you read our log lines and our code, not a
   framework's internals.
-- **Few dependencies.** There are four runtime libraries: `openai`, `mcp`,
-  `azure-identity` and `pyyaml`.
+- **Few dependencies.** The core runtime libraries are `openai`, `anthropic`,
+  `mcp`, `pyyaml`, `httpx2` and `tzdata`; `azure-identity` is the optional `azure` extra
+  (included in the image).
 
 **What we give up.** We write the loop, output truncation and error handling ourselves,
 which is a few dozen lines. If a later stage needs what a framework offers, such as
 multi-agent work, only `agent.py` changes. The tools, knowledge and model client are
 separate modules.
 
-## Why the Chat Completions API
+## Why three APIs
 
-Foundry hosts OpenAI and non-OpenAI chat models. All of them support the Chat
-Completions API, so switching models is a configuration change (`FOUNDRY_DEPLOYMENT`).
-We set no `temperature`, because gpt-5.x reasoning models accept only the default.
+Newer reasoning models need their hidden thinking carried from one tool call to the
+next, and the Chat Completions API has no place for it. The model client therefore
+speaks three APIs behind one neutral interface (`k8s_servant/llm/`): the Responses API
+(`foundry`, `openai`), Anthropic's Messages API (`anthropic`) and Chat Completions
+(`ollama`, `openai-compatible`). `LLM_PROVIDER` decides which; the agent loop, health
+check and report never see the difference. Switching models within a provider is a
+configuration change (`LLM_MODEL`). Plain-words explanation and a recipe per provider:
+[model-providers.md](model-providers.md).
+We set no `temperature`, because reasoning models accept only the default.
 
 ## MCP first, kubectl as fallback
 
@@ -229,7 +236,7 @@ leaves the cluster.
   - an MCP tool reporting an error, or an MCP call failing (too large an answer, a
     timeout). The text then tells the model to narrow the query or use another tool.
 - Model-call failures (401, 403, 404, 429, network, token) stop the command with an
-  explanation from `explain_model_error()`, and the exit code is 1.
+  explanation from `model_error_text()`, and the exit code is 1.
 
 ## Output truncation
 

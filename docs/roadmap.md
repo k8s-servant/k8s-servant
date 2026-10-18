@@ -25,7 +25,7 @@ default and the core.
 
 | Step | What | Issue |
 |---|---|---|
-| 0 | Multi-provider LLM support (Anthropic, OpenAI, Ollama, ...; Azure AI Foundry stays the main example) and provider-neutral docs | [#2](https://github.com/k8s-servant/k8s-servant/issues/2), [#11](https://github.com/k8s-servant/k8s-servant/issues/11) |
+| 0 | **Done in this release:** multi-provider LLM support (Foundry, OpenAI, Anthropic, Ollama and any OpenAI-compatible server; [model-providers.md](model-providers.md)). Still open: provider-neutral README rewrite | [#2](https://github.com/k8s-servant/k8s-servant/issues/2), [#11](https://github.com/k8s-servant/k8s-servant/issues/11) |
 | 0b | **Documentation site** (Zensical on GitHub Pages), once the docs are provider-neutral, before the Teams launch | [#5](https://github.com/k8s-servant/k8s-servant/issues/5) |
 | 0c | **Initial scan**: the agent onboards itself (platform, installed components, what's normal here) and drafts the environment description for a human to review | [#35](https://github.com/k8s-servant/k8s-servant/issues/35) |
 | 1 | **Two-way MS Teams bot for the whole fleet**: @mention questions, interactive cards, platform-team allow-list, per-day budget (opt-in component) | [#27](https://github.com/k8s-servant/k8s-servant/issues/27) |
