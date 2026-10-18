@@ -1,6 +1,9 @@
 # k8s-servant
 
-![Logo](docs/images/logo.png "Logo")
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/logo-dark.svg">
+  <img src="docs/images/logo-light.svg" alt="k8s-servant" width="420">
+</picture>
 
 [![CI](https://github.com/k8s-servant/k8s-servant/actions/workflows/ci.yml/badge.svg)](https://github.com/k8s-servant/k8s-servant/actions/workflows/ci.yml)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/k8s-servant/k8s-servant/badge)](https://scorecard.dev/viewer/?uri=github.com/k8s-servant/k8s-servant)
@@ -152,7 +155,7 @@ k8s-servant/
 │   └── setup-workload-identity.sh  # The pod's managed identity: federated credential, Key Vault secret + Foundry roles
 ├── tests/                          # pytest suite: one file per module, fakes.py, documentation checks
 ├── docs/                           # Documentation (see Documentation below)
-│   └── images/logo.png             # Project logo
+│   └── images/                     # Logo (light and dark), icon, avatar and social preview
 ├── .github/                        # CI (GitHub Actions), release-please, issue and PR templates
 ├── Dockerfile                      # Image: Python alpine, pinned kubectl, non-root, read-only root fs
 ├── pyproject.toml                  # Package, dependencies, the `k8s-servant` entry point
