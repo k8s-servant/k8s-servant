@@ -167,8 +167,31 @@ def test_doctor_warns_when_workload_identity_and_key(monkeypatch, tmp_path, caps
     cli.main(["doctor"])
     out = capsys.readouterr().out
     assert "[OK  ] config" in out
-    assert "[WARN] auth" in out and "LLM_AUTH=entra" in out
+    assert out.count("[WARN] auth") == 1 and "LLM_AUTH=entra" in out
     assert "sk-test-secret" not in out
+
+
+@pytest.mark.parametrize("provider,endpoint", [("anthropic", ""), ("openai", "")])
+def test_doctor_no_auth_warning_on_a_public_api_with_workload_identity(
+    monkeypatch, tmp_path, capsys, provider, endpoint
+):
+    key_file = tmp_path / "key"
+    key_file.write_text("sk-test-secret\n")
+    _doctor_env(monkeypatch, provider, endpoint)
+    monkeypatch.setenv("LLM_API_KEY_FILE", str(key_file))
+    monkeypatch.setenv("AZURE_FEDERATED_TOKEN_FILE", str(tmp_path / "token"))
+    assert cli.main(["doctor"]) == 0
+    assert "[WARN] auth" not in capsys.readouterr().out
+
+
+def test_doctor_logs_the_auth_warning_once(monkeypatch, tmp_path, capsys):
+    key_file = tmp_path / "key"
+    key_file.write_text("sk-test-secret\n")
+    _doctor_env(monkeypatch, "foundry", endpoint="https://x.openai.azure.com/")
+    monkeypatch.setenv("LLM_API_KEY_FILE", str(key_file))
+    monkeypatch.setenv("AZURE_FEDERATED_TOKEN_FILE", str(tmp_path / "token"))
+    cli.main(["doctor"])
+    assert capsys.readouterr().err.count("Workload Identity is available") == 1
 
 
 def _fake_kubectl(tmp_path, can_i_answer: str, can_i_exit: int) -> str:

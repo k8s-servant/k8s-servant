@@ -82,13 +82,15 @@ def test_auto_warns_when_workload_identity_and_key(caplog):
         auth = resolve_model_auth(config)
     assert auth.method == "api-key"
     assert "Workload Identity" in caplog.text and "sk-test-secret" not in caplog.text
+    assert "LLM_AUTH=entra" in auth.warning and "sk-test-secret" not in auth.warning
 
 
 def test_no_warning_for_workload_identity_and_key_on_a_non_azure_provider(caplog):
     config = _config("anthropic", "https://api.anthropic.com", llm_api_key="k", workload_identity=True)
     with caplog.at_level(logging.WARNING):
-        resolve_model_auth(config)
+        auth = resolve_model_auth(config)
     assert caplog.text == ""
+    assert auth.warning == ""
 
 
 def test_label_names_the_key_file_not_the_key(tmp_path):

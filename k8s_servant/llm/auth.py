@@ -9,7 +9,7 @@ never be sent to a third-party base URL. Keys are never logged; only their sourc
 import asyncio
 import logging
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Literal
 
 from k8s_servant.llm.providers import is_foundry_endpoint
@@ -25,11 +25,14 @@ class ModelAuth:
         method: "api-key", "entra" or "none".
         source: Where the credential comes from (never the credential itself).
         label: The same, for `doctor` and logs.
+        warning: A note for the operator when auto mode chose the key over an
+            available Workload Identity; empty otherwise. `doctor` prints it.
     """
 
     method: Literal["api-key", "entra", "none"]
     source: str
     label: str
+    warning: str = ""
 
 
 def resolve_model_auth(config: dict) -> ModelAuth:
@@ -64,10 +67,12 @@ def resolve_model_auth(config: dict) -> ModelAuth:
         return _api_key(config)
     if key:
         if config["workload_identity"] and eligible:
-            logger.warning(
+            warning = (
                 "Workload Identity is available but an API key is configured: using the key. "
                 "Set LLM_AUTH=entra and remove the key to use Workload Identity."
             )
+            logger.warning(warning)
+            return replace(_api_key(config), warning=warning)
         return _api_key(config)
     if eligible:
         return _entra(config)

@@ -355,19 +355,14 @@ async def cmd_doctor(args, config: dict, knowledge, memory: Memory) -> int:
     else:
         try:
             # Resolve once: it validates the combination and logs the auto-mode warning.
-            resolve_model_auth(config)
+            auth = resolve_model_auth(config)
         except ValueError as exc:
             report("FAIL", "config", str(exc))
         else:
             config_ok = True
-            report("OK", "config", describe_model(config))
-            if config["llm_auth"] == "auto" and config["workload_identity"] and config["llm_api_key"]:
-                report(
-                    "WARN",
-                    "auth",
-                    "Workload Identity is available but an API key is configured and used; "
-                    "set LLM_AUTH=entra and remove the key to use Workload Identity",
-                )
+            report("OK", "config", describe_model(config, auth))
+            if auth.warning:
+                report("WARN", "auth", auth.warning)
 
     # 2. Knowledge
     report(

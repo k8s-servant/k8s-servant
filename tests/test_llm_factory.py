@@ -1,4 +1,5 @@
 import builtins
+import logging
 
 import pytest
 
@@ -123,3 +124,16 @@ def test_entra_on_a_foundry_endpoint_uses_the_token_provider(monkeypatch):
     monkeypatch.setattr("k8s_servant.llm.chat_completions.entra_token_provider", lambda scope: token)
     chat = build_chat(_config("openai-compatible", "https://x.openai.azure.com/openai/v1"))
     assert chat.client._api_key_provider is token
+
+
+def test_build_chat_logs_the_auth_warning_once(caplog):
+    config = _config(
+        "foundry",
+        "https://my-foundry.openai.azure.com",
+        llm_api_key="k",
+        llm_api_key_source="LLM_API_KEY",
+        workload_identity=True,
+    )
+    with caplog.at_level(logging.WARNING):
+        build_chat(config)
+    assert caplog.text.count("Workload Identity is available") == 1

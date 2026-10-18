@@ -7,7 +7,7 @@ of this package.
 
 import logging
 
-from k8s_servant.llm.auth import resolve_model_auth
+from k8s_servant.llm.auth import ModelAuth, resolve_model_auth
 from k8s_servant.llm.chat_completions import ChatCompletionsChat, build_client
 from k8s_servant.llm.errors import MODEL_ERRORS, explain_model_error, model_error_text
 from k8s_servant.llm.messages import MessagesChat, build_messages_client
@@ -18,11 +18,12 @@ from k8s_servant.llm.types import ChatModel, ModelCallFailed, ModelOutputTruncat
 logger = logging.getLogger(__name__)
 
 
-def describe_model(config: dict) -> str:
+def describe_model(config: dict, auth: ModelAuth | None = None) -> str:
     """One line naming provider, model, API and sign-in, for logs and `doctor`.
 
     Args:
         config: Settings from configure_app().
+        auth: The already resolved sign-in; resolved here when omitted.
 
     Returns:
         E.g. "foundry / my-deployment via Responses API, Entra ID (Workload Identity)".
@@ -31,7 +32,7 @@ def describe_model(config: dict) -> str:
         ValueError: The sign-in settings are invalid.
     """
     provider = PROVIDERS[config["llm_provider"]]
-    auth = resolve_model_auth(config)
+    auth = auth or resolve_model_auth(config)
     return f"{provider.name} / {config['llm_model']} via {provider.api_label}, {auth.label}"
 
 
@@ -61,7 +62,7 @@ def build_chat(config: dict) -> ChatModel:
             config["llm_reasoning_effort"],
             config["llm_max_output_tokens"],
         )
-    logger.info("Model: %s", describe_model(config))
+    logger.info("Model: %s", describe_model(config, auth))
     return chat
 
 
