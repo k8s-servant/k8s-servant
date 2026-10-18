@@ -4,7 +4,7 @@ import pytest
 from openai.types.responses import Response
 
 from k8s_servant.llm.responses import ResponsesChat
-from k8s_servant.llm.types import ModelOutputTruncated, ToolCall, ToolSpec, Turn
+from k8s_servant.llm.types import ModelCallFailed, ModelOutputTruncated, ToolCall, ToolSpec, Turn
 
 SPEC = ToolSpec("t", "d", {"type": "object"})
 
@@ -26,7 +26,7 @@ MESSAGE = {
 }
 
 
-def _response(output, status="completed", usage=None):
+def _response(output, status="completed", usage=None, **extra):
     """A real SDK Response, so conversion is tested against the real shapes."""
     return Response.model_validate(
         {
@@ -40,6 +40,7 @@ def _response(output, status="completed", usage=None):
             "status": status,
             "output": output,
             "usage": usage,
+            **extra,
         }
     )
 
@@ -149,3 +150,26 @@ async def test_usage_is_logged_and_counted(caplog):
     await chat.complete([], [])
     assert "1200 prompt (1024 cached) + 300 completion tokens (200 reasoning)" in caplog.text
     assert chat.total_tokens == 3000
+
+
+async def test_failed_response_raises_with_the_provider_error():
+    error = {"code": "server_error", "message": "boom"}
+    chat, _ = _chat(_response([], status="failed", error=error))
+    with pytest.raises(ModelCallFailed, match="the model call failed: server_error: boom"):
+        await chat.complete([Turn("user", "q")], [])
+
+
+async def test_cancelled_response_raises():
+    chat, _ = _chat(_response([], status="cancelled"))
+    with pytest.raises(ModelCallFailed):
+        await chat.complete([Turn("user", "q")], [])
+
+
+async def test_incomplete_for_content_filter_is_a_failure_not_truncation():
+    chat, _ = _chat(_response([], status="incomplete", incomplete_details={"reason": "content_filter"}))
+    with pytest.raises(ModelCallFailed, match="content filter") as info:
+        await chat.complete([Turn("user", "q")], [])
+    assert not isinstance(info.value, ModelOutputTruncated)
+    chat, _ = _chat(_response([], status="incomplete", incomplete_details={"reason": "max_output_tokens"}))
+    with pytest.raises(ModelOutputTruncated):
+        await chat.complete([Turn("user", "q")], [])

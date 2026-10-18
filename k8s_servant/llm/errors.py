@@ -8,9 +8,14 @@ never contains the API key (providers sometimes echo it in their error body).
 import anthropic
 import openai
 
-from k8s_servant.llm.types import ModelOutputTruncated
+from k8s_servant.llm.types import ModelCallFailed, ModelOutputTruncated
 
-_errors: list[type[BaseException]] = [openai.OpenAIError, anthropic.AnthropicError, ModelOutputTruncated]
+_errors: list[type[BaseException]] = [
+    openai.OpenAIError,
+    anthropic.AnthropicError,
+    ModelOutputTruncated,
+    ModelCallFailed,
+]
 try:
     from azure.core.exceptions import ClientAuthenticationError
 except ImportError:  # the azure extra is optional
@@ -53,6 +58,8 @@ def explain_model_error(exc: BaseException, provider: str = "") -> str:
     hints = _FOUNDRY_HINTS if provider == "foundry" else _OTHER_HINTS
     if status in hints:
         return f"HTTP {status} {hints[status]}"
+    if isinstance(exc, ModelCallFailed):
+        return str(exc)
     if isinstance(exc, ModelOutputTruncated):
         return "the reply hit the output limit: raise LLM_MAX_OUTPUT_TOKENS or lower LLM_REASONING_EFFORT."
     if ClientAuthenticationError is not None and isinstance(exc, ClientAuthenticationError):

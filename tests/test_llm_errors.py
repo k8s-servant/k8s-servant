@@ -2,7 +2,7 @@ import openai
 import pytest
 
 from k8s_servant.llm.errors import MODEL_ERRORS, explain_model_error, model_error_text
-from k8s_servant.llm.types import ModelOutputTruncated
+from k8s_servant.llm.types import ModelCallFailed, ModelOutputTruncated
 
 
 def make_status_error(status, body="boom"):
@@ -77,3 +77,11 @@ def test_model_errors_cover_the_sdks_and_truncation():
     assert ModelOutputTruncated in MODEL_ERRORS
     ClientAuthenticationError = pytest.importorskip("azure.core.exceptions").ClientAuthenticationError
     assert ClientAuthenticationError in MODEL_ERRORS
+
+
+def test_model_call_failed_is_reported_with_its_text_and_redacted():
+    exc = ModelCallFailed("the model call failed: server_error: bad key sk-test-secret")
+    assert ModelCallFailed in MODEL_ERRORS
+    config = {"llm_provider": "openai", "llm_api_key": "sk-test-secret"}
+    text = model_error_text(exc, config)
+    assert text == "the model call failed: server_error: bad key [redacted]"

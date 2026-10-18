@@ -46,6 +46,10 @@ class ModelOutputTruncated(Exception):
     """The reply was cut off by a token limit; never treated as an answer."""
 
 
+class ModelCallFailed(Exception):
+    """The provider reported the call as failed or cancelled; never treated as an answer."""
+
+
 class ChatModel(Protocol):
     """The one operation the agent needs from a model: continue a conversation."""
 

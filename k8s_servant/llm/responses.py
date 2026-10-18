@@ -19,7 +19,7 @@ import time
 
 from openai import AsyncOpenAI
 
-from k8s_servant.llm.types import ModelOutputTruncated, ToolCall, ToolSpec, Turn, log_usage
+from k8s_servant.llm.types import ModelCallFailed, ModelOutputTruncated, ToolCall, ToolSpec, Turn, log_usage
 
 logger = logging.getLogger(__name__)
 
@@ -71,8 +71,18 @@ class ResponsesChat:
             cached = getattr(getattr(usage, "input_tokens_details", None), "cached_tokens", None) or 0
             self.total_tokens += usage.input_tokens + usage.output_tokens
             log_usage(usage.input_tokens, cached, usage.output_tokens, reasoning, time.monotonic() - started)
+        if response.status == "failed":
+            error = response.error
+            raise ModelCallFailed(
+                f"the model call failed: {error.code}: {error.message}" if error else "the model call failed"
+            )
+        if response.status == "cancelled":
+            raise ModelCallFailed("the model call was cancelled")
         if response.status == "incomplete":
-            raise ModelOutputTruncated("the reply hit the output token limit (status=incomplete)")
+            reason = response.incomplete_details.reason if response.incomplete_details else None
+            if reason == "content_filter":
+                raise ModelCallFailed("the reply was stopped by the provider's content filter")
+            raise ModelOutputTruncated(f"the reply hit the output token limit (incomplete: {reason})")
         calls = [ToolCall(o.call_id, o.name, o.arguments) for o in response.output if o.type == "function_call"]
         # exclude_none: the input types reject the explicit nulls the output models carry.
         state = [o.model_dump(mode="json", exclude_none=True) for o in response.output]

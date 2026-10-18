@@ -12,7 +12,7 @@ from k8s_servant.llm.chat_completions import ChatCompletionsChat, build_client
 from k8s_servant.llm.errors import MODEL_ERRORS, explain_model_error, model_error_text
 from k8s_servant.llm.providers import PROVIDERS, normalize_endpoint
 from k8s_servant.llm.responses import ResponsesChat
-from k8s_servant.llm.types import ChatModel, ModelOutputTruncated
+from k8s_servant.llm.types import ChatModel, ModelCallFailed, ModelOutputTruncated
 
 logger = logging.getLogger(__name__)
 
@@ -64,6 +64,7 @@ def build_chat(config: dict) -> ChatModel:
 __all__ = [
     "MODEL_ERRORS",
     "ChatCompletionsChat",
+    "ModelCallFailed",
     "ModelOutputTruncated",
     "ResponsesChat",
     "build_chat",
