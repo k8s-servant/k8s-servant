@@ -121,17 +121,22 @@ helm install k8s-servant oci://myregistry.example.com/k8s-servant/charts/k8s-ser
 ```
 
 With Flux, change `url` in the `OCIRepository` of `examples/flux-helmrelease.yaml` to
-`oci://myregistry.example.com/k8s-servant/charts/k8s-servant` and pin
-`ref.tag: 0.3.0` (or a `semver` range). Keep the `verify` block as it is: the copied
-signature still names this project's release workflow.
+`oci://myregistry.example.com/k8s-servant/charts/k8s-servant`. To pin one version,
+replace `ref.semver` with `ref.tag: 0.3.0` (set one of them, not both); to follow new
+versions automatically, keep a `semver` range, but then only versions you have mirrored
+are found. Keep the `verify` block as it is: the copied signature still names this
+project's release workflow.
 
 ## Enforce signatures on the mirror
 
 The admission policies in
 [verifying-releases.md](verifying-releases.md#enforce-it-in-the-cluster) work on the
-mirror unchanged, except for the image reference: match
-`myregistry.example.com/k8s-servant/k8s-servant*` instead of
-`ghcr.io/k8s-servant/k8s-servant*`. The identity and the issuer stay the same.
+mirror unchanged, except for the image patterns. Change every one that names
+ghcr.io: Kyverno's `imageReferences` becomes
+`myregistry.example.com/k8s-servant/k8s-servant*`, and the policy-controller's `glob`
+becomes `myregistry.example.com/k8s-servant/k8s-servant*` as well (the upstream glob
+`ghcr.io/k8s-servant/**` would also catch the unsigned sidecar once it sits under the
+same path in your mirror). The identity and the issuer stay the same.
 
 The MCP sidecar is not signed by this project. Leave it out of that rule, or add your
 own rule for it.
