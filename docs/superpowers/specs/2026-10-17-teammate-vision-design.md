@@ -228,9 +228,10 @@ provider-neutral docs (#11) and before Teams.
 - **The offline evaluation set belongs to step 2** and gates step 4, not step 1: the first
   Teams users are the platform team, who can judge answers themselves.
 - **A simple per-day budget cap ships with step 1**; the full cost meter stays step 3.
-- **The command centre comes after the Teams bot**, because it reuses the agent's HTTP
-  API that step 1 introduces. It talks only to that API and never to the cluster directly, so the read-only
-  agent and the separate action component stay the only things with cluster access.
+- **The command centre comes after the Teams bot**, because it reuses the agent's
+  HTTP API that step 1 introduces. It talks only to that API and never to the cluster
+  directly, so the read-only agent and the separate action component stay the only
+  things with cluster access.
 - No hosted SaaS for the core, ever. The project stays self-hosted.
 - `docs/roadmap.md` follows this order.
 
