@@ -35,9 +35,20 @@ previous turn, otherwise it forgets why it asked for the tool and works worse.
 
 The older **Chat Completions API** has no place to carry those hidden steps from one tool
 call to the next. The newest GPT models therefore refuse to combine tools with reasoning
-on it (OpenAI: from GPT-5.4 on, Chat Completions does not support tool calling with a
-reasoning effort other than `none`; Microsoft documents the same for the `gpt-5.6`
-models on Azure). The two newer APIs do have a place for them. They hand the hidden steps
+on it, and the exact cut-off differs by platform:
+
+- **OpenAI API:** "Starting with GPT-5.4, Chat Completions does not support tool calling
+  with `reasoning_effort` values other than `none`"
+  ([OpenAI: migrate to Responses](https://developers.openai.com/api/docs/guides/migrate-to-responses)).
+- **Microsoft Foundry:** the `gpt-5.6` models "support the Chat Completions API and tools,
+  but can't combine reasoning with tools on Chat Completions". A request with tools fails
+  even without `reasoning_effort`, because these models default to `medium`. `gpt-5.4` and
+  `gpt-5.5` still allow it on Foundry
+  ([Microsoft Learn](https://learn.microsoft.com/azure/foundry/openai/how-to/reasoning#tool-calling-with-reasoning-models)).
+
+So an older deployment such as `gpt-5.4-mini` on Foundry works on Chat Completions (the
+agent's first release ran that way), but moving to the Responses API keeps current and
+future models working. The two newer APIs do have a place for the hidden steps. They hand the hidden steps
 back in a sealed (encrypted or signed) form that the agent keeps unread and sends back
 unchanged on the next call:
 
@@ -420,8 +431,14 @@ A setting a provider has no use for has no effect; the agent does not warn about
 
 The settings of the single-provider releases were renamed, with no aliases. If an old
 name is still set, the agent refuses to start and names the new one. The Helm chart
-refuses an old `appConfig` key the same way. Also set `LLM_PROVIDER` (new and required);
-use `foundry` for what you had before.
+refuses an old `appConfig` key the same way. Also set `LLM_PROVIDER`: the app requires it, and
+you use `foundry` for what you had before. The chart's `values.yaml` already sets
+`LLM_PROVIDER: foundry`, so chart users on any other provider must override it.
+
+The credential settings do not map to `appConfig` keys: the chart rejects
+`FOUNDRY_API_KEY` and `FOUNDRY_API_KEY_FILE` in `appConfig`. They become
+`llmApiKey.existingSecret` (or `llmApiKey.file`), which the chart turns into
+`LLM_API_KEY_FILE`.
 
 | Before | Now |
 |---|---|

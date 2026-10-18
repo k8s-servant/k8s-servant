@@ -352,13 +352,13 @@ Microsoft documents this setting through PowerShell, Bicep/ARM (`disableLocalAut
 and Azure Policy. The `az resource update` form above sets the same ARM property. It can
 take a while to apply; afterwards an old key gets HTTP 401.
 
-**Cluster in another tenant than Foundry.** Workload Identity gives the pod a token
-for the tenant of the cluster's identity; it cannot call a Foundry resource in a
-different tenant. If your Key Vault (or other Azure resources) are in the cluster's
-tenant but Foundry is in another one, keep Workload Identity for those and give the
-agent a Foundry **API key** instead: create the Secret as in
-[model-providers.md](model-providers.md#openai), set `LLM_AUTH: api-key` and
-`llmApiKey.existingSecret`. In that case do not disable local auth on that resource.
+**Cluster in another tenant than Foundry.** If the pod's identity has no role on the
+Foundry resource (for example because the resource lives in another tenant or
+subscription that you do not control), use a Foundry **API key** kept in Key Vault:
+Workload Identity still reads the key from Key Vault, and `LLM_AUTH: api-key` uses it.
+Deliver the key as a Secret or mounted file as in
+[model-providers.md](model-providers.md#openai) (`llmApiKey.existingSecret` or
+`llmApiKey.file`). In that case do not disable local auth on that resource.
 
 **Token scope.** The agent requests tokens for `https://ai.azure.com/.default`, the
 current scope in Microsoft's documentation. It can be changed with `LLM_TOKEN_SCOPE`.
@@ -488,7 +488,7 @@ Sources: [Default safety policies](https://learn.microsoft.com/azure/foundry/gua
 
 ## 11. Troubleshooting
 
-`k8s-servant` turns these into one-line advice (`explain_model_error` in `k8s_servant/llm/providers.py`).
+`k8s-servant` turns these into one-line advice (`explain_model_error` in `k8s_servant/llm/errors.py`).
 
 | Symptom | Likely cause | Fix |
 |---|---|---|

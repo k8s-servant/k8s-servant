@@ -122,8 +122,9 @@ multi-agent orchestration. We chose not to use one:
   on one can break on an upgrade.
 - **Debugging.** When the agent misbehaves you read our log lines and our code, not a
   framework's internals.
-- **Few dependencies.** There are four runtime libraries: `openai`, `mcp`,
-  `azure-identity` and `pyyaml`.
+- **Few dependencies.** The core runtime libraries are `openai`, `anthropic`,
+  `mcp`, `pyyaml`, `httpx2` and `tzdata`; `azure-identity` is the optional `azure` extra
+  (included in the image).
 
 **What we give up.** We write the loop, output truncation and error handling ourselves,
 which is a few dozen lines. If a later stage needs what a framework offers, such as

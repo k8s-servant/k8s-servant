@@ -159,7 +159,7 @@ Start from the examples in this repository:
 
 Every provider has a full recipe in [model-providers.md](model-providers.md).
 
-The chart requires `appConfig.CLUSTER_NAME`, `appConfig.LLM_PROVIDER` (default `foundry`) and `appConfig.LLM_MODEL`, plus `appConfig.LLM_ENDPOINT` for `foundry` and `openai-compatible`.
+The chart requires `appConfig.CLUSTER_NAME`, `appConfig.LLM_MODEL`, plus `appConfig.LLM_ENDPOINT` for `foundry` and `openai-compatible`. The app requires `LLM_PROVIDER`; the chart's `values.yaml` sets it to `foundry` by default, so set `appConfig.LLM_PROVIDER` yourself for any other provider.
 Workload Identity is off in the chart defaults, so the Azure example turns it on
 explicitly; with it enabled, the chart refuses to render with an empty client ID.
 

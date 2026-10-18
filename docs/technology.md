@@ -55,7 +55,7 @@ The provider is a setting (`LLM_PROVIDER`; see [model-providers.md](model-provid
 | Deployment type | **DataZoneStandard** | Processing stays in the EU data zone; pay per token |
 | Capacity | 200k tokens per minute | A full check's busiest minute is ~90k tokens |
 | Upgrade policy | OnceCurrentVersionExpired | The tested version stays until its retirement date |
-| API | **Responses** for GPT and similar models (`foundry`); Messages for Claude; Chat Completions for the rest | Current GPT models refuse tools together with reasoning on Chat Completions; the Responses API carries the reasoning between tool calls |
+| API | **Responses** for GPT and similar models (`foundry`); Messages for Claude; Chat Completions for the rest | On OpenAI from GPT-5.4, and on Foundry for the gpt-5.6 models, Chat Completions cannot combine tools with reasoning (gpt-5.4-mini on Foundry still can, and was measured that way); the Responses API carries the reasoning between tool calls |
 | Parameters | `reasoning_effort=medium`, no `temperature` | gpt-5.x reasons only when asked; reasoning models accept only the default temperature |
 | Authentication | Entra ID, role *Cognitive Services OpenAI User* | No keys; Workload Identity in the cluster |
 | Resources | One for non-prod, one for prod (e.g. `my-foundry-nonprod`, `my-foundry-prod`) | Dedicated resources: own quota, network rules, cost |
