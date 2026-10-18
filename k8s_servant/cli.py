@@ -33,14 +33,12 @@ import sys
 import time
 from datetime import UTC, datetime, timedelta
 
-import openai
 import yaml
-from azure.core.exceptions import ClientAuthenticationError
 
 from k8s_servant.config import configure_app, configure_logging, missing_model_settings
 from k8s_servant.healthcheck import CheckResult, record_failed_run, run_health_check
 from k8s_servant.knowledge import load_knowledge
-from k8s_servant.llm import ModelOutputTruncated, build_chat, explain_model_error
+from k8s_servant.llm import MODEL_ERRORS, build_chat, model_error_text
 from k8s_servant.llm.types import Turn
 from k8s_servant.memory import Memory
 from k8s_servant.report import MorningReport, build_morning_report, format_age
@@ -58,9 +56,6 @@ from k8s_servant.tools.kubectl_tool import run_kubectl
 from k8s_servant.tools.prometheus_tool import check_ready
 
 logger = logging.getLogger(__name__)
-
-# Errors a model call can end with that we explain instead of printing a traceback.
-MODEL_ERRORS = (openai.OpenAIError, ClientAuthenticationError, ModelOutputTruncated)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -159,7 +154,7 @@ async def check_and_post(
                 ignore_alerts=config["alerts_ignore_names"],
             )
         except MODEL_ERRORS as exc:
-            record_failed_run(memory, "check", started, explain_model_error(exc))
+            record_failed_run(memory, "check", started, model_error_text(exc, config))
             error = exc
     # Raised only after the session is closed: inside it, the MCP client's task group
     # would wrap the error in an ExceptionGroup that callers do not expect.
@@ -214,8 +209,8 @@ async def cmd_ask(args, config: dict, knowledge, memory: Memory) -> int:
         try:
             result = await session.agent.run(question)
         except MODEL_ERRORS as exc:
-            print(f"Model call failed: {explain_model_error(exc)}", file=sys.stderr)
-            record_failed_run(memory, "ask", started, explain_model_error(exc))
+            print(f"Model call failed: {model_error_text(exc, config)}", file=sys.stderr)
+            record_failed_run(memory, "ask", started, model_error_text(exc, config))
             return 1
     memory.record_run(
         "ask",
@@ -243,7 +238,7 @@ async def cmd_check(args, config: dict, knowledge, memory: Memory) -> int:
     try:
         result = await check_and_post(config, knowledge, memory, chat, post=args.post)
     except MODEL_ERRORS as exc:
-        print(f"Model call failed: {explain_model_error(exc)}", file=sys.stderr)
+        print(f"Model call failed: {model_error_text(exc, config)}", file=sys.stderr)
         return 1
     print(result.report_md)
     return 0 if result.ok else 1
@@ -444,7 +439,7 @@ async def cmd_doctor(args, config: dict, knowledge, memory: Memory) -> int:
             reply = await chat.complete([Turn("user", "Reply with the single word OK.")], [])
             report("OK", "model", f"answered {reply.content.strip()[:40]!r} in {time.monotonic() - started:.1f}s")
         except (*MODEL_ERRORS, ValueError) as exc:
-            report("FAIL", "model", explain_model_error(exc))
+            report("FAIL", "model", model_error_text(exc, config))
 
     return 1 if "FAIL" in statuses else 0
 

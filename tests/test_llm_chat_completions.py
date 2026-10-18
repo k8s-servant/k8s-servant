@@ -106,9 +106,12 @@ async def test_logs_and_counts_tokens(caplog):
 
 def test_build_chat_uses_the_configured_deployment_and_effort():
     config = {
-        "llm_provider": "foundry",
-        "llm_endpoint": "https://x.openai.azure.com",
+        "llm_provider": "openai-compatible",
+        "llm_endpoint": "https://llm.example.com/v1",
         "llm_api_key": "k",
+        "llm_api_key_source": "LLM_API_KEY",
+        "llm_auth": "auto",
+        "workload_identity": False,
         "llm_timeout_seconds": 5,
         "llm_model": "dep",
         "llm_reasoning_effort": "low",

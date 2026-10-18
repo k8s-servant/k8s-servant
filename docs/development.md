@@ -8,7 +8,7 @@ short form.
 ## Setup
 
 ```bash
-python3.14 -m venv .venv && .venv/bin/pip install -e '.[dev]'
+python3.14 -m venv .venv && .venv/bin/pip install -e '.[dev,azure]'
 .venv/bin/pytest                    # the whole suite, ~10 s, no cluster and no model needed
 set -a; source .env; set +a         # for manual runs against a real cluster and model
 ```

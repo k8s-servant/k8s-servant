@@ -34,7 +34,7 @@ from zoneinfo import ZoneInfo
 
 from k8s_servant.findings import StoredFinding
 from k8s_servant.healthcheck import SKIPPED_SUMMARY_PREFIX, record_failed_run, run_check
-from k8s_servant.llm import explain_model_error
+from k8s_servant.llm import model_error_text
 from k8s_servant.llm.types import Turn
 from k8s_servant.memory import Memory
 from k8s_servant.tools.prometheus_tool import fetch_alerts_fired_since, fetch_firing_alerts, format_alerts
@@ -257,7 +257,7 @@ async def build_morning_report(
         check = await run_check(session.agent, memory, cluster, clock=clock)
         check_ok, check_error = check.ok, check.error
     except Exception as exc:  # the report must still go out when the model or a tool fails
-        check_error = explain_model_error(exc)
+        check_error = model_error_text(exc, config)
         logger.error("Health check for the morning report failed: %s", check_error)
         record_failed_run(memory, "check", started, check_error)
 

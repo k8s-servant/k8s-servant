@@ -13,7 +13,7 @@ locally, or in-cluster (Helm chart) where it runs scheduled health checks and re
 ## Commands
 
 ```bash
-python3 -m venv .venv && .venv/bin/pip install -e '.[dev]'     # setup
+python3 -m venv .venv && .venv/bin/pip install -e '.[dev,azure]'     # setup
 .venv/bin/pytest                                                # tests
 .venv/bin/ruff check . && .venv/bin/ruff format --check .       # lint
 set -a; source .env; set +a                                     # local settings (see .env.example)
