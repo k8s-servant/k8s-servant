@@ -60,7 +60,8 @@ that the client sends back unchanged.
     `LLM_ENDPOINT` is a Foundry address (host ending in `.openai.azure.com`,
     `.services.ai.azure.com` or `.cognitiveservices.azure.com`). Any other combination is
     a configuration error. Under `auto`, Entra ID is tried without a key only in those
-    same cases; elsewhere a missing key (except `ollama`) is a configuration error.
+    same cases; elsewhere a missing key is a configuration error, except for
+    `ollama` and `openai-compatible`, which may run without one.
 - **Well documented, and not Foundry-only**: a "Model providers" page that explains, in
   plain words, why there are three APIs, and gives a full recipe for every provider.
   Foundry is listed first, but every provider gets an equally complete example, plus a
