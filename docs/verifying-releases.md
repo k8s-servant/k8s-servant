@@ -163,7 +163,9 @@ GitOps tools that pull the chart can verify it on the way in with the same ident
 and issuer. For example, `examples/flux-helmrelease.yaml` does this for Flux.
 
 If you mirror the images into your own registry, copy the signatures too
-(`cosign copy`), or verify before mirroring and sign the copy with your own identity.
+(`oras cp -r`; `cosign copy` did not copy them in our test), or verify before mirroring
+and sign the copy with your own identity. See
+[running-from-a-mirror.md](running-from-a-mirror.md#mirror-a-release).
 
 The MCP sidecar image (`ghcr.io/containers/kubernetes-mcp-server`) comes from its own
 upstream project and is not signed by this release workflow. Keep it out of the policy
