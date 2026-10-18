@@ -22,8 +22,12 @@
 #      one secret (not the vault). On an access-policy vault that is impossible,
 #      so the script stops unless ALLOW_VAULT_WIDE_SECRET_READ=yes is set; then
 #      "get" on secrets is set for the whole vault.
-#   5. "Cognitive Services OpenAI User" on the Foundry resource (any subscription
-#      of the same tenant).
+#   5. The model role on the Foundry resource (any subscription of the same
+#      tenant): "Cognitive Services OpenAI User" by default, which covers only
+#      OpenAI models (least privilege for GPT). Claude and other non-OpenAI models
+#      (DeepSeek, Llama, Grok, partner models) need MODEL_ROLE="Cognitive Services
+#      User" (or "Foundry User"). Microsoft Learn: https://learn.microsoft.com/
+#      azure/foundry/foundry-models/how-to/configure-entra-id#troubleshooting
 #   6. Prints the Helm values (client ID, tenant ID).
 #
 # EPHEMERAL_CLUSTER=yes: set it when the cluster and its resource group are
@@ -36,8 +40,12 @@
 #   az keyvault show --name <vault> --query id -o tsv
 #   az cognitiveservices account show --name <foundry> --resource-group <rg> --query id -o tsv
 #
+# MODEL_ROLE: the role to assign on the Foundry resource; exactly one of
+# "Cognitive Services OpenAI User" (default), "Cognitive Services User",
+# "Foundry User".
+#
 # Usage:
-#   ./scripts/setup-workload-identity.sh \
+#   [MODEL_ROLE="Cognitive Services User"] ./scripts/setup-workload-identity.sh \
 #     <SUBSCRIPTION_NAME> <IDENTITY_RESOURCE_GROUP> <IDENTITY_NAME> \
 #     <CLUSTER_RESOURCE_GROUP> <CLUSTER_NAME> <KEYVAULT_ID> <FOUNDRY_ID> \
 #     [KEYVAULT_SECRET_NAME] [SERVICE_ACCOUNT_NAMESPACE] [SERVICE_ACCOUNT_NAME]
@@ -68,7 +76,8 @@ SERVICE_ACCOUNT_NAMESPACE=${9:-"k8s-servant"}
 SERVICE_ACCOUNT_NAME=${10:-"k8s-servant"}
 
 KV_ROLE="Key Vault Secrets User"
-FOUNDRY_ROLE="Cognitive Services OpenAI User"
+# The model role; validated below against the roles that can call Foundry models.
+FOUNDRY_ROLE="${MODEL_ROLE:-Cognitive Services OpenAI User}"
 KV_ID_PATTERN='^/subscriptions/([^/]+)/resourceGroups/([^/]+)/providers/Microsoft\.KeyVault/vaults/([^/]+)$'
 FOUNDRY_ID_PATTERN='^/subscriptions/[^/]+/resourceGroups/[^/]+/providers/Microsoft\.CognitiveServices/accounts/[^/]+$'
 
@@ -93,6 +102,11 @@ elif [[ ! "$FOUNDRY_ID" =~ $FOUNDRY_ID_PATTERN ]]; then
   ERRORS+=("FOUNDRY_ID (arg 7) must be a Foundry resource ID (/subscriptions/.../providers/Microsoft.CognitiveServices/accounts/<name>)")
 fi
 
+case "$FOUNDRY_ROLE" in
+  "Cognitive Services OpenAI User" | "Cognitive Services User" | "Foundry User") ;;
+  *) ERRORS+=("MODEL_ROLE must be \"Cognitive Services OpenAI User\" (OpenAI models, the default), \"Cognitive Services User\" or \"Foundry User\" (Claude and other non-OpenAI models), got \"$FOUNDRY_ROLE\"") ;;
+esac
+
 # The resource group of an ephemeral cluster is destroyed with it: an identity in it
 # would block the destroy or be deleted with it (and its client ID would change).
 if [[ "${EPHEMERAL_CLUSTER:-}" == "yes" && "$IDENTITY_RESOURCE_GROUP" == "$CLUSTER_RESOURCE_GROUP" ]]; then
@@ -103,7 +117,7 @@ if [[ ${#ERRORS[@]} -gt 0 ]]; then
   echo "ERROR: Invalid arguments:" >&2
   for err in "${ERRORS[@]}"; do echo "  - $err" >&2; done
   echo "" >&2
-  echo "Usage: $0 <SUBSCRIPTION_NAME> <IDENTITY_RESOURCE_GROUP> <IDENTITY_NAME> <CLUSTER_RESOURCE_GROUP> <CLUSTER_NAME> <KEYVAULT_ID> <FOUNDRY_ID> [KEYVAULT_SECRET_NAME] [SERVICE_ACCOUNT_NAMESPACE] [SERVICE_ACCOUNT_NAME]" >&2
+  echo "Usage: [MODEL_ROLE=\"Cognitive Services User\"] $0 <SUBSCRIPTION_NAME> <IDENTITY_RESOURCE_GROUP> <IDENTITY_NAME> <CLUSTER_RESOURCE_GROUP> <CLUSTER_NAME> <KEYVAULT_ID> <FOUNDRY_ID> [KEYVAULT_SECRET_NAME] [SERVICE_ACCOUNT_NAMESPACE] [SERVICE_ACCOUNT_NAME]" >&2
   exit 1
 fi
 
@@ -239,7 +253,7 @@ echo "   Identity:   $IDENTITY_NAME ($IDENTITY_RESOURCE_GROUP)"
 echo "   Subject:    $SUBJECT"
 echo "   Issuer:     $OIDC_ISSUER"
 echo "   Key Vault:  $KEYVAULT_NAME ($KV_ACCESS)"
-echo "   Foundry:    ${FOUNDRY_ID##*/}"
+echo "   Foundry:    ${FOUNDRY_ID##*/} ('$FOUNDRY_ROLE')"
 echo "======================================================================"
 echo ""
 echo "1. Put this into the Helm values of the k8s-servant release on $CLUSTER_NAME:"
@@ -249,6 +263,10 @@ echo "    clientId: \"${CLIENT_ID}\""
 echo "    tenantId: \"${TENANT_ID}\""
 echo "  appConfig:"
 echo "    LLM_PROVIDER: foundry     # or anthropic for Claude on Foundry (docs/model-providers.md)"
+if [[ "$FOUNDRY_ROLE" == "Cognitive Services OpenAI User" ]]; then
+  echo "    # '$FOUNDRY_ROLE' covers OpenAI models only; for Claude or other non-OpenAI"
+  echo "    # models re-run with MODEL_ROLE=\"Cognitive Services User\"."
+fi
 echo "    LLM_AUTH: entra           # Entra ID tokens through this identity, no API key"
 echo ""
 echo "2. The pod's service account must be ${SERVICE_ACCOUNT_NAMESPACE}/${SERVICE_ACCOUNT_NAME}"
