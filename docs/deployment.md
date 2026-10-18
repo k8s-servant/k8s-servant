@@ -69,8 +69,10 @@ cosign verify ghcr.io/k8s-servant/k8s-servant:<version> \
 [verifying-releases.md](verifying-releases.md) explains how the signing works, how to
 verify the chart, and how to enforce signatures with an admission policy.
 
-If your cluster only admits images from your own registry, mirror both images and set
-`image.repository` and `mcp.image.repository` in the values.
+If your cluster only admits images from your own registry, mirror both images and the
+chart, and set `image.repository` and `mcp.image.repository` in the values.
+[running-from-a-mirror.md](running-from-a-mirror.md) shows how to copy them with their
+signatures, and how to keep your settings in a private repository without a fork.
 
 ## Prerequisites
 

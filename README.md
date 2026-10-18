@@ -679,6 +679,7 @@ See [docs/architecture.md](docs/architecture.md#why-our-own-loop-and-no-framewor
 | [docs/technology.md](docs/technology.md) | What it is built with and why: Python libraries, the model, MCP, Prometheus, Teams, alternatives considered |
 | [docs/memory.md](docs/memory.md) | What the agent remembers: findings (new / still open / resolved), run history, learned notes |
 | [docs/security.md](docs/security.md) | Read-only guarantees, what data leaves the cluster, credentials |
+| [docs/running-from-a-mirror.md](docs/running-from-a-mirror.md) | Running from your own registry: mirroring the image, chart and sidecar with their signatures, a private configuration repository, upgrades, no fork |
 | [docs/verifying-releases.md](docs/verifying-releases.md) | Checking that an image or chart was built and signed by this project: cosign keyless, admission policies, SBOM and provenance |
 | [docs/data-processing.md](docs/data-processing.md) | What happens to cluster data before and after the model: reduction, size caps, answer checks, facts computed in Python, and what is not done (no redaction) |
 | [docs/troubleshooting.md](docs/troubleshooting.md) | Symptoms, causes and fixes, from the first real runs |

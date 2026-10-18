@@ -18,6 +18,7 @@ it, by hand or automatically in a cluster.
 - [How the signing works](#how-the-signing-works)
 - [The identity to check](#the-identity-to-check)
 - [Verify by hand](#verify-by-hand)
+- [What the certificate tells you](#what-the-certificate-tells-you)
 - [Enforce it in the cluster](#enforce-it-in-the-cluster)
 - [SBOM and provenance](#sbom-and-provenance)
 - [For maintainers](#for-maintainers)
@@ -107,6 +108,79 @@ helm install k8s-servant oci://ghcr.io/k8s-servant/charts/k8s-servant \
   --version <version> -n k8s-servant --create-namespace -f my-values.yaml
 ```
 
+## What the certificate tells you
+
+`cosign verify` answers yes or no. A security review often wants more: what exactly
+was trusted, and which build produced this artifact. Both answers are in the signing
+certificate.
+
+**What a successful verification rests on:**
+
+1. **Sigstore's root of trust**, shipped with cosign and kept up to date through
+   Sigstore's signed update channel (TUF). It vouches for Fulcio, the certificate
+   authority, and for Rekor, the log.
+2. **GitHub's OIDC tokens.** Only a workflow run of this repository's
+   `release-please.yml` on `main` gets a token with that identity, and only that token
+   gets a certificate with it. A fork or another branch gets a different identity.
+3. **Whoever can change `main`.** The repository's ruleset requires a pull request and
+   passing checks for `main` and blocks force pushes; organisation admins can bypass
+   it. Tags `v*` are protected by a second ruleset.
+
+The identity you pass to `cosign verify` is not a secret and not something to take on
+faith: it is the repository address plus the workflow file and the branch. Once you
+decide to trust `github.com/k8s-servant/k8s-servant`, the identity follows. A wrong
+identity handed to you would name a different repository.
+
+**Which build produced the artifact.** cosign 3 no longer prints the certificate, but
+it is in the signature bundle attached to the artifact. With
+[oras](https://oras.land/docs/installation), `jq` and `openssl`:
+
+```bash
+ARTIFACT=ghcr.io/k8s-servant/k8s-servant:<version>   # or ghcr.io/k8s-servant/charts/k8s-servant:<version>
+REPO=${ARTIFACT%:*}
+
+# The signature is attached to the artifact's digest as an OCI referrer. Other
+# referrers may sit next to it, so pick the one that holds a Sigstore bundle.
+for SIG in $(oras discover "$ARTIFACT" --format json | jq -r '.referrers[].digest'); do
+  BUNDLE=$(oras manifest fetch "$REPO@$SIG" \
+    | jq -r '.layers[]? | select(.mediaType | startswith("application/vnd.dev.sigstore.bundle")) | .digest')
+  [ -n "$BUNDLE" ] && break
+done
+[ -n "$BUNDLE" ] || echo "no signature bundle found on $ARTIFACT" >&2
+
+# The certificate inside the bundle.
+oras blob fetch "$REPO@$BUNDLE" --output - \
+  | jq -r '.verificationMaterial.certificate.rawBytes' | base64 -d \
+  | openssl x509 -inform der -noout -text
+
+# Its entry in the Rekor log.
+oras blob fetch "$REPO@$BUNDLE" --output - | jq '.verificationMaterial.tlogEntries[0] | {logIndex, integratedTime}'
+```
+
+The fields to read, with the values from release 0.3.0:
+
+| Certificate field | Meaning | 0.3.0 |
+|---|---|---|
+| Subject Alternative Name | The identity `cosign verify` checks | `https://github.com/k8s-servant/k8s-servant/.github/workflows/release-please.yml@refs/heads/main` |
+| Validity | The certificate lived about 10 minutes | 2026-10-18 14:15:09 to 14:25:09 UTC |
+| `1.3.6.1.4.1.57264.1.12` | Source repository | `https://github.com/k8s-servant/k8s-servant` |
+| `1.3.6.1.4.1.57264.1.13` | Source commit | `ba1382b7328931547162f744697ef69aa7bb54cf` (the release commit) |
+| `1.3.6.1.4.1.57264.1.14` | Branch | `refs/heads/main` |
+| `1.3.6.1.4.1.57264.1.20` | What started the build | `push` |
+| `1.3.6.1.4.1.57264.1.21` | The build run | `https://github.com/k8s-servant/k8s-servant/actions/runs/39134712884/attempts/1` |
+| Rekor `logIndex` | The public log entry | `3312333839` (image), `3312341301` (chart) |
+
+Open the run to read the build logs, open the commit to see the code that went in, and
+look up the log index on [search.sigstore.dev](https://search.sigstore.dev/).
+
+These commands only read what is attached; they don't check it. Run `cosign verify`
+first: it proves that the bundle is genuine and belongs to this digest.
+
+**What a valid signature does not prove:** that the code is safe. It proves where the
+artifact came from and that it hasn't changed since. Trust in the code itself comes
+from review, the [SBOM](#sbom-and-provenance) and vulnerability scans, and the branch
+rules above.
+
 ## Enforce it in the cluster
 
 An admission controller can reject pods whose image is not signed by the release
@@ -163,7 +237,9 @@ GitOps tools that pull the chart can verify it on the way in with the same ident
 and issuer. For example, `examples/flux-helmrelease.yaml` does this for Flux.
 
 If you mirror the images into your own registry, copy the signatures too
-(`cosign copy`), or verify before mirroring and sign the copy with your own identity.
+(`oras cp -r`; `cosign copy` did not copy them in our test), or verify before mirroring
+and sign the copy with your own identity. See
+[running-from-a-mirror.md](running-from-a-mirror.md#mirror-a-release).
 
 The MCP sidecar image (`ghcr.io/containers/kubernetes-mcp-server`) comes from its own
 upstream project and is not signed by this release workflow. Keep it out of the policy
