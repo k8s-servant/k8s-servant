@@ -223,3 +223,19 @@ async def test_assistant_turn_without_content_or_calls_sends_a_placeholder():
     chat, fake = _chat(_message([TEXT]))
     await chat.complete([Turn("user", "q"), Turn("assistant", ""), Turn("user", "again")], [])
     assert fake.calls[0]["messages"][1]["content"] == [{"type": "text", "text": "(no answer)"}]
+
+
+async def test_minimal_effort_warns_once_that_low_is_used(caplog):
+    # Spec: no silent degradation. The Messages API has no "minimal".
+    chat, fake = _chat(_message([TEXT]), effort="minimal")
+    await chat.complete([Turn("user", "q")], [])
+    await chat.complete([Turn("user", "q")], [])
+    warnings = [r for r in caplog.records if r.levelname == "WARNING" and "minimal" in r.getMessage()]
+    assert len(warnings) == 1 and '"low"' in warnings[0].getMessage()
+    assert fake.calls[0]["output_config"] == {"effort": "low"}
+
+
+def test_other_efforts_do_not_warn(caplog):
+    for effort in ("", "none", "low", "medium", "high", "xhigh", "max"):
+        _chat(_message([TEXT]), effort=effort)
+    assert not [r for r in caplog.records if r.levelname == "WARNING"]

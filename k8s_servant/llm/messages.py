@@ -72,6 +72,9 @@ class MessagesChat:
         self.reasoning_effort = reasoning_effort
         self.max_output_tokens = max_output_tokens
         self.total_tokens = 0
+        if reasoning_effort == "minimal":
+            # Said once here rather than per request: the substitution must not be silent.
+            logger.warning('LLM_REASONING_EFFORT=minimal: the Messages API has no "minimal"; "low" is used')
 
     async def complete(self, turns: list[Turn], tools: list[ToolSpec], *, use_tools: bool = True) -> Turn:
         """Send the conversation (and tool definitions) and return the model's reply.
