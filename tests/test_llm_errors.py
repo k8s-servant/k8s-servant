@@ -1,6 +1,7 @@
 import openai
 import pytest
 
+from k8s_servant.config import configure_app
 from k8s_servant.llm.errors import MODEL_ERRORS, explain_model_error, model_error_text
 from k8s_servant.llm.types import ModelCallFailed, ModelOutputTruncated
 
@@ -17,7 +18,7 @@ def make_status_error(status, body="boom"):
 @pytest.mark.parametrize("status", [400, 401, 403, 404, 429, 500])
 def test_model_error_text_never_contains_the_key(status):
     exc = make_status_error(status, body="Incorrect API key provided: sk-test-secret")
-    config = {"llm_provider": "openai", "llm_api_key": "sk-test-secret"}
+    config = configure_app({"LLM_PROVIDER": "openai", "LLM_MODEL": "m", "LLM_API_KEY": "sk-test-secret"})
     assert "sk-test-secret" not in model_error_text(exc, config)
 
 
@@ -53,13 +54,21 @@ def test_other_providers_hints_by_status(status, text):
 def test_connection_and_timeout_hints():
     request = openai.APIConnectionError(request=None)
     assert "cannot reach LLM_ENDPOINT" in explain_model_error(request, "ollama")
+    assert "docs/model-providers.md" in explain_model_error(request, "ollama")
+    assert "docs/foundry-setup.md" not in explain_model_error(request, "ollama")
+    assert "docs/foundry-setup.md, section Networking" in explain_model_error(request, "foundry")
     timeout = openai.APITimeoutError(request=None)
     assert "LLM_TIMEOUT_SECONDS" in explain_model_error(timeout, "ollama")
 
 
-def test_truncated_hint_names_the_settings():
-    text = explain_model_error(ModelOutputTruncated("cut"), "openai")
+def test_truncated_hint_names_the_output_limit_only_on_the_messages_api():
+    # LLM_MAX_OUTPUT_TOKENS is sent only on the Messages API (anthropic).
+    text = explain_model_error(ModelOutputTruncated("cut"), "anthropic")
     assert "LLM_MAX_OUTPUT_TOKENS" in text and "LLM_REASONING_EFFORT" in text
+    for provider in ("foundry", "openai", "ollama", "openai-compatible"):
+        text = explain_model_error(ModelOutputTruncated("cut"), provider)
+        assert "LLM_MAX_OUTPUT_TOKENS" not in text
+        assert "LLM_REASONING_EFFORT" in text and "shorten the question" in text
 
 
 def test_token_error_hint():
@@ -82,6 +91,54 @@ def test_model_errors_cover_the_sdks_and_truncation():
 def test_model_call_failed_is_reported_with_its_text_and_redacted():
     exc = ModelCallFailed("the model call failed: server_error: bad key sk-test-secret")
     assert ModelCallFailed in MODEL_ERRORS
-    config = {"llm_provider": "openai", "llm_api_key": "sk-test-secret"}
+    config = configure_app({"LLM_PROVIDER": "openai", "LLM_MODEL": "m", "LLM_API_KEY": "sk-test-secret"})
     text = model_error_text(exc, config)
     assert text == "the model call failed: server_error: bad key [redacted]"
+
+
+def _config(provider, endpoint, **env):
+    return configure_app({"LLM_PROVIDER": provider, "LLM_ENDPOINT": endpoint, "LLM_MODEL": "m", **env})
+
+
+FOUNDRY_HOST = "https://my-resource.services.ai.azure.com"
+
+
+def test_connection_hint_for_a_foundry_endpoint_points_at_the_networking_docs():
+    config = _config("anthropic", FOUNDRY_HOST, LLM_API_KEY="sk-test-key")
+    assert "docs/foundry-setup.md" in model_error_text(openai.APIConnectionError(request=None), config)
+
+
+def test_claude_on_foundry_with_entra_gets_the_foundry_role_hint():
+    config = _config("anthropic", FOUNDRY_HOST, LLM_AUTH="entra")
+    text = model_error_text(make_status_error(401), config)
+    assert "check LLM_API_KEY_FILE" not in text
+    assert "Entra ID token was rejected" in text
+    assert "'Cognitive Services User'" in text and "'Cognitive Services OpenAI User'" in text
+
+
+def test_foundry_with_a_key_points_at_the_key_file():
+    config = _config("foundry", FOUNDRY_HOST, LLM_API_KEY="sk-test-key")
+    text = model_error_text(make_status_error(401), config)
+    assert "check LLM_API_KEY_FILE" in text and "az login" not in text
+
+
+def test_partner_model_on_foundry_via_openai_compatible_gets_foundry_hints():
+    config = _config("openai-compatible", FOUNDRY_HOST + "/models", LLM_AUTH="entra")
+    assert "private endpoint" in model_error_text(make_status_error(403), config)
+
+
+def test_foundry_403_hint_mentions_both_roles():
+    text = explain_model_error(make_status_error(403), "foundry")
+    assert "'Cognitive Services User'" in text and "'Cognitive Services OpenAI User'" in text
+
+
+def test_invalid_sign_in_settings_fall_back_to_a_neutral_401_hint():
+    # LLM_AUTH=entra with a key is invalid; the hint must still be produced.
+    config = _config("foundry", FOUNDRY_HOST, LLM_AUTH="entra", LLM_API_KEY="sk-test-key")
+    text = model_error_text(make_status_error(401), config)
+    assert "az login" in text and "LLM_API_KEY_FILE" in text
+
+
+def test_non_foundry_anthropic_keeps_the_plain_key_hint():
+    config = _config("anthropic", "", LLM_API_KEY="sk-test-key")
+    assert "the API key was rejected (check LLM_API_KEY_FILE)" in model_error_text(make_status_error(401), config)
