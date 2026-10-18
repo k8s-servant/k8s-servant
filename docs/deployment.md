@@ -115,7 +115,9 @@ The script does the following:
   Azure RBAC, the role is scoped to that secret only. A vault with access policies
   cannot limit access to one secret, so the script stops there. It continues only
   when you accept vault-wide read access with `ALLOW_VAULT_WIDE_SECRET_READ=yes`;
-- gives the identity *Cognitive Services OpenAI User* on the Foundry resource;
+- gives the identity *Cognitive Services OpenAI User* on the Foundry resource, which
+  covers OpenAI models only; for Claude and other non-OpenAI models set
+  `MODEL_ROLE="Cognitive Services User"` when running the script;
 - prints the values snippet (client ID, tenant ID) and an equivalent Terraform snippet.
 
 For a second cluster, run the same command with that cluster's resource group and name

@@ -478,7 +478,7 @@ Almost nothing in `.env` is secret:
 | Value | Secret? | Local (laptop) | Cluster |
 |---|---|---|---|
 | Endpoints, names, URLs of Prometheus etc., timeouts | No | `.env` | ConfigMap rendered by the Helm chart |
-| **Access to the model (Foundry with Entra ID)** | — | your `az login` session; nothing is stored in `.env` | **Workload Identity**: the pod's ServiceAccount is federated with a managed identity that has *Cognitive Services OpenAI User* on the Foundry resource. No key anywhere |
+| **Access to the model (Foundry with Entra ID)** | — | your `az login` session; nothing is stored in `.env` | **Workload Identity**: the pod's ServiceAccount is federated with a managed identity that has *Cognitive Services OpenAI User* on the Foundry resource (*Cognitive Services User* for Claude and other non-OpenAI models). No key anywhere |
 | `LLM_API_KEY` | **Yes** | leave it empty for Foundry with Entra ID and for Ollama; required for OpenAI and Anthropic | not used with Entra ID or Ollama; otherwise a Kubernetes Secret you create, named in `llmApiKey.existingSecret`, mounted as a file (`LLM_API_KEY_FILE`) |
 | **`TEAMS_WEBHOOK_URL`** | **Yes**: anyone with it can post to the channel | load it from your secret store into your shell (below) | A Kubernetes Secret you create any way you like (kubectl, External Secrets, Sealed Secrets, ...), named in `teamsWebhook.existingSecret`, mounted as a file and read through `TEAMS_WEBHOOK_URL_FILE`. `examples/values-azure.yaml` syncs it from Azure Key Vault with External Secrets |
 

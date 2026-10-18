@@ -2,8 +2,12 @@
 
 LLM_AUTH=auto picks a key when one is configured, Entra ID where the endpoint is an
 Azure resource, and no sign-in for self-hosted servers. The eligibility rule matters
-for security: an Entra ID token is only ever minted for Foundry endpoints, so it can
-never be sent to a third-party base URL. Keys are never logged; only their source.
+for security, because it decides where a token can go: an Entra ID token is minted
+only for LLM_PROVIDER=foundry, or for anthropic and openai-compatible when LLM_ENDPOINT
+is a Foundry host. With foundry any https LLM_ENDPOINT is accepted on purpose (custom
+domains, gateways), so the token goes to whatever endpoint is configured; operators
+must point it only at their Foundry resource or a gateway they control. Keys are never
+logged; only their source.
 """
 
 import asyncio

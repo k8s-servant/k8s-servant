@@ -282,12 +282,16 @@ The agent authenticates with **Entra ID**. Whoever calls the model needs a
 **data-plane role** on the resource. *Owner* and *Contributor* are not enough: they
 manage the resource but cannot call models.
 
-**Which role.** Assign **Cognitive Services OpenAI User** on the Foundry resource. It is
-the least-privileged role that allows chat completions on OpenAI models.
-- *Foundry User* (formerly *Azure AI User*) also works but is broader, granting all
-  Foundry data actions.
-- If you deploy a non-OpenAI model (for example Mistral or DeepSeek), use *Cognitive
-  Services User* or *Foundry User* instead.
+**Which role.** It depends on the model ([Microsoft Learn](https://learn.microsoft.com/azure/foundry/foundry-models/how-to/configure-entra-id#troubleshooting)):
+- **GPT and other OpenAI models:** **Cognitive Services OpenAI User** on the Foundry
+  resource. It is the least-privileged role that can call them, and it grants access to
+  OpenAI models only.
+- **Claude and other non-OpenAI models** (DeepSeek, Llama, Grok, partner models):
+  **Cognitive Services User**. *Cognitive Services OpenAI User* is not enough for them.
+  `scripts/setup-workload-identity.sh` assigns it when run with
+  `MODEL_ROLE="Cognitive Services User"`.
+- *Foundry User* (formerly *Azure AI User*) also works for both but is broader, granting
+  all Foundry data actions.
 
 Role assignments take **up to about 5 minutes** to apply.
 
@@ -296,8 +300,8 @@ FOUNDRY_ID=$(az cognitiveservices account show --name "$FOUNDRY" --resource-grou
 ```
 
 **Portal:** role assignments are made in the **Azure portal**: the Foundry resource → **Access
-control (IAM)** → **Add** → **Add role assignment** → role *Cognitive Services OpenAI User* →
-select the user or managed identity → **Review + assign**. As Owner of the resource you can
+control (IAM)** → **Add** → **Add role assignment** → role *Cognitive Services OpenAI User* (or *Cognitive
+Services User* for non-OpenAI models) → select the user or managed identity → **Review + assign**. As Owner of the resource you can
 assign it to yourself.
 
 ### a) You, for local development
@@ -315,7 +319,8 @@ az login   # if not logged in; the agent picks up this session through DefaultAz
 The agent pod authenticates with AKS **Workload Identity**: a user-assigned managed
 identity with a federated credential for the agent's ServiceAccount.
 `scripts/setup-workload-identity.sh` creates the identity and assigns it this
-role ([deployment.md](deployment.md#1-workload-identity-aks)). Done by hand, the assignment is:
+role (set `MODEL_ROLE="Cognitive Services User"` for Claude and other non-OpenAI models;
+[deployment.md](deployment.md#1-workload-identity-aks)). Done by hand, the assignment is:
 
 ```bash
 az role assignment create \
@@ -488,12 +493,12 @@ Sources: [Default safety policies](https://learn.microsoft.com/azure/foundry/gua
 
 ## 11. Troubleshooting
 
-`k8s-servant` turns these into one-line advice (`explain_model_error` in `k8s_servant/llm/errors.py`).
+`k8s-servant` turns these into one-line advice (`model_error_text` in `k8s_servant/llm/errors.py`).
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
 | **401** "Access token is missing, invalid, audience is incorrect" | Not logged in, expired session, wrong token scope, or a wrong or rotated API key | `az login`; check `LLM_TOKEN_SCOPE` (default `https://ai.azure.com/.default`); check the key in `LLM_API_KEY_FILE` |
-| **401** "PermissionDenied … lacks the required data action" | The identity has no data-plane role | Assign *Cognitive Services OpenAI User* on the resource (Step 4) and wait ~5 minutes |
+| **401** "PermissionDenied … lacks the required data action" | The identity has no data-plane role, or the wrong one for the model | Assign *Cognitive Services OpenAI User* (OpenAI models) or *Cognitive Services User* (Claude and other non-OpenAI models) on the resource (Step 4) and wait ~5 minutes |
 | **403** | Network rules: public access disabled or IP not allowed, or the resource is suspended | Use the private endpoint and check that the hostname resolves to its private IP (Step 5) |
 | **404** `DeploymentNotFound` | Wrong `LLM_MODEL` (model name used instead of deployment name), wrong resource in `LLM_ENDPOINT`, or the deployment is less than ~5 minutes old | Compare with `az cognitiveservices account deployment list`; wait a few minutes |
 | **410** | The model version has been retired | Deploy a current model (Step 2) |

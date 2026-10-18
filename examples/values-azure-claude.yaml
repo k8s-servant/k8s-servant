@@ -1,7 +1,9 @@
 # Example values for one AKS cluster: Claude served by Azure AI Foundry, reached with
 # Workload Identity (Entra ID tokens, no API key). Prerequisite: the identity, its
-# federated credential and a role on the Foundry resource, from
-# scripts/setup-workload-identity.sh. See docs/model-providers.md.
+# federated credential and the 'Cognitive Services User' role on the Foundry resource
+# (Claude is not covered by 'Cognitive Services OpenAI User'), from
+#   MODEL_ROLE="Cognitive Services User" scripts/setup-workload-identity.sh ...
+# See docs/model-providers.md.
 # All names below are placeholders.
 #
 #   helm install k8s-servant oci://ghcr.io/k8s-servant/charts/k8s-servant \

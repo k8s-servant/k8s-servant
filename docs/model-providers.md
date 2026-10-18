@@ -95,7 +95,8 @@ Rules that hold for every provider:
   `pip install -e '.[dev,azure]'` in a clone. The container image already includes it.
 - `LLM_REASONING_EFFORT` defaults to `medium` for `foundry`, `openai` and `anthropic`,
   and to empty (not sent) for `ollama` and `openai-compatible`. On Anthropic,
-  `minimal` is sent as `low` and `none` turns thinking off.
+  `minimal` is sent as `low` (with a warning in the log, as the Messages API has no
+  `minimal`) and `none` turns thinking off.
 - `LLM_MAX_OUTPUT_TOKENS` (default `32000`, thinking included) is sent only on the
   Messages API, which requires a limit. A reply that is cut off by a limit is an
   error and the run is recorded as failed, as is a failed, cancelled or
@@ -113,7 +114,10 @@ prefer it.
 **Choose it when** your organisation runs on Azure and you want a model inside your own
 tenant, in an EU or US data zone, with no key to manage: on AKS the pod signs in with
 Workload Identity. It serves GPT models and others (for example DeepSeek, Llama, Grok)
-through the Responses API. Partner models that offer only Chat Completions use
+through the Responses API. *Cognitive Services OpenAI User*, the role the setup script
+assigns by default, covers only OpenAI models: for DeepSeek, Llama, Grok and other
+non-OpenAI models run the script with `MODEL_ROLE="Cognitive Services User"`
+([Microsoft Learn](https://learn.microsoft.com/azure/foundry/foundry-models/how-to/configure-entra-id#troubleshooting)). Partner models that offer only Chat Completions use
 [`openai-compatible`](#openai-compatible-vllm-litellm-gemini-) with a Foundry endpoint,
 and Claude has [its own recipe](#claude-on-foundry).
 
@@ -195,9 +199,11 @@ appConfig:
   LLM_AUTH: entra
 ```
 
-Entra ID setup is the same as for [Foundry](#foundry-gpt-and-other-responses-models):
-`scripts/setup-workload-identity.sh`, then the identity's client and tenant IDs in
-`azureWorkloadIdentity`. Entra ID is accepted for `anthropic` only because the endpoint
+Entra ID setup is the same as for [Foundry](#foundry-gpt-and-other-responses-models),
+except for the role: *Cognitive Services OpenAI User* covers only OpenAI models, and
+Claude needs *Cognitive Services User* ([Microsoft Learn](https://learn.microsoft.com/azure/foundry/foundry-models/how-to/configure-entra-id#troubleshooting)). Run
+`MODEL_ROLE="Cognitive Services User" scripts/setup-workload-identity.sh ...`, then put the
+identity's client and tenant IDs in `azureWorkloadIdentity`. Entra ID is accepted for `anthropic` only because the endpoint
 is a Foundry address.
 
 Expected `doctor` model line:
@@ -290,8 +296,8 @@ Expected `doctor` model line:
 model: anthropic / claude-sonnet-5-5 via Messages API, API key (file /var/run/secrets/llm/api-key)
 ```
 
-Reasoning effort maps onto Anthropic's effort levels (`minimal` is sent as `low`, `none`
-switches thinking off). If a reply hits the output limit the run fails with a message
+Reasoning effort maps onto Anthropic's effort levels (`minimal` is sent as `low` with a warning
+in the log, `none` switches thinking off). If a reply hits the output limit the run fails with a message
 naming `LLM_MAX_OUTPUT_TOKENS`.
 
 ## Ollama (laptop and in-cluster)
