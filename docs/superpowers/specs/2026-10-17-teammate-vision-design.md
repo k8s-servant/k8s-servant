@@ -81,7 +81,10 @@ and fit the "teammate" idea:
   all *what is normal here*: recurring warnings and always-firing alerts) and drafts the
   environment description for a human to review and approve. It turns the biggest
   setup effort into the first five minutes' "wow", and improves accuracy for everything
-  that follows. Optional re-scans suggest additions when the cluster changes.
+  that follows. Optional re-scans suggest additions when the cluster changes. The scan
+  uses only the existing read-only tools and guard rails (MCP `core` toolset, the
+  allow-listed `kubectl`, no Secrets, and Prometheus/Alertmanager when configured); a
+  new data source would go through review like any other.
 - **G8. A configurable persona (#36).** Tone, humour, answer length, language and name
   are configurable through Helm values. Guard rails: no humour on critical findings,
   incidents or actions; style never changes facts, the finding format or fingerprints;
@@ -151,6 +154,7 @@ issue.
 | # | Step | Builds on | Notes |
 |---|---|---|---|
 | 0 | Multi-provider LLM (#2), provider-neutral docs (#11) | n/a | Already planned; prerequisite for "any model" |
+| 0b (#5) | **Documentation site** (Zensical on GitHub Pages) | 0 (neutral docs) | Before the Teams launch is announced |
 | 0c (#35) | **Initial scan** (G7): `onboard` drafts the environment description from what the agent discovers; a human approves it | the summary tools, knowledge layer | Before Teams: first impression and accuracy |
 | 1 (#27) | **Two-way Teams for the fleet** (G1): one bot for all clusters, @mention questions, "which cluster?" in the conversation, interactive cards, follow-ups; platform-team allow-list; per-day budget | an HTTP API in each cluster's agent; a central, opt-in bot component that routes questions to the right cluster's agent | First visible differentiator; also brings multi-cluster routing forward |
 | 2 (#28) | **Scoreboard** (G2): grading buttons on cards, self-verification from memory, accuracy per task type, plus the offline evaluation set already on the roadmap | 1 (the buttons), memory | The evaluation set gates step 4: no action is promoted without measured accuracy |
