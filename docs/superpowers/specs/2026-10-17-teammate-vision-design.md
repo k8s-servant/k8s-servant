@@ -1,6 +1,6 @@
 # k8s-servant: from read-only watcher to trusted teammate (vision)
 
-Status: approved by the maintainer · Date: 2026-10-17 · Steps: #27–#32
+Status: approved by the maintainer · Date: 2026-10-17 · Steps: #27–#32, #38
 
 This is a direction document, not a build plan for one feature. It records why the
 project exists, where it should go, and the order of the big steps. Each step becomes
@@ -89,6 +89,20 @@ and fit the "teammate" idea:
   are configurable through Helm values. Guard rails: no humour on critical findings,
   incidents or actions; style never changes facts, the finding format or fingerprints;
   no extra model calls; defaults behave like today.
+- **G9. A command centre (#38).** A web view where the team can both *look* and,
+  later, *act*. Chat is good for asking but poor for an overview. The trust ladder
+  needs a place where the track record is visible and actions are approved. *Look*
+  means open findings across clusters, run history and morning reports,
+  conversations with their evidence, cost and token use, and model health. *Act*
+  comes in two stages: first low-risk changes (approve the onboarding draft and
+  learned notes, change the persona), then an approval queue for cluster actions
+  with a full audit log. Guard rails:
+  - it has no cluster access of its own and talks only to the agent's API;
+  - every action goes through the same approval and audit path as Teams;
+  - login goes through the organisation's identity provider, with viewer, approver
+    and admin roles;
+  - acting panels stay off until an admin turns them on;
+  - no secrets are ever shown.
 
 ## 4. Non-goals
 
@@ -153,10 +167,11 @@ issue.
 
 | # | Step | Builds on | Notes |
 |---|---|---|---|
-| 0 | Multi-provider LLM (#2), provider-neutral docs (#11) | n/a | Already planned; prerequisite for "any model" |
+| 0 | Multi-provider LLM (#2), provider-neutral docs (#11) | n/a | #2 shipped in 0.3.0; #11 still open |
 | 0b (#5) | **Documentation site** (Zensical on GitHub Pages) | 0 (neutral docs) | Before the Teams launch is announced |
 | 0c (#35) | **Initial scan** (G7): `onboard` drafts the environment description from what the agent discovers; a human approves it | the summary tools, knowledge layer | Before Teams: first impression and accuracy |
 | 1 (#27) | **Two-way Teams for the fleet** (G1): one bot for all clusters, @mention questions, "which cluster?" in the conversation, interactive cards, follow-ups; platform-team allow-list; per-day budget | an HTTP API in each cluster's agent; a central, opt-in bot component that routes questions to the right cluster's agent | First visible differentiator; also brings multi-cluster routing forward |
+| 1b (#38) | **Command centre, phase 1: look** (G9): read-only pages for findings, history, conversations and cost, with OIDC login | 1 (the HTTP API) | Phases 2 and 3 (low-risk changes, then approving cluster actions) arrive with step 4 |
 | 2 (#28) | **Scoreboard** (G2): grading buttons on cards, self-verification from memory, accuracy per task type, plus the offline evaluation set already on the roadmap | 1 (the buttons), memory | The evaluation set gates step 4: no action is promoted without measured accuracy |
 | 3 (#29) | **Cost meter and budgets** (G5): full version (per-run and per-day reporting, downgrade to a cheaper model) | the simple cap from step 1 | Can run in parallel with 2 |
 | 4 (#30) | **Runbooks with the trust ladder** (G3): first restarting a crashing pod, then rolling node restarts after patching | 1 (approval in Teams), 2 (scores and evaluation set) | A separate action component with its own identity and audit trail from day one |
@@ -184,6 +199,8 @@ provider-neutral docs (#11) and before Teams.
   reaches about 90%.
 - Grading comes from the asker, the platform team and the bot's own verification.
 - Actions start with the platform team and may widen later.
+- **A command centre (#38)** where people can both look at what the agent does and,
+  later, act on it.
 - What would make people uninstall it: cost, wrong answers, slowness.
 
 ## 9. Calls made by the writer (please check)
@@ -202,11 +219,14 @@ provider-neutral docs (#11) and before Teams.
 - Two-way Teams is built on a **small HTTP API** in each cluster's agent. The central bot
   is its first caller; the CLI and a portal plugin can reuse it later. Its
   authentication is designed in step 1.
-- **Step 0 (#2, #11) is not a hard blocker for step 1.** #2 is still the next piece of
-  work, as already agreed, but Teams can start against the current model client.
+- **Step 0 (#2, #11) is not a hard blocker for step 1.** #2 shipped in 0.3.0, and Teams
+  can start before #11 is finished.
 - **The offline evaluation set belongs to step 2** and gates step 4, not step 1: the first
   Teams users are the platform team, who can judge answers themselves.
 - **A simple per-day budget cap ships with step 1**; the full cost meter stays step 3.
+- **The command centre comes after the Teams bot**, because it reuses the bot's HTTP
+  API. It talks only to that API and never to the cluster directly, so the read-only
+  agent and the separate action component stay the only things with cluster access.
 - No hosted SaaS for the core, ever. The project stays self-hosted.
 - `docs/roadmap.md` follows this order.
 

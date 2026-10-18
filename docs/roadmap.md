@@ -8,9 +8,9 @@ issues.
 
 | Area | What exists |
 |---|---|
-| **Core agent** | The tool-calling loop on an Azure AI Foundry chat model; MCP tools with a guarded kubectl fallback; knowledge (environment description, cluster notes, skills); CLI `ask`, `tools`, `doctor`; Foundry guide and `scripts/setup-foundry.sh` |
+| **Core agent** | The tool-calling loop on any of five model providers (Azure AI Foundry, OpenAI, Anthropic, Ollama, any OpenAI-compatible server; [model-providers.md](model-providers.md)); MCP tools with a guarded kubectl fallback; knowledge (environment description, cluster notes, skills); CLI `ask`, `tools`, `doctor`; Foundry guide and `scripts/setup-foundry.sh` |
 | **Checks, memory, Teams** | Scheduled health checks with findings memory (new / still open / resolved), the morning report, Teams cards, Prometheus and Alertmanager tools; `cluster_problems` / `warning_events` summary tools, the policy-event filter, reasoning effort, skipping unchanged checks |
-| **In the cluster** | Signed container image, Helm chart as an OCI artifact (agent + MCP sidecar, read-only RBAC, PVC, credentials from your own Secrets, extension points), examples for Azure, any cluster and Flux, `scripts/setup-workload-identity.sh`, the [deployment guide](deployment.md) |
+| **In the cluster** | Signed container image, Helm chart as an OCI artifact (agent + MCP sidecar, read-only RBAC, PVC, credentials from your own Secrets, extension points), examples for Azure (GPT and Claude), Anthropic, OpenAI, Ollama, any OpenAI-compatible server and Flux, `scripts/setup-workload-identity.sh`, the [deployment guide](deployment.md) |
 
 ## Direction
 
@@ -25,10 +25,11 @@ default and the core.
 
 | Step | What | Issue |
 |---|---|---|
-| 0 | **Done in this release:** multi-provider LLM support (Foundry, OpenAI, Anthropic, Ollama and any OpenAI-compatible server; [model-providers.md](model-providers.md)). Still open: provider-neutral README rewrite | [#2](https://github.com/k8s-servant/k8s-servant/issues/2), [#11](https://github.com/k8s-servant/k8s-servant/issues/11) |
+| 0 | **Provider-neutral README rewrite**. Multi-provider support itself shipped in 0.3.0 ([#2](https://github.com/k8s-servant/k8s-servant/issues/2)) | [#11](https://github.com/k8s-servant/k8s-servant/issues/11) |
 | 0b | **Documentation site** (Zensical on GitHub Pages), once the docs are provider-neutral, before the Teams launch | [#5](https://github.com/k8s-servant/k8s-servant/issues/5) |
 | 0c | **Initial scan**: the agent onboards itself (platform, installed components, what's normal here) and drafts the environment description for a human to review | [#35](https://github.com/k8s-servant/k8s-servant/issues/35) |
 | 1 | **Two-way MS Teams bot for the whole fleet**: @mention questions, interactive cards, platform-team allow-list, per-day budget (opt-in component) | [#27](https://github.com/k8s-servant/k8s-servant/issues/27) |
+| 1b | **Command centre, phase 1 (look)**: a web view of findings across clusters, run history, conversations with their evidence, and cost; OIDC login. Acting (approving the onboarding draft, then cluster actions) arrives with step 4 | [#38](https://github.com/k8s-servant/k8s-servant/issues/38) |
 | 2 | **Scoreboard**: answers graded by the asker, the platform team and the bot's own verification; accuracy per task type; the offline evaluation set | [#28](https://github.com/k8s-servant/k8s-servant/issues/28) |
 | 3 | **Cost meter and budgets** | [#29](https://github.com/k8s-servant/k8s-servant/issues/29) |
 | 4 | **Action runbooks with a trust ladder**: explain, then propose and approve, then do and report; first a pod restart, then rolling node restarts after patching; a separate action component | [#30](https://github.com/k8s-servant/k8s-servant/issues/30) |
