@@ -2,7 +2,7 @@
 
 How to work on the code: where things are, the rules every change follows, and
 step-by-step recipes for the most common changes. Read [architecture.md](architecture.md)
-first for the big picture; [CLAUDE.md](../CLAUDE.md) holds the same conventions in
+first for the big picture; [AGENTS.md](../AGENTS.md) holds the same conventions in
 short form.
 
 ## Setup
