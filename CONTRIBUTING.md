@@ -37,8 +37,8 @@ docker build -t k8s-servant:dev . # image
 
 ## AI-assisted contributions
 
-Using Claude Code or another assistant is fine. [`CLAUDE.md`](CLAUDE.md) holds the
-project conventions those tools should follow. You remain responsible for every line
+Using Claude Code or another assistant is fine. [`AGENTS.md`](AGENTS.md) holds the
+project conventions those tools should follow (`CLAUDE.md` imports it). You remain responsible for every line
 you submit. Maintainers can also mention `@claude` on issues and PRs.
 
 ## Releases

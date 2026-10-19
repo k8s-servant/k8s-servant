@@ -276,7 +276,7 @@ does not show in the changelog or count toward the version.
 ### claude-review.yml: automatic review
 
 On every non-draft PR from a branch in this repository, Claude reads the diff and
-[CLAUDE.md](../CLAUDE.md) and reviews in priority order: the read-only guarantee, then
+[AGENTS.md](../AGENTS.md) and reviews in priority order: the read-only guarantee, then
 correctness, security, tests and docs. Findings arrive as inline comments plus one
 summary. The review is not a required check, but its inline comments are conversations
 that must be resolved before merging.

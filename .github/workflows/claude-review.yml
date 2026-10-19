@@ -42,7 +42,7 @@ jobs:
             REPO: ${{ github.repository }}
             PR NUMBER: ${{ github.event.pull_request.number }}
 
-            Review this pull request. Follow the conventions in CLAUDE.md. Focus, in order:
+            Review this pull request. Follow the conventions in AGENTS.md. Focus, in order:
 
             1. **Read-only guarantee.** Flag anything that could let the agent change
                cluster objects, read Secrets, widen RBAC beyond get/list/watch, loosen
