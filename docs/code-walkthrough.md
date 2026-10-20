@@ -107,9 +107,9 @@ for iteration in range(1, self.max_iterations + 1):
     reply = await self.chat.complete(messages, self.registry.specs())
     messages.append(reply)
     if not reply.tool_calls:
-        return AgentResult(reply.content, ...)             # no tool requests: the answer
+        return AgentResult(reply.content, ...)  # no tool requests: the answer
     for call in reply.tool_calls:
-        messages.append(await self._run_tool_call(call))     # run the tool, add its output
+        messages.append(await self._run_tool_call(call))  # run the tool, add its output
 ```
 
 Every round sends the whole conversation and the tool definitions. The model either
@@ -188,6 +188,7 @@ The contract every translator meets:
 ```python
 class ChatModel(Protocol):
     total_tokens: int
+
     async def complete(self, turns, tools, *, use_tools=True) -> Turn: ...
 ```
 
@@ -459,8 +460,8 @@ In the cluster the pod runs `k8s-servant serve`. Files: `scheduler.py`,
 
 ```python
 stop = asyncio.Event()
-loop.add_signal_handler(signal.SIGTERM, stop.set)   # pod shutdown
-loop.add_signal_handler(signal.SIGINT, stop.set)    # Ctrl-C
+loop.add_signal_handler(signal.SIGTERM, stop.set)  # pod shutdown
+loop.add_signal_handler(signal.SIGINT, stop.set)  # Ctrl-C
 await Scheduler(config, memory, *serve_jobs(...)).run(stop)
 ```
 
@@ -639,10 +640,13 @@ Because `ChatModel` is a Protocol, a small class can stand in for any provider:
 ```python
 class ScriptedChat:
     """Fake model: returns the scripted replies in order and records every request."""
+
     def __init__(self, *replies):
         self.replies = list(replies)
         self.calls = []
+
     total_tokens = 0
+
     async def complete(self, turns, tools, *, use_tools=True):
         self.calls.append({"turns": [...], "tools": tools, "use_tools": use_tools})
         reply = self.replies.pop(0)
@@ -705,7 +709,7 @@ One test, many inputs (`test_kubectl_tool.py`):
         (["delete", "pod", "x"], "verb 'delete' is not allowed"),
         (["get", "pods,secrets"], "Secrets"),
         (["get", "pods", "--as=system:admin"], "'--as'"),
-        (["get", "pods", "-shttps://attacker.example"], "'-s'"),
+        (["get", "pods", "-shttps://evil.example"], "'-s'"),
     ],
 )
 def test_refused(args, reason):
