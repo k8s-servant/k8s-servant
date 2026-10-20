@@ -123,7 +123,7 @@ it runs as a sidecar container on `localhost:8080`, from the upstream image `ghc
 
 | Alternative | Why not (for now) |
 |---|---|
-| **HolmesGPT** (open source AI SRE, CNCF) | Covers much of the same ground. A small own agent was chosen to keep the security model, the memory and the Teams flow simple and under the project's control; a fair comparison is planned |
+| **HolmesGPT** (open source AI SRE, CNCF) | Covers much of the same ground. A small own agent was chosen to keep the security model, the memory and the Teams flow simple and under the project's control |
 | An agent framework (LangChain, Semantic Kernel, …) | Hides the loop that most needs to be understood and tested; the loop is small |
 | Microsoft `aks-mcp` | stdio only, documented as not for running inside a cluster |
 | One API for all providers | Chat Completions cannot carry reasoning between tool calls on current models, so there are three API clients behind one interface |
