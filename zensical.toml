@@ -84,7 +84,6 @@ features = [
   "navigation.indexes",
   "navigation.instant",
   "navigation.path",
-  "navigation.sections",
   "navigation.tabs",
   "navigation.top",
   "navigation.tracking",
