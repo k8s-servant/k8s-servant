@@ -26,7 +26,7 @@ each provider's recipe in [model-providers.md](model-providers.md) shows the exp
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| `LLM_AUTH=entra needs an Microsoft Foundry endpoint` | Entra ID is only used for Foundry hosts (`.openai.azure.com`, `.services.ai.azure.com`, `.cognitiveservices.azure.com`) | Use `LLM_AUTH=api-key` with a key, or fix `LLM_ENDPOINT` |
+| `LLM_AUTH=entra needs a Microsoft Foundry endpoint` | Entra ID is only used for Foundry hosts (`.openai.azure.com`, `.services.ai.azure.com`, `.cognitiveservices.azure.com`) | Use `LLM_AUTH=api-key` with a key, or fix `LLM_ENDPOINT` |
 | `Entra ID sign-in needs azure-identity` | The `azure` extra is missing outside the image | `pip install -e '.[azure]'` |
 | `HTTP 401` right after setup | The data-plane role takes ~5–10 minutes to apply | Wait, run `doctor` again |
 | `HTTP 401` with Claude or another non-OpenAI model | *Cognitive Services OpenAI User* covers only OpenAI models | Assign *Cognitive Services User* (`MODEL_ROLE="Cognitive Services User" scripts/setup-workload-identity.sh ...`) |
