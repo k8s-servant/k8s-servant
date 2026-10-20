@@ -5,8 +5,8 @@ main process (`k8s-servant serve`). One command works in two places:
 
 | Where | How the agent reaches the cluster | How it reaches the model | Memory | Available |
 |---|---|---|---|---|
-| **Your laptop** | your current kubeconfig context (and a local kubernetes-mcp-server, if you start one) | `az login` (Foundry), or `LLM_API_KEY` / `LLM_API_KEY_FILE`; none for Ollama | `./.data` | now |
-| **Inside the agent's pod** | the pod's read-only ServiceAccount and the MCP sidecar | Workload Identity (Foundry), or an API key from a mounted Secret | `/data` (shared with the scheduler) | now ([deployment.md](deployment.md)) |
+| **Your laptop** | your current kubeconfig context (and a local kubernetes-mcp-server, if you start one) | an API key file (`LLM_API_KEY_FILE`), nothing for Ollama, or `az login` for Azure AI Foundry with Entra ID | `./.data` | now |
+| **Inside the agent's pod** | the pod's read-only ServiceAccount and the MCP sidecar | an API key from a mounted Secret, nothing for an in-cluster Ollama, or Workload Identity for Azure AI Foundry | `/data` (shared with the scheduler) | now ([deployment.md](deployment.md)) |
 
 Settings come from environment variables; see the table in the [README](../README.md#configuration).
 On a laptop, put them in `.env` and load it into your shell with `set -a; source .env; set +a`.
@@ -240,7 +240,7 @@ model call. Run it first whenever something does not work.
 
 ```console
 $ k8s-servant --values examples/knowledge-values.yaml --values my-values.yaml doctor
-[OK  ] config           endpoint https://my-foundry.openai.azure.com/, deployment k8s-servant
+[OK  ] config           anthropic / claude-sonnet-5-5 via Messages API, API key (file /home/me/.config/k8s-servant/llm-api-key)
 [OK  ] knowledge        environment: yes, cluster notes: yes, skills: 5
 [OK  ] memory           .data: 2 open findings, notes 312 chars
 [OK  ] mcp              13 tools from http://localhost:8080/mcp

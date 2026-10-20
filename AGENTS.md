@@ -71,6 +71,9 @@ docker build -t k8s-servant:dev .                               # image
   a file and read through a `*_FILE` setting, never an environment variable. Anything
   site-specific goes through the extension points (`extraEnv`, `extraEnvFrom`,
   `extraVolumes`, `extraVolumeMounts`, `extraObjects`), not new tool-specific values.
+- **Provider-neutral docs.** Write "the model" or "the model provider". Name a provider
+  (Azure AI Foundry, OpenAI, Anthropic, Ollama, ...) only in provider-specific sections,
+  recipes, examples and lists of all providers.
 - **Public repository.** Never add real cluster names, registries, tenant or
   subscription IDs, hostnames, company names or personal data to code, tests, docs or
   examples. Use placeholders (`example.com`, `00000000-0000-0000-0000-000000000000`,

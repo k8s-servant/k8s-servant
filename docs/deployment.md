@@ -2,9 +2,11 @@
 
 How k8s-servant gets into a Kubernetes cluster and how to run it there: prerequisites,
 the model identity, values, installing with Helm or Flux, checks after the first
-deployment, and day-2 operations. The examples use AKS with Azure AI Foundry, Workload
-Identity and Azure Key Vault, because that is the tested path; the chart itself works
-on any cluster.
+deployment, and day-2 operations. The chart works on any cluster and with every model
+provider ([model-providers.md](model-providers.md)). The sections marked *AKS* show the
+fully worked Azure path (Azure AI Foundry, Workload Identity and Key Vault); with
+another provider, skip them and give the pod an API key from a Secret
+([Credentials](#credentials-bring-your-own-secrets)).
 
 ## Table of Contents
 
@@ -78,7 +80,7 @@ signatures, and how to keep your settings in a private repository without a fork
 
 | What | How to check |
 |---|---|
-| A chat model with tool calling | Azure AI Foundry: `scripts/setup-foundry.sh` ([foundry-setup.md](foundry-setup.md)) |
+| A chat model with tool calling | Pick a provider ([model-providers.md](model-providers.md)); for Azure AI Foundry, `scripts/setup-foundry.sh` ([foundry-setup.md](foundry-setup.md)) |
 | (AKS) OIDC issuer and Workload Identity on the cluster | `az aks show -g my-cluster-rg -n my-cluster --query "[oidcIssuerProfile.enabled, securityProfile.workloadIdentity.enabled]"` → `[true, true]` |
 | (Optional) The Teams webhook URL, as a Kubernetes Secret or in your secret store | [MS Teams setup](../README.md#ms-teams-setup); see [Credentials](#credentials-bring-your-own-secrets) |
 | (Optional, Azure example) External Secrets Operator, to sync it from Key Vault | `kubectl get crd externalsecrets.external-secrets.io secretstores.external-secrets.io` |
@@ -137,13 +139,15 @@ annotations go into `serviceAccount.annotations` (for example
 ## 2. Network
 
 If the cluster's egress is restricted, the pod needs HTTPS (443) to:
-- the model endpoint, e.g. `my-foundry.openai.azure.com`;
-- `login.microsoftonline.com`, for Entra ID tokens (Workload Identity);
+- the model endpoint (`LLM_ENDPOINT`, or the provider's default), e.g. `api.anthropic.com`,
+  `api.openai.com` or `my-foundry.openai.azure.com`; nothing for an in-cluster Ollama;
+- `login.microsoftonline.com`, for Entra ID tokens (Foundry with Workload Identity only);
 - the Teams webhook host;
 - your Prometheus and Alertmanager, if they are outside the cluster.
 
-If `k8s-servant doctor` in the pod shows a timeout for the model, open the egress or
-use a private endpoint ([foundry-setup.md](foundry-setup.md#7-step-5--networking)).
+If `k8s-servant doctor` in the pod shows a timeout for the model, open the egress; on
+Foundry you can also use a private endpoint
+([foundry-setup.md](foundry-setup.md#7-step-5--networking)).
 
 ## 3. Values for the cluster
 

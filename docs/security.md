@@ -43,16 +43,19 @@ local files, or block forever.
 
 | Destination | What is sent | Notes |
 |---|---|---|
-| **MS Foundry** (the model) | The system prompt (rules, environment description, cluster notes, learned notes, skill catalog), the question, and the **outputs of the tools the model calls**: object names and statuses, events, metrics, and **application log lines** | Never Secrets. Application logs can contain sensitive data if applications log it; the agent reads logs only when investigating, with a tail limit. |
+| **The model provider** (`LLM_PROVIDER`: Azure AI Foundry, OpenAI, Anthropic, or a server you run) | The system prompt (rules, environment description, cluster notes, learned notes, skill catalog), the question, and the **outputs of the tools the model calls**: object names and statuses, events, metrics, and **application log lines** | Never Secrets. Application logs can contain sensitive data if applications log it; the agent reads logs only when investigating, with a tail limit. With Ollama or another server inside your network, this data does not leave it. |
 | **MS Teams** (Workflows webhook) | Titles, details and summaries of findings, and the morning overview | Details are the model's own words, which may quote names, events or log lines. |
 
-Where Foundry processes data depends on the deployment type. The recommended
-**DataZoneStandard** keeps processing inside the EU data zone; see
-[foundry-concepts.md](foundry-concepts.md#deployment-types-where-data-is-processed).
+Where the provider processes and keeps that data, and whether it may train on it, is
+set by the provider's terms: choose one your organisation has approved. Links per
+provider: [model-providers.md](model-providers.md#data-handling-and-errors).
 
-Prompts and completions are not used to train models and are not shared with
-OpenAI. Microsoft may keep content flagged for abuse for review, inside the EU for an
-EU resource.
+**With Azure AI Foundry**, where data is processed depends on the deployment type. The
+recommended **DataZoneStandard** keeps processing inside the EU data zone; see
+[foundry-concepts.md](foundry-concepts.md#deployment-types-where-data-is-processed).
+Prompts and completions are not used to train models and are not shared with OpenAI.
+Microsoft may keep content flagged for abuse for review, inside the EU for an EU
+resource.
 
 What is filtered, summarised or cut before the model sees it, and what is passed
 through unchanged (no redaction of log content): [data-processing.md](data-processing.md).
@@ -61,7 +64,8 @@ through unchanged (no redaction of log content): [data-processing.md](data-proce
 
 | Credential | How it is handled |
 |---|---|
-| **Foundry access** | Entra ID tokens: `az login` on a laptop, AKS **Workload Identity** in the cluster. There is no long-lived secret. The identity has one data-plane role on the Foundry resource: *Cognitive Services OpenAI User* for GPT and other OpenAI models (least privilege), or *Cognitive Services User* for Claude and other non-OpenAI models, which the OpenAI role does not cover ([Microsoft Learn](https://learn.microsoft.com/azure/foundry/foundry-models/how-to/configure-entra-id#troubleshooting)). Use `LLM_AUTH=entra` so a key is refused; an API key can be disabled on the resource. For OpenAI, Anthropic and other endpoints the chart mounts the key from a Secret as a file (`LLM_API_KEY_FILE`), never an environment variable. Entra ID tokens are minted only for `LLM_PROVIDER=foundry`, or for `anthropic` and `openai-compatible` when `LLM_ENDPOINT` is a Foundry host, always over https. With `foundry` the token goes to whatever `LLM_ENDPOINT` you set (any https host, so custom domains and gateways work): point it only at your Foundry resource or a gateway you control. **Plain `http` is allowed for in-cluster `ollama` and `openai-compatible` endpoints, by design: an API key sent there travels unencrypted inside the cluster network. Use https, or no key, for such endpoints** ([model-providers.md](model-providers.md#ollama-laptop-and-in-cluster)). |
+| **The model's API key** (OpenAI, Anthropic and most other providers) | The chart mounts it from a Secret you create as a file (`LLM_API_KEY_FILE`), never an environment variable; locally, a file only you can read. It is never logged, and it is removed from model error messages before they reach logs or Teams. **Plain `http` is allowed for in-cluster `ollama` and `openai-compatible` endpoints, by design: an API key sent there travels unencrypted inside the cluster network. Use https, or no key, for such endpoints** ([model-providers.md](model-providers.md#ollama-laptop-and-in-cluster)). |
+| **Azure AI Foundry with Entra ID** | Entra ID tokens: `az login` on a laptop, AKS **Workload Identity** in the cluster. There is no long-lived secret. The identity has one data-plane role on the Foundry resource: *Cognitive Services OpenAI User* for GPT and other OpenAI models (least privilege), or *Cognitive Services User* for Claude and other non-OpenAI models, which the OpenAI role does not cover ([Microsoft Learn](https://learn.microsoft.com/azure/foundry/foundry-models/how-to/configure-entra-id#troubleshooting)). Use `LLM_AUTH=entra` so a key is refused; an API key can be disabled on the resource. Entra ID tokens are minted only for `LLM_PROVIDER=foundry`, or for `anthropic` and `openai-compatible` when `LLM_ENDPOINT` is a Foundry host, always over https. With `foundry` the token goes to whatever `LLM_ENDPOINT` you set (any https host, so custom domains and gateways work): point it only at your Foundry resource or a gateway you control. |
 | **Kubernetes access** | Your kubeconfig on a laptop. In the cluster, the pod's ServiceAccount token, which is mounted by Kubernetes and never shown to the model. |
 | **Teams webhook URL** | The URL contains a signature that allows posting, so it **is a credential**. In the cluster it comes from a Kubernetes Secret you create (kubectl, External Secrets, ...), mounted as a file (`TEAMS_WEBHOOK_URL_FILE`). Locally it comes from `.env`, which is git-ignored. It is never logged; even network errors are logged without it. |
 
@@ -111,8 +115,10 @@ must print `no`; `k8s-servant doctor` in the pod checks this too
 
 ## Recommendations
 
-- Use DataZoneStandard deployments and disable key authentication on the Foundry
-  resource once everyone uses Entra ID.
+- Choose a model provider, region and data terms your organisation has approved, or
+  run the model inside your network (Ollama or another OpenAI-compatible server).
+- On Azure AI Foundry, use DataZoneStandard deployments and disable key authentication
+  on the resource once everyone uses Entra ID.
 - Review learned notes regularly and promote lasting facts into the environment
   description through Git.
 - Keep the Teams channel limited to the people who should see cluster details.
