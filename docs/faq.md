@@ -5,7 +5,7 @@ gives it read-only roles without Secrets; kubectl is limited to an allow-list; t
 is no shell. See [security.md](security.md).
 
 **What data leaves the cluster?** Object names, statuses, events, metrics and, when
-it investigates, log lines go to the model endpoint (with Azure AI Foundry: in the data
+it investigates, log lines go to the model endpoint (with Microsoft Foundry: in the data
 zone you choose, not used for training; with other providers see their data policies,
 linked from [model-providers.md](model-providers.md#data-handling-and-errors)). Findings and summaries go to Teams. Never
 Secrets. Most data is reduced in Python first; log lines are not redacted.
@@ -78,7 +78,7 @@ Honest notes from the first real runs:
 
 With a hosted model you pay **per token**; an idle agent costs nothing, and a local
 Ollama costs only your hardware. Measured on a test cluster (~600 Deployments, ~1,250
-pods) with gpt-5.4-mini on Azure AI Foundry; other models use a similar number of
+pods) with gpt-5.4-mini on Microsoft Foundry; other models use a similar number of
 tokens, at their own price:
 
 | Run | Model calls | Tokens | Time |
@@ -90,7 +90,7 @@ tokens, at their own price:
 
 - **Rate limits.** A full check's busiest minute uses about 90k tokens, so your
     provider's tokens-per-minute limit must cover that, or deep checks fail with
-    `HTTP 429`. On Azure AI Foundry, give the deployment 150–200k TPM (raising it costs
+    `HTTP 429`. On Microsoft Foundry, give the deployment 150–200k TPM (raising it costs
     nothing).
 - **Monthly cost** depends on how often something changes, because unchanged hours
     are free. For gpt-5.4-mini, a rough estimate from public price lists was about
@@ -102,6 +102,6 @@ tokens, at their own price:
 - Every model call is logged with its tokens: `model call: N prompt (M cached) + K
     completion tokens (R reasoning)`. Set a budget alert with your provider (on Foundry: the resource group).
 
-More: [model-providers.md](model-providers.md); for Azure AI Foundry,
+More: [model-providers.md](model-providers.md); for Microsoft Foundry,
 [Foundry setup guide](providers/foundry/setup.md#9-cost-and-limits) and
 [Foundry concepts](providers/foundry/concepts.md).

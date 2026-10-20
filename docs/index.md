@@ -11,7 +11,7 @@ hide:
 A **read-only AI SRE** for Kubernetes clusters. It looks at a cluster the way an
 experienced cluster administrator would: it finds what is wrong, explains why with
 evidence, says what to do about it, and remembers what it already told you. **It never
-changes anything.** You choose the model: Azure AI Foundry, OpenAI, Anthropic, a
+changes anything.** You choose the model: Microsoft Foundry, OpenAI, Anthropic, a
 self-hosted model through Ollama, or any OpenAI-compatible server. Results go to the
 terminal and to an MS Teams channel.
 

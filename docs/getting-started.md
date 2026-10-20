@@ -14,7 +14,7 @@ source .venv/bin/activate
 ```
 
 `pip install -e .` is all a user needs. Developers add the test tools with
-`'.[dev]'`; Azure AI Foundry with Entra ID sign-in also needs the `azure` extra, for
+`'.[dev]'`; Microsoft Foundry with Entra ID sign-in also needs the `azure` extra, for
 example `'.[dev,azure]'`.
 
 **2. A cluster with something broken**
@@ -56,7 +56,7 @@ export LLM_API_KEY_FILE=~/.config/k8s-servant/llm-api-key
 export LLM_PROVIDER=anthropic LLM_MODEL=claude-sonnet-5-5   # or: LLM_PROVIDER=openai LLM_MODEL=gpt-5
 ```
 
-Azure AI Foundry (Entra ID, no key), Claude on Foundry and any OpenAI-compatible server
+Microsoft Foundry (Entra ID, no key), Claude on Foundry and any OpenAI-compatible server
 have their own recipes in [model-providers.md](model-providers.md).
 
 **4. Ask**

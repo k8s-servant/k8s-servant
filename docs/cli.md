@@ -5,8 +5,8 @@ main process (`k8s-servant serve`). One command works in two places:
 
 | Where | How the agent reaches the cluster | How it reaches the model | Memory | Available |
 |---|---|---|---|---|
-| **Your laptop** | your current kubeconfig context (and a local kubernetes-mcp-server, if you start one) | an API key file (`LLM_API_KEY_FILE`), nothing for Ollama, or `az login` for Azure AI Foundry with Entra ID | `./.data` | now |
-| **Inside the agent's pod** | the pod's read-only ServiceAccount and the MCP sidecar | an API key from a mounted Secret, nothing for an in-cluster Ollama, or Workload Identity for Azure AI Foundry | `/data` (shared with the scheduler) | now ([deployment.md](deployment.md)) |
+| **Your laptop** | your current kubeconfig context (and a local kubernetes-mcp-server, if you start one) | an API key file (`LLM_API_KEY_FILE`), nothing for Ollama, or `az login` for Microsoft Foundry with Entra ID | `./.data` | now |
+| **Inside the agent's pod** | the pod's read-only ServiceAccount and the MCP sidecar | an API key from a mounted Secret, nothing for an in-cluster Ollama, or Workload Identity for Microsoft Foundry | `/data` (shared with the scheduler) | now ([deployment.md](deployment.md)) |
 
 Settings come from environment variables; see the [settings reference](configuration.md).
 On a laptop, put them in `.env` and load it into your shell with `set -a; source .env; set +a`.

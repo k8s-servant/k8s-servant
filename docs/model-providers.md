@@ -1,6 +1,6 @@
 # Model providers
 
-k8s-servant works with the model you already have: Azure AI Foundry, OpenAI, Anthropic
+k8s-servant works with the model you already have: Microsoft Foundry, OpenAI, Anthropic
 (Claude), a self-hosted model through Ollama, or any other server that speaks the
 OpenAI Chat Completions API (vLLM, LiteLLM, LM Studio, Gemini, ...). You choose the
 provider with `LLM_PROVIDER`. This page explains the choice and the rules every
@@ -14,10 +14,10 @@ Entra ID), and what `doctor` should print.
 | [OpenAI](providers/openai.md) | `openai` | API key |
 | [Ollama](providers/ollama.md), on a laptop or in the cluster | `ollama` | none |
 | [OpenAI-compatible](providers/openai-compatible.md): vLLM, LiteLLM, Gemini, LM Studio, ... | `openai-compatible` | API key (optional) |
-| [GPT and other models on Azure AI Foundry](providers/foundry/gpt.md) | `foundry` | Entra ID or API key |
-| [Claude on Azure AI Foundry](providers/foundry/claude.md) | `anthropic` | Entra ID |
+| [GPT and other models on Microsoft Foundry](providers/foundry/gpt.md) | `foundry` | Entra ID or API key |
+| [Claude on Microsoft Foundry](providers/foundry/claude.md) | `anthropic` | Entra ID |
 
-No provider is the "main" one. Azure AI Foundry also has an
+No provider is the "main" one. Microsoft Foundry also has an
 [overview](providers/foundry/index.md), a [concepts page](providers/foundry/concepts.md)
 and a [step-by-step setup guide](providers/foundry/setup.md).
 

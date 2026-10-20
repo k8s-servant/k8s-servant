@@ -1,5 +1,5 @@
 # Example values for one AKS cluster: the complete Azure setup.
-#   - Azure AI Foundry as the model, reached with Workload Identity (no API key);
+#   - Microsoft Foundry as the model, reached with Workload Identity (no API key);
 #   - the Teams webhook URL kept in Azure Key Vault and synced into a Kubernetes Secret
 #     by External Secrets Operator (ESO), which also authenticates with Workload Identity.
 # The chart itself knows nothing about Key Vault or ESO: the SecretStore and

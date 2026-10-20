@@ -22,11 +22,11 @@ each provider's recipe in [model-providers.md](model-providers.md) shows the exp
 | A check "hangs" for minutes | A request timed out (`LLM_TIMEOUT_SECONDS`, 120 s) and the SDK retries it up to 3 times | The log shows `Retrying request in ...`. A scheduled job is cancelled after `JOB_TIMEOUT_MINUTES` |
 | Shallow answers, few tool calls, obvious problems missed | Reasoning switched off (gpt-5.x models reason only when asked), or a small model | Keep `LLM_REASONING_EFFORT=medium` (default for `foundry`, `openai`, `anthropic`); `high` for harder clusters. Small local models often stop after the first tool call: use a larger or hosted model |
 
-### Azure AI Foundry
+### Microsoft Foundry
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| `LLM_AUTH=entra needs an Azure AI Foundry endpoint` | Entra ID is only used for Foundry hosts (`.openai.azure.com`, `.services.ai.azure.com`, `.cognitiveservices.azure.com`) | Use `LLM_AUTH=api-key` with a key, or fix `LLM_ENDPOINT` |
+| `LLM_AUTH=entra needs a Microsoft Foundry endpoint` | Entra ID is only used for Foundry hosts (`.openai.azure.com`, `.services.ai.azure.com`, `.cognitiveservices.azure.com`) | Use `LLM_AUTH=api-key` with a key, or fix `LLM_ENDPOINT` |
 | `Entra ID sign-in needs azure-identity` | The `azure` extra is missing outside the image | `pip install -e '.[azure]'` |
 | `HTTP 401` right after setup | The data-plane role takes ~5–10 minutes to apply | Wait, run `doctor` again |
 | `HTTP 401` with Claude or another non-OpenAI model | *Cognitive Services OpenAI User* covers only OpenAI models | Assign *Cognitive Services User* (`MODEL_ROLE="Cognitive Services User" scripts/setup-workload-identity.sh ...`) |

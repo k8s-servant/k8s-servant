@@ -1,7 +1,7 @@
-# Azure AI Foundry
+# Microsoft Foundry
 
-[Azure AI Foundry](https://ai.azure.com) serves models inside your own Azure tenant, in
-the data zone you choose. On AKS the pod signs in with Workload Identity, so there is
+[Microsoft Foundry](https://ai.azure.com) (formerly Azure AI Foundry) serves models
+inside your own Azure tenant, in the data zone you choose. On AKS the pod signs in with Workload Identity, so there is
 no key to manage. Foundry has four pages here:
 
 | Page | Read it when |

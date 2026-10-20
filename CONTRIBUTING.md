@@ -32,7 +32,7 @@ recipes for common changes.
 1. For anything bigger than a small fix, open an issue first so we can agree on the approach.
 2. Fork, create a branch, and write a failing test before the code (one test file per module).
 3. Keep PRs focused. Update docs alongside behavior changes. Docs stay provider-neutral:
-   they say "the model" or "the model provider" and name Azure AI Foundry, OpenAI,
+   they say "the model" or "the model provider" and name Microsoft Foundry, OpenAI,
    Anthropic or Ollama only in provider-specific sections and recipes.
 4. **PR titles follow [Conventional Commits](https://www.conventionalcommits.org/)**
    (`feat: ...`, `fix(chart): ...`, `docs: ...`). PRs are squash-merged, and the title

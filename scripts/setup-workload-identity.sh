@@ -5,7 +5,7 @@
 # and gives it exactly the access it needs:
 #   - read ONE Key Vault secret: the Teams webhook URL, synced by External
 #     Secrets into the agent's own Kubernetes Secret;
-#   - call the chat model in the MS Foundry resource.
+#   - call the chat model in the Microsoft Foundry resource.
 # This script is the documented way to set the identity up (a prerequisite of
 # the deployment, see docs/deployment.md).
 #

@@ -116,7 +116,7 @@ At the start of every run (a question, a health check, the morning report),
 Total in the measured example: **about 10,000 characters, roughly 2,500 tokens**. With the
 tool definitions (another ~3,000 tokens), the first model call of a run was measured at
 about **6,000 prompt tokens**. Every following call resends the system prompt, so the
-provider's prompt cache serves most of it where it has one (Azure AI Foundry, OpenAI and
+provider's prompt cache serves most of it where it has one (Microsoft Foundry, OpenAI and
 Anthropic do; cached tokens are billed at a discount).
 
 An excerpt (start of the environment description and the catalog):
@@ -243,7 +243,7 @@ promote it) → the next run knows. No code change.
 - It does not fine-tune or train the model; nothing about your cluster leaves the
     request it was sent with. Whether the provider may keep or train on that request is
     set by its terms ([model-providers.md](model-providers.md#data-handling-and-errors));
-    Azure AI Foundry does not train on your prompts.
+    Microsoft Foundry does not train on your prompts.
 - It does not learn from its findings: the findings history is used for
     new / still open / resolved, not as knowledge.
 - It cannot see what nobody wrote down. If an important fact is only in people's
