@@ -101,7 +101,7 @@ def explain_model_error(exc: BaseException, provider: str = "", *, endpoint: str
     if isinstance(exc, openai.APITimeoutError | anthropic.APITimeoutError):
         return "the request timed out; try again or raise LLM_TIMEOUT_SECONDS."
     if isinstance(exc, openai.APIConnectionError | anthropic.APIConnectionError):
-        docs = "docs/foundry-setup.md, section Networking" if foundry else "docs/model-providers.md"
+        docs = "docs/providers/foundry/setup.md, section Networking" if foundry else "docs/model-providers.md"
         return f"cannot reach LLM_ENDPOINT: check the URL, DNS and the firewall / private endpoint ({docs})."
     if status is not None:
         return f"HTTP {status}: {getattr(exc, 'message', None) or exc}"

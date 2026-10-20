@@ -81,10 +81,10 @@ So **the laptop and the cluster see identical knowledge**.
 `description`) and the Markdown body:
 
 - the skill's identity is its folder name (or its `extraSkills` key); a different
-  `name` in the frontmatter is logged as a warning;
+    `name` in the frontmatter is logged as a warning;
 - Windows line endings and a BOM are accepted;
 - broken YAML keeps the body and loses the description (warning); a skill without a
-  description stays loadable but the model will hardly ever choose it.
+    description stays loadable but the model will hardly ever choose it.
 
 The log shows the result:
 
@@ -173,17 +173,17 @@ Learned notes are the agent's own memory of lasting facts, kept in `DATA_DIR/not
 ```
 
 - **Written by the model** with the `save_note` tool when it learns something that
-  will matter later. One sentence, at most 500 characters, no secrets. People can edit
-  the file too.
+    will matter later. One sentence, at most 500 characters, no secrets. People can edit
+    the file too.
 - **Read at the start of every run** (unlike the environment description, which is
-  read once per process), so a note saved in one run is used in the next.
+    read once per process), so a note saved in one run is used in the next.
 - **Size limit.** Only the newest notes up to `NOTES_MAX_CHARS` (default 8,000) go into
-  the prompt, cut at a line boundary, with "(older notes omitted)" in front.
+    the prompt, cut at a line boundary, with "(older notes omitted)" in front.
 - **Visible to people.** Every new note is logged at WARNING and listed in the next
-  morning report, because a note changes what every future run treats as normal, and
-  it could have been planted by text in a log line (prompt injection).
+    morning report, because a note changes what every future run treats as normal, and
+    it could have been planted by text in a log line (prompt injection).
 - **Promote lasting facts to Git.** A note that stays true belongs in the environment
-  description or cluster notes, where it is reviewed. Then delete it from `notes.md`.
+    description or cluster notes, where it is reviewed. Then delete it from `notes.md`.
 
 Details: [memory.md](memory.md#learned-notes).
 
@@ -206,13 +206,13 @@ tool resources_list(... GitRepository / Kustomization / HelmRelease)
 ```
 
 - **The description decides whether a skill is used.** The model chooses by the
-  catalog line alone, so it should start with "Use when ..." and name the symptoms
-  people ask about.
+    catalog line alone, so it should start with "Use when ..." and name the symptoms
+    people ask about.
 - **An unknown name** returns `ERROR: no skill named 'x'. Available skills: ...`, and
-  the model corrects itself.
+    the model corrects itself.
 - **Why not put every skill in the prompt?** It would grow with every skill and be
-  resent on every call. The catalog keeps the prompt small however many skills
-  there are; a skill costs tokens only in runs that need it.
+    resent on every call. The catalog keeps the prompt small however many skills
+    there are; a skill costs tokens only in runs that need it.
 
 ## Which knowledge wins
 
@@ -241,10 +241,10 @@ promote it) → the next run knows. No code change.
 ## What the agent does not learn
 
 - It does not fine-tune or train the model; nothing about your cluster leaves the
-  request it was sent with. Whether the provider may keep or train on that request is
-  set by its terms ([model-providers.md](model-providers.md#data-handling-and-errors));
-  Azure AI Foundry does not train on your prompts.
+    request it was sent with. Whether the provider may keep or train on that request is
+    set by its terms ([model-providers.md](model-providers.md#data-handling-and-errors));
+    Azure AI Foundry does not train on your prompts.
 - It does not learn from its findings: the findings history is used for
-  new / still open / resolved, not as knowledge.
+    new / still open / resolved, not as knowledge.
 - It cannot see what nobody wrote down. If an important fact is only in people's
-  heads, the agent will flag it as a problem until someone adds it.
+    heads, the agent will flag it as a problem until someone adds it.

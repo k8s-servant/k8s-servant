@@ -5,7 +5,7 @@ This runbook sets up the language model the agent uses: a chat model deployed in
 Follow the steps in order. Each step explains what you are doing and why, and gives
 both the portal path and the `az` CLI commands.
 
-New to Foundry? Read [foundry-concepts.md](foundry-concepts.md) first. It explains
+New to Foundry? Read [Foundry concepts](concepts.md) first. It explains
 resources, deployments, quota, cost and access, and whether to use a shared or a
 dedicated resource.
 
@@ -14,7 +14,7 @@ the resource group, the Foundry resource and the model deployment, gives you the
 data-plane role, and prints the `.env` values. It is safe to re-run: existing parts
 are skipped, and a missing resource group is created. Networking (Step 5) stays
 manual. A suggested layout is one resource for non-prod clusters and one for prod
-([layout](foundry-concepts.md#layout-one-resource-for-non-prod-one-for-prod)):
+([layout](concepts.md#layout-one-resource-for-non-prod-one-for-prod)):
 
 ```bash
 # ./scripts/setup-foundry.sh <subscription> <resource-group> <foundry-name> <location>
@@ -65,7 +65,7 @@ Links to the sources are at the end of each section and in [Reference](#12-refer
 **Why this API.** For GPT and other OpenAI-style models the agent uses the standard
 `openai` Python SDK with the Responses API (`LLM_PROVIDER=foundry`), which, unlike Chat
 Completions, can carry a reasoning model's hidden steps between tool calls
-([model-providers.md](model-providers.md#why-three-apis)). Claude on Foundry uses the
+([model-providers.md](../../model-providers.md#why-three-apis)). Claude on Foundry uses the
 Messages API and partner models with only Chat Completions use `openai-compatible`
 (recipes in the same page). Changing the model within a provider later
 only changes `LLM_MODEL`.
@@ -77,16 +77,16 @@ rotated.
 ## 2. Prerequisites
 
 - **Azure CLI** 2.60 or newer (`az version`), logged in with `az login`, on the right
-  subscription (`az account set --subscription "<name or id>"`).
+    subscription (`az account set --subscription "<name or id>"`).
 - **Permissions on the target resource group:**
-  - *Contributor*, to create the resource and deployments;
-  - *User Access Administrator* or *Owner*, to assign roles in Step 4.
+    - *Contributor*, to create the resource and deployments;
+    - *User Access Administrator* or *Owner*, to assign roles in Step 4.
 - **A region with the model you want.**
-  - For EU data residency choose an EU region, for example **Sweden Central** or **West
-    Europe**. gpt-5.4-mini is offered there as GlobalStandard and DataZoneStandard.
-  - Check before you start, using the commands in Step 2.
+    - For EU data residency choose an EU region, for example **Sweden Central** or **West
+        Europe**. gpt-5.4-mini is offered there as GlobalStandard and DataZoneStandard.
+    - Check before you start, using the commands in Step 2.
 - **Quota.** New subscriptions have a default tokens-per-minute (TPM) quota per model and
-  region. Raising it is a request in the portal (Foundry → Quota).
+    region. Raising it is a request in the portal (Foundry → Quota).
 
 Set variables used in the commands below:
 
@@ -173,20 +173,20 @@ differs.
 `--sku-capacity` is in **units of 1,000 tokens per minute** (TPM). Rough sizing:
 
 - One `ask` uses about 5–15 model calls. Each call resends the system prompt and the
-  conversation so far, about 10k–40k tokens at the end of a long investigation, so one
-  question totals about **100k–300k tokens over 1–3 minutes**.
+    conversation so far, about 10k–40k tokens at the end of a long investigation, so one
+    question totals about **100k–300k tokens over 1–3 minutes**.
 - An hourly health check is similar. **Measured on a test cluster (~600 Deployments, ~1,250 pods):**
-  150k–225k tokens per check, about 10 model calls in 2–3 minutes, with peaks of
-  about 90k tokens in one minute. The log line `model call: N prompt + M completion
-  tokens` shows the usage of every call.
+    150k–225k tokens per check, about 10 model calls in 2–3 minutes, with peaks of
+    about 90k tokens in one minute. The log line `model call: N prompt + M completion
+    tokens` shows the usage of every call.
 - With 50 (= 50k TPM) deep checks hit HTTP 429 (the SDK retries, which slows a
-  check down and can still fail). **Use 150–200** if the subscription's quota allows
-  it (Foundry portal → **Quota**). Capacity only limits throughput; you pay for tokens
-  used, not for capacity. Change an existing deployment in the Foundry portal:
-  **Models + endpoints** → the deployment → **Edit** → **Tokens per Minute Rate Limit**.
+    check down and can still fail). **Use 150–200** if the subscription's quota allows
+    it (Foundry portal → **Quota**). Capacity only limits throughput; you pay for tokens
+    used, not for capacity. Change an existing deployment in the Foundry portal:
+    **Models + endpoints** → the deployment → **Edit** → **Tokens per Minute Rate Limit**.
 - **Reasoning effort.** gpt-5.x models reason only when the request asks for it. The
-  agent sends `reasoning_effort` = `LLM_REASONING_EFFORT` (default `medium`).
-  Without it gpt-5.4-mini answered after 3 shallow tool calls and missed firing alerts.
+    agent sends `reasoning_effort` = `LLM_REASONING_EFFORT` (default `medium`).
+    Without it gpt-5.4-mini answered after 3 shallow tool calls and missed firing alerts.
 
 ### Deploy
 
@@ -223,7 +223,7 @@ decides what happens when Microsoft releases a newer one:
 
 With `OnceCurrentVersionExpired`, upgrading is your decision: deploy the new version on
 non-prod, test, then change prod (see
-[foundry-concepts.md](foundry-concepts.md)). Before the retirement date, plan the move.
+[Foundry concepts](concepts.md)). Before the retirement date, plan the move.
 
 The CLI cannot set the policy (`az cognitiveservices account deployment` has no option
 for it), so the script sets it on the ARM resource, also on an existing deployment:
@@ -268,12 +268,12 @@ LLM_AUTH=entra
 ```
 
 - **Use the `<name>.openai.azure.com` hostname.** The v1 API is documented for
-  `https://<name>.openai.azure.com/openai/v1/` and
-  `https://<name>.services.ai.azure.com/openai/v1/`. If `properties.endpoint` prints a
-  `*.cognitiveservices.azure.com` URL, build the `openai.azure.com` one from your
-  custom subdomain.
+    `https://<name>.openai.azure.com/openai/v1/` and
+    `https://<name>.services.ai.azure.com/openai/v1/`. If `properties.endpoint` prints a
+    `*.cognitiveservices.azure.com` URL, build the `openai.azure.com` one from your
+    custom subdomain.
 - **You do not need to add `/openai/v1/`.** The agent appends it (see
-  `normalize_endpoint` in `k8s_servant/llm/providers.py`). The endpoint must start with `https://`.
+    `normalize_endpoint` in `k8s_servant/llm/providers.py`). The endpoint must start with `https://`.
 - `LLM_MODEL` is the **deployment name** from Step 2, not the model name.
 
 ## 6. Step 4: Give access
@@ -283,15 +283,16 @@ The agent authenticates with **Entra ID**. Whoever calls the model needs a
 manage the resource but cannot call models.
 
 **Which role.** It depends on the model ([Microsoft Learn](https://learn.microsoft.com/azure/foundry/foundry-models/how-to/configure-entra-id#troubleshooting)):
+
 - **GPT and other OpenAI models:** **Cognitive Services OpenAI User** on the Foundry
-  resource. It is the least-privileged role that can call them, and it grants access to
-  OpenAI models only.
+    resource. It is the least-privileged role that can call them, and it grants access to
+    OpenAI models only.
 - **Claude and other non-OpenAI models** (DeepSeek, Llama, Grok, partner models):
-  **Cognitive Services User**. *Cognitive Services OpenAI User* is not enough for them.
-  `scripts/setup-workload-identity.sh` assigns it when run with
-  `MODEL_ROLE="Cognitive Services User"`.
+    **Cognitive Services User**. *Cognitive Services OpenAI User* is not enough for them.
+    `scripts/setup-workload-identity.sh` assigns it when run with
+    `MODEL_ROLE="Cognitive Services User"`.
 - *Foundry User* (formerly *Azure AI User*) also works for both but is broader, granting
-  all Foundry data actions.
+    all Foundry data actions.
 
 Role assignments take **up to about 5 minutes** to apply.
 
@@ -320,7 +321,7 @@ The agent pod authenticates with AKS **Workload Identity**: a user-assigned mana
 identity with a federated credential for the agent's ServiceAccount.
 `scripts/setup-workload-identity.sh` creates the identity and assigns it this
 role (set `MODEL_ROLE="Cognitive Services User"` for Claude and other non-OpenAI models;
-[deployment.md](deployment.md#1-workload-identity-aks)). Done by hand, the assignment is:
+[deployment.md](../../deployment.md#1-workload-identity-aks)). Done by hand, the assignment is:
 
 ```bash
 az role assignment create \
@@ -338,6 +339,7 @@ az cognitiveservices account keys list --name "$FOUNDRY" --resource-group "$RG"
 ```
 
 Keys are discouraged:
+
 - they are long-lived shared secrets;
 - anyone holding one can use the model;
 - they need rotation.
@@ -362,7 +364,7 @@ Foundry resource (for example because the resource lives in another tenant or
 subscription that you do not control), use a Foundry **API key** kept in Key Vault:
 Workload Identity still reads the key from Key Vault, and `LLM_AUTH: api-key` uses it.
 Deliver the key as a Secret or mounted file as in
-[model-providers.md](providers/openai.md) (`llmApiKey.existingSecret` or
+[model-providers.md](../openai.md) (`llmApiKey.existingSecret` or
 `llmApiKey.file`). In that case do not disable local auth on that resource.
 
 **Token scope.** The agent requests tokens for `https://ai.azure.com/.default`, the
@@ -399,19 +401,19 @@ az network private-endpoint create \
 ```
 
 - **Private DNS zones**, one per hostname you use, each linked to the VNets whose DNS
-  the cluster uses (the hub DNS):
-  - `privatelink.openai.azure.com`: **required**, because the agent uses
-    `<name>.openai.azure.com`.
-  - `privatelink.services.ai.azure.com` and `privatelink.cognitiveservices.azure.com`:
-    add them if you use those hostnames, for example from the portal.
+    the cluster uses (the hub DNS):
+    - `privatelink.openai.azure.com`: **required**, because the agent uses
+        `<name>.openai.azure.com`.
+    - `privatelink.services.ai.azure.com` and `privatelink.cognitiveservices.azure.com`:
+        add them if you use those hostnames, for example from the portal.
 - **Check the result.** From inside the cluster, `<name>.openai.azure.com` must
-  resolve to the private IP of the endpoint.
+    resolve to the private IP of the endpoint.
 - **Close public access** once private access works: in the portal, **Networking** →
-  **Public network access: Disabled**.
+    **Public network access: Disabled**.
 - **Ownership.** Private DNS zones and firewall rules often belong to a network team.
-  Request them with the resource ID and the hostname.
+    Request them with the resource ID and the hostname.
 
-**Testing from inside the cluster.** Once the agent is deployed ([deployment.md](deployment.md)), run
+**Testing from inside the cluster.** Once the agent is deployed ([deployment.md](../../deployment.md)), run
 `kubectl -n k8s-servant exec deploy/k8s-servant -c agent -- k8s-servant doctor`.
 Its `model` line proves DNS, network, authentication and deployment in one go.
 
@@ -450,42 +452,44 @@ The `model` check sends one tiny request. If it fails, the line says why; see
 ## 9. Cost and limits
 
 - **Billing.** You pay **per token**, with input and output priced separately (per 1M
-  tokens; prices on the
-  [Azure OpenAI pricing page](https://azure.microsoft.com/pricing/details/azure-openai/)).
-  For reasoning models, internal reasoning tokens are billed as output.
+    tokens; prices on the
+    [Azure OpenAI pricing page](https://azure.microsoft.com/pricing/details/azure-openai/)).
+    For reasoning models, internal reasoning tokens are billed as output.
 - **Capacity (TPM)** limits throughput only. An idle deployment costs nothing.
 - **Typical usage.** One `ask` is about 100k–300k tokens. An hourly health check
-  is about 24 such runs a day (fewer when unchanged checks are skipped). Multiply by the per-token price of your model
-  for a daily estimate; mini models keep this small.
+    is about 24 such runs a day (fewer when unchanged checks are skipped). Multiply by the per-token price of your model
+    for a daily estimate; mini models keep this small.
 - **Budget alert.** Azure portal → **Cost Management** → **Budgets** → create one on the
-  resource group, filtered to the Foundry resource, with an email alert at for example
-  80%. A budget alerts but does not stop spending.
+    resource group, filtered to the Foundry resource, with an email alert at for example
+    80%. A budget alerts but does not stop spending.
 
 Sources: [Manage costs](https://learn.microsoft.com/azure/foundry/concepts/manage-costs).
 
 ## 10. Content safety and data handling
 
 - **Content filter.** Every deployment has a default guardrail:
-  - hate, sexual, violence and self-harm are filtered at *Medium* on prompts and
-    completions;
-  - Prompt Shields (jailbreak) and protected-material checks are on.
+    - hate, sexual, violence and self-harm are filtered at *Medium* on prompts and
+        completions;
+    - Prompt Shields (jailbreak) and protected-material checks are on.
 
-  A filtered request returns HTTP 400 with `content_filter`. Normal cluster data does
-  not trigger it.
+    A filtered request returns HTTP 400 with `content_filter`. Normal cluster data does
+    not trigger it.
+
 - **Your data.**
-  - Prompts and completions are **not used to train models** and are not shared with
-    OpenAI. The models keep no state between requests.
-  - Abuse monitoring may store flagged content for review in the resource's geography
-    (for an EU resource, reviewers are in the EEA).
-- **What the agent sends.** The system prompt (rules, environment description, skill
-  catalog) and the outputs of its tools: object names, statuses, events and log lines.
-  **Secrets are never sent**:
-  - the kubectl tool refuses them;
-  - the MCP server is configured to deny them;
-  - in the cluster, RBAC forbids them;
-  - the MCP `config` toolset, which would expose the kubeconfig, is disabled.
+    - Prompts and completions are **not used to train models** and are not shared with
+        OpenAI. The models keep no state between requests.
+    - Abuse monitoring may store flagged content for review in the resource's geography
+        (for an EU resource, reviewers are in the EEA).
 
-  Remember that application **logs** can contain sensitive data if applications log it.
+- **What the agent sends.** The system prompt (rules, environment description, skill
+    catalog) and the outputs of its tools: object names, statuses, events and log lines.
+    **Secrets are never sent**:
+    - the kubectl tool refuses them;
+    - the MCP server is configured to deny them;
+    - in the cluster, RBAC forbids them;
+    - the MCP `config` toolset, which would expose the kubeconfig, is disabled.
+
+    Remember that application **logs** can contain sensitive data if applications log it.
 
 Sources: [Default safety policies](https://learn.microsoft.com/azure/foundry/guardrails/default-safety-policies),
 [Data privacy](https://learn.microsoft.com/azure/foundry/responsible-ai/openai/data-privacy),
@@ -504,7 +508,7 @@ Sources: [Default safety policies](https://learn.microsoft.com/azure/foundry/gua
 | **410** | The model version has been retired | Deploy a current model (Step 2) |
 | **429** | Tokens-per-minute or requests-per-minute exceeded | The SDK retries automatically (3×). If it persists, raise `--sku-capacity` |
 | "cannot reach LLM_ENDPOINT" / timeout | DNS, firewall or private endpoint problem; on a laptop, VPN or proxy | Step 5; `nslookup <name>.openai.azure.com`; try the curl test |
-| "could not get an Entra ID token" (`CredentialUnavailableError`) | No credential found: not logged in locally, or Workload Identity not set up in the pod | `az login`; in the cluster check the ServiceAccount annotation and the federated credential ([deployment.md](deployment.md#1-workload-identity-aks)) |
+| "could not get an Entra ID token" (`CredentialUnavailableError`) | No credential found: not logged in locally, or Workload Identity not set up in the pod | `az login`; in the cluster check the ServiceAccount annotation and the federated credential ([deployment.md](../../deployment.md#1-workload-identity-aks)) |
 | `LLM_ENDPOINT must start with https://` | Endpoint typo | Use the value from Step 3 |
 
 Source: [Troubleshoot errors](https://learn.microsoft.com/azure/foundry/openai/how-to/troubleshoot-errors).

@@ -1,8 +1,8 @@
 # Claude on Azure AI Foundry
 
 **Choose it when** you want Claude but inside Azure: same Entra ID sign-in and billing as
-the [Foundry recipe](foundry.md), with Claude's Messages API. Deploy a Claude model in your Foundry
-resource first ([foundry-setup.md](../foundry-setup.md), Step 2, choose a Claude model).
+the [Foundry recipe](gpt.md), with Claude's Messages API. Deploy a Claude model in your Foundry
+resource first ([Foundry setup guide](setup.md), Step 2, choose a Claude model).
 
 Laptop `.env`:
 
@@ -28,7 +28,7 @@ appConfig:
   LLM_AUTH: entra
 ```
 
-Entra ID setup is the same as for [Foundry](foundry.md),
+Entra ID setup is the same as for [Foundry](gpt.md),
 except for the role: *Cognitive Services OpenAI User* covers only OpenAI models, and
 Claude needs *Cognitive Services User* ([Microsoft Learn](https://learn.microsoft.com/azure/foundry/foundry-models/how-to/configure-entra-id#troubleshooting)). Run
 `MODEL_ROLE="Cognitive Services User" scripts/setup-workload-identity.sh ...`, then put the

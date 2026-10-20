@@ -61,10 +61,10 @@ resolved.
 `test (py3.14)`, `helm` and `docker`. Requiring each of them would cause two problems:
 
 - **Renames break merging.** Adding Python 3.15 creates a check nobody requires;
-  dropping 3.12 leaves the ruleset waiting forever for `test (py3.12)`, and every PR is
-  stuck.
+    dropping 3.12 leaves the ruleset waiting forever for `test (py3.12)`, and every PR is
+    stuck.
 - **Skipped counts as passed.** GitHub treats a skipped required job as success, so a
-  job skipped after an earlier failure could make a PR look mergeable.
+    job skipped after an earlier failure could make a PR look mergeable.
 
 So `ci.yml` ends with a small job, `CI result`, that waits for the others and checks how
 each one ended. The ruleset requires only that name:
@@ -115,11 +115,11 @@ template or value fails here instead of on a user's cluster.
 ### docker: buildx and Trivy
 
 - Builds the image (amd64) and runs `k8s-servant --help` inside it. The image is thrown
-  away; nothing is pushed.
+    away; nothing is pushed.
 - [Trivy](https://trivy.dev/) scans the image's Alpine packages, Python packages and Go
-  binaries (kubectl) for known vulnerabilities.
+    binaries (kubectl) for known vulnerabilities.
 - Fixable **CRITICAL** findings fail the check. **HIGH** findings are reported only,
-  because upstream kubectl builds often lag behind Go security patches for weeks.
+    because upstream kubectl builds often lag behind Go security patches for weeks.
 
 Locally:
 
@@ -159,13 +159,13 @@ Locally: `gitleaks git .` (history) or `gitleaks dir .` (files only).
 Workflows hold write tokens and secrets, so they get their own linter. It catches:
 
 - **template injection**, e.g. `run: echo ${{ github.event.issue.title }}`, which lets
-  anyone who opens an issue run shell commands in CI;
+    anyone who opens an issue run shell commands in CI;
 - **excessive permissions** on jobs;
 - **unpinned actions** (`@v1` instead of a commit SHA);
 - **leaked checkout credentials** (missing `persist-credentials: false`);
 - **dangerous triggers** such as `pull_request_target` and `issue_comment`. The one use of
-  `issue_comment`, in `claude.yml`, is gated to trusted authors and carries an inline
-  ignore that explains why;
+    `issue_comment`, in `claude.yml`, is gated to trusted authors and carries an inline
+    ignore that explains why;
 - **actions with known vulnerabilities** (online audit).
 
 Locally: `uvx zizmor .`
@@ -175,13 +175,13 @@ Locally: `uvx zizmor .`
 A GitHub service, not a CLI:
 
 1. GitHub's **dependency graph** parses the manifests: `pyproject.toml`, the `uses:` lines
-   in workflows, and others.
+      in workflows, and others.
 2. On a PR, the Action asks GitHub's API for the **difference** between the graph of the
-   base branch and the PR head: packages added, removed or changed.
+      base branch and the PR head: packages added, removed or changed.
 3. Each added or changed package is checked against the **GitHub Advisory Database** and
-   its declared license.
+      its declared license.
 4. The check fails on a new dependency with a **HIGH or CRITICAL** advisory, or a license
-   that cannot ship under Apache-2.0 (GPL-3.0, AGPL-3.0), and writes a summary on the PR.
+      that cannot ship under Apache-2.0 (GPL-3.0, AGPL-3.0), and writes a summary on the PR.
 
 Its limit: it sees only what the manifests declare. Without a lockfile it checks the
 version ranges in `pyproject.toml`, not every transitive package; Trivy covers what
@@ -213,11 +213,11 @@ on `main`.
 ### Why the title, not the commits
 
 - PRs are **squash-merged only**: the commits on a branch ("wip", "fix typo") are
-  squashed away, so contributors never have to rewrite history.
+    squashed away, so contributors never have to rewrite history.
 - The repository is set so the squash commit message is the **PR title**: only the title
-  reaches `main`, as one commit.
+    reaches `main`, as one commit.
 - **release-please** reads the commits on `main` to choose the next version and write the
-  changelog.
+    changelog.
 
 ### Where the rules come from
 
@@ -252,11 +252,11 @@ When you add a type to `pr-title.yml`, add it to `changelog-sections` in
 ### How the check works
 
 1. It runs when a PR is opened, gets new commits, or **its title is edited**. Fixing the
-   title re-runs the check by itself.
+      title re-runs the check by itself.
 2. It reads the title from the event payload and never checks out code, so it is safe on
-   fork PRs.
+      fork PRs.
 3. It parses `type(scope)!: subject`: a type from the list, an optional scope, `!` for a
-   breaking change, and a lowercase subject.
+      breaking change, and a lowercase subject.
 4. The result is the required `pr-title` check.
 
 You can **open** a PR with any title, but it cannot be **merged** until the check passes.
@@ -310,10 +310,10 @@ code runs inside the job, next to the Claude credential. So the tests are switch
 unless **both** of these are true:
 
 - the issue or PR, and every comment in its thread (including PR review comments and
-  review bodies), was written by the owner, a member or a collaborator. Only
-  `claude[bot]` and `github-actions[bot]` are exempt; any other bot counts as an
-  outsider, since it may repost someone else's text. Outsider-written text could try
-  to steer Claude into writing and running hostile code;
+    review bodies), was written by the owner, a member or a collaborator. Only
+    `claude[bot]` and `github-actions[bot]` are exempt; any other bot counts as an
+    outsider, since it may repost someone else's text. Outsider-written text could try
+    to steer Claude into writing and running hostile code;
 - for a PR, its branch is in this repository, not a fork.
 
 When they are off, Claude can still read, answer and push changes, but it runs nothing.
@@ -337,20 +337,20 @@ Runs on every push to `main`. The work is split between Google's
 [release-please](https://github.com/googleapis/release-please) bot and our own jobs:
 
 1. **The bot** reads the commits since the last tag. After a normal merge it opens or
-   updates one PR, `chore(main): release X.Y.Z`, which bumps the version in
-   `pyproject.toml` and `charts/k8s-servant/Chart.yaml` and writes `CHANGELOG.md`.
+      updates one PR, `chore(main): release X.Y.Z`, which bumps the version in
+      `pyproject.toml` and `charts/k8s-servant/Chart.yaml` and writes `CHANGELOG.md`.
 2. **You** merge that release PR when you want to ship. The bot never merges anything.
 3. On that merge the bot tags `vX.Y.Z`, creates the GitHub Release and sets
-   `release_created=true`.
+      `release_created=true`.
 4. **Our jobs** run only when `release_created` is true:
-   - `publish image` builds amd64 and arm64 images, pushes
-     `ghcr.io/k8s-servant/k8s-servant:X.Y.Z`, `:X.Y` and `:latest` with an SBOM and a
-     provenance attestation, and signs them with cosign (keyless, tied to this
-     workflow's identity);
-   - `publish chart` packages, pushes and signs the chart at
-     `oci://ghcr.io/k8s-servant/charts/k8s-servant`.
+      - `publish image` builds amd64 and arm64 images, pushes
+          `ghcr.io/k8s-servant/k8s-servant:X.Y.Z`, `:X.Y` and `:latest` with an SBOM and a
+          provenance attestation, and signs them with cosign (keyless, tied to this
+          workflow's identity);
+      - `publish chart` packages, pushes and signs the chart at
+          `oci://ghcr.io/k8s-servant/charts/k8s-servant`.
 
-   How users check these signatures: [verifying-releases.md](verifying-releases.md).
+      How users check these signatures: [verifying-releases.md](verifying-releases.md).
 
 The bot knows only about versions, changelogs, tags and releases. Anything else that
 should happen on a release is another job with the same `if:` condition.
@@ -386,27 +386,27 @@ The site at [k8s-servant.dev](https://k8s-servant.dev) is built from `docs/` wit
 `docs/superpowers/` are left out).
 
 - **On a PR** that touches `docs/`, `zensical.toml`, `pyproject.toml` or the workflow,
-  the `docs` job builds the site with `--strict`: a link to a missing page or heading
-  fails it. It is not a required check, because it does not run on every PR.
+    the `docs` job builds the site with `--strict`: a link to a missing page or heading
+    fails it. It is not a required check, because it does not run on every PR.
 - **On a merge to `main`** the same build is uploaded and the `deploy` job publishes it
-  to GitHub Pages. Only that job gets `pages: write` and `id-token: write`. The custom
-  domain is set in the repository's Pages settings, so there is no `CNAME` file.
+    to GitHub Pages. Only that job gets `pages: write` and `id-token: write`. The custom
+    domain is set in the repository's Pages settings, so there is no `CNAME` file.
 - **Locally:** `pip install -e '.[docs]'`, then `zensical serve` for a live preview, or
-  `zensical build --strict` for the CI check. Zensical is pinned exactly while it is in
-  alpha; Dependabot proposes updates.
+    `zensical build --strict` for the CI check. Zensical is pinned exactly while it is in
+    alpha; Dependabot proposes updates.
 
 ## Housekeeping: Scorecard, labels, Dependabot
 
 - **scorecard.yml**: [OpenSSF Scorecard](https://scorecard.dev/) grades the repository
-  against supply-chain practices (branch protection, pinned actions, signed releases,
-  security policy, code review) weekly and on push to `main`. It publishes the score
-  shown in the README badge and puts findings in the Security tab.
+    against supply-chain practices (branch protection, pinned actions, signed releases,
+    security policy, code review) weekly and on push to `main`. It publishes the score
+    shown in the README badge and puts findings in the Security tab.
 - **labels.yml**: makes the repository's labels match `.github/labels.yml` whenever that
-  file changes, so labels are reviewed in git instead of edited by hand.
+    file changes, so labels are reviewed in git instead of edited by hand.
 - **Dependabot** (`.github/dependabot.yml`, a config file, not a workflow): weekly grouped
-  PRs for Python packages, GitHub Actions SHAs and the Docker base image, with a 7-day
-  cooldown so brand-new releases are not picked up at once. It does not update the
-  kubectl version (a Dockerfile build argument).
+    PRs for Python packages, GitHub Actions SHAs and the Docker base image, with a 7-day
+    cooldown so brand-new releases are not picked up at once. It does not update the
+    kubectl version (a Dockerfile build argument).
 
 ## Conventions every workflow follows
 

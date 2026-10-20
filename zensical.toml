@@ -29,10 +29,11 @@ nav = [
     { "Ollama" = "providers/ollama.md" },
     { "OpenAI-compatible" = "providers/openai-compatible.md" },
     { "Azure AI Foundry" = [
-      { "GPT and other models" = "providers/foundry.md" },
-      { "Claude on Foundry" = "providers/foundry-claude.md" },
-      { "Concepts" = "foundry-concepts.md" },
-      { "Setup guide" = "foundry-setup.md" },
+      "providers/foundry/index.md",
+      { "GPT and other models" = "providers/foundry/gpt.md" },
+      { "Claude on Foundry" = "providers/foundry/claude.md" },
+      { "Concepts" = "providers/foundry/concepts.md" },
+      { "Setup guide" = "providers/foundry/setup.md" },
     ] },
   ] },
   { "Configure" = [

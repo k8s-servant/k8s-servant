@@ -30,11 +30,11 @@ each provider's recipe in [model-providers.md](model-providers.md) shows the exp
 | `Entra ID sign-in needs azure-identity` | The `azure` extra is missing outside the image | `pip install -e '.[azure]'` |
 | `HTTP 401` right after setup | The data-plane role takes ~5–10 minutes to apply | Wait, run `doctor` again |
 | `HTTP 401` with Claude or another non-OpenAI model | *Cognitive Services OpenAI User* covers only OpenAI models | Assign *Cognitive Services User* (`MODEL_ROLE="Cognitive Services User" scripts/setup-workload-identity.sh ...`) |
-| `HTTP 401` later | `az login` expired, wrong tenant, or the identity lacks the role | `az login`; check the role on the Foundry resource ([foundry-setup.md](foundry-setup.md#6-step-4-give-access)) |
-| `HTTP 403` | Network rules of the Foundry resource (public access disabled, IP not allowed) | Private endpoint / firewall ([foundry-setup.md](foundry-setup.md#7-step-5-networking)) |
+| `HTTP 401` later | `az login` expired, wrong tenant, or the identity lacks the role | `az login`; check the role on the Foundry resource ([Foundry setup guide](providers/foundry/setup.md#6-step-4-give-access)) |
+| `HTTP 403` | Network rules of the Foundry resource (public access disabled, IP not allowed) | Private endpoint / firewall ([Foundry setup guide](providers/foundry/setup.md#7-step-5-networking)) |
 | `HTTP 404` | `LLM_MODEL` is the model name instead of the deployment name, wrong resource, or a deployment younger than ~5 min | `az cognitiveservices account deployment list -g <rg> -n <resource> -o table` |
 | `HTTP 429 ... exceeded token rate limit` | The deployment's capacity is too low | Raise it to 150–200k TPM (Foundry portal → the deployment → Edit). It costs nothing extra: you pay per token |
-| `cannot reach LLM_ENDPOINT` | DNS or private endpoint | `nslookup <resource>.openai.azure.com`; the curl test in [foundry-setup.md](foundry-setup.md#8-step-6-smoke-test) |
+| `cannot reach LLM_ENDPOINT` | DNS or private endpoint | `nslookup <resource>.openai.azure.com`; the curl test in [Foundry setup guide](providers/foundry/setup.md#8-step-6-smoke-test) |
 
 ### Anthropic
 
@@ -107,11 +107,11 @@ each provider's recipe in [model-providers.md](model-providers.md) shows the exp
 ## Cost higher than expected
 
 - Check the log lines `model call: N prompt (M cached) + K completion tokens`. Cached
-  prompt tokens are billed at a discount.
+    prompt tokens are billed at a discount.
 - Most hourly checks should be `Health check skipped ... unchanged`. If not, see
-  "Scheduled checks never say Unchanged" above.
+    "Scheduled checks never say Unchanged" above.
 - `TOOL_OUTPUT_MAX_CHARS` (default 8,000) limits how much each tool result adds to
-  every later call.
+    every later call.
 - Fewer full checks: a longer `CHECK_INTERVAL_MINUTES` or `CHECK_FULL_INTERVAL_HOURS`.
 - Set a budget alert with your provider; on Foundry, on the resource group
-  ([foundry-setup.md](foundry-setup.md#9-cost-and-limits)).
+    ([Foundry setup guide](providers/foundry/setup.md#9-cost-and-limits)).

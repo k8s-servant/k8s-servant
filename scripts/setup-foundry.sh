@@ -19,7 +19,7 @@
 #      user, so `k8s-servant doctor` / `ask` work from your laptop with `az login`.
 #   5. Prints the LLM_PROVIDER / LLM_ENDPOINT / LLM_MODEL values for .env.
 #
-# What it does NOT do (see docs/foundry-setup.md):
+# What it does NOT do (see docs/providers/foundry/setup.md):
 #   - Networking (private endpoint / firewall) for the private AKS clusters.
 #   - The agent's managed identity: scripts/setup-workload-identity.sh.
 #   - A budget alert: `az consumption budget create` cannot add e-mail
@@ -27,7 +27,7 @@
 #
 # Cost: the resource and an idle deployment are free; you pay per token used.
 #
-# Layout suggestion (docs/foundry-concepts.md): one resource for non-prod
+# Layout suggestion (docs/providers/foundry/concepts.md): one resource for non-prod
 # clusters and one for prod, each in the subscription and region you choose.
 #
 # Usage:
@@ -246,5 +246,5 @@ echo "  Azure portal -> Cost Management -> Budgets -> + Add"
 echo "  Scope: resource group '$RESOURCE_GROUP', monthly amount, alert at 80% to your e-mail."
 echo ""
 echo "Next for the cluster: private endpoint or firewall rule"
-echo "(docs/foundry-setup.md, Step 5) and scripts/setup-workload-identity.sh."
+echo "(docs/providers/foundry/setup.md, Step 5) and scripts/setup-workload-identity.sh."
 echo "======================================================================"

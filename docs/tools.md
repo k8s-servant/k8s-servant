@@ -26,25 +26,25 @@ Tools are registered in this order: MCP tools first (so they win a name clash), 
 ## How the model is told to use them
 
 - **Overall health questions start with the summary tools** (`cluster_problems`,
-  `warning_events`). They return only what is wrong, so they work on clusters that are
-  far too large to list (a test cluster: 615 Deployments, 1,252 pods, 3,700 Warning events).
+    `warning_events`). They return only what is wrong, so they work on clusters that are
+    far too large to list (a test cluster: 615 Deployments, 1,252 pods, 3,700 Warning events).
 - **Single objects, logs and metrics: MCP tools.** They are the preferred way to read
-  details.
+    details.
 - **`kubectl` is the fallback.** Its description starts with `FALLBACK:` when MCP is
-  available; when MCP is not, it is the only detailed tool and the system prompt says so.
+    available; when MCP is not, it is the only detailed tool and the system prompt says so.
 - **Skills first.** The model looks at the skill catalog, loads the matching skill and
-  follows it (`load_skill`).
+    follows it (`load_skill`).
 
 ## Every tool result is text, and errors never stop the investigation
 
 - A tool result longer than `TOOL_OUTPUT_MAX_CHARS` (default 8,000) is cut: two thirds
-  from the head, one third from the tail, with a marker telling the model to narrow
-  the query. Every later model call resends earlier results, so this limit also drives
-  the token cost.
+    from the head, one third from the tail, with a marker telling the model to narrow
+    the query. Every later model call resends earlier results, so this limit also drives
+    the token cost.
 - Failures come back as text starting with `ERROR:` instead of stopping the run: an
-  unknown tool, invalid arguments, a crash, a refused kubectl command, a timeout, or an
-  MCP call that failed. A failed MCP call also tells the model to narrow the query or
-  use another tool.
+    unknown tool, invalid arguments, a crash, a refused kubectl command, a timeout, or an
+    MCP call that failed. A failed MCP call also tells the model to narrow the query or
+    use another tool.
 
 ## `cluster_problems`
 
@@ -152,13 +152,13 @@ A guarded fallback for anything the other tools cannot show, for example
 `describe`, `auth can-i` or a field selector MCP does not support.
 
 - **Verbs:** `get`, `describe`, `logs`, `top`, `events`, `api-resources`,
-  `api-versions`, `explain`, `version`, `cluster-info`, `auth can-i`.
+    `api-versions`, `explain`, `version`, `cluster-info`, `auth can-i`.
 - **Flags:** only an allow-list of read flags (`-n`, `-A`, `-l`, `--field-selector`,
-  `--sort-by`, `-o`, `--tail`, `--since`, `-c`, `-p`, ...), parsed the way kubectl parses
-  them. **Output formats:** `wide`, `yaml`, `json`, `name`, `jsonpath=...`,
-  `custom-columns=...`.
+    `--sort-by`, `-o`, `--tail`, `--since`, `-c`, `-p`, ...), parsed the way kubectl parses
+    them. **Output formats:** `wide`, `yaml`, `json`, `name`, `jsonpath=...`,
+    `custom-columns=...`.
 - **Never:** Secrets, write verbs, `exec`, `port-forward`, flags that change the server,
-  user or kubeconfig, template files.
+    user or kubeconfig, template files.
 - No shell: arguments are passed as a list.
 
 Why an allow-list and which bypasses it closes: [security.md](security.md#why-the-kubectl-guard-is-an-allow-list).
@@ -169,10 +169,10 @@ Registered only when `PROMETHEUS_URL` / `ALERTMANAGER_URL` are set. GET requests
 
 - `prometheus_query`: an instant PromQL query (optionally at a past `time`).
 - `prometheus_query_range`: a query over a time range; each series is summarised as
-  first / last / min / max with timestamps ("when did it start", "is it getting
-  worse").
+    first / last / min / max with timestamps ("when did it start", "is it getting
+    worse").
 - `alertmanager_alerts`: alerts firing now (not silenced, not inhibited), most severe
-  first, optionally filtered by label matchers.
+    first, optionally filtered by label matchers.
 
 The `prometheus-queries` skill holds proven queries. An empty result is not proof
 that all is well.

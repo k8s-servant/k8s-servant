@@ -81,35 +81,36 @@ kind delete cluster --name k8s-servant-demo && rm -rf .data
 ## Going further
 
 - **Keep your settings.** `cp .env.example .env`, fill it in (no secrets in it: see
-  [Secrets: local vs cluster](configuration.md#secrets-local-vs-cluster)), then load it into each new
-  shell with `set -a; source .env; set +a`.
+    [Secrets: local vs cluster](configuration.md#secrets-local-vs-cluster)), then load it into each new
+    shell with `set -a; source .env; set +a`.
 - **The MCP server** (recommended; the agent falls back to kubectl without it). In its
-  own terminal, with the binary from its GitHub releases or through npm:
+    own terminal, with the binary from its GitHub releases or through npm:
 
-  ```bash
-  npx -y kubernetes-mcp-server@0.0.67 --config deploy/local/mcp-config.toml
-  ```
+    ```bash
+    npx -y kubernetes-mcp-server@0.0.67 --config deploy/local/mcp-config.toml
+    ```
 
-  Then `unset MCP_URL` in the shell you use for the agent (step 4 set it to empty, which
-  turns MCP off); unset, it defaults to `http://localhost:8080/mcp`.
+    Then `unset MCP_URL` in the shell you use for the agent (step 4 set it to empty, which
+    turns MCP off); unset, it defaults to `http://localhost:8080/mcp`.
+
 - **Prometheus and Alertmanager**, through port-forwards in their own terminals (adjust
-  namespace and service names to your monitoring stack), then set
-  `PROMETHEUS_URL=http://localhost:9090` and `ALERTMANAGER_URL=http://localhost:9093`.
-  Port-forwards drop now and then; restart them when `doctor` reports FAIL.
+    namespace and service names to your monitoring stack), then set
+    `PROMETHEUS_URL=http://localhost:9090` and `ALERTMANAGER_URL=http://localhost:9093`.
+    Port-forwards drop now and then; restart them when `doctor` reports FAIL.
 
-  ```bash
-  kubectl -n monitoring port-forward svc/prometheus-operated 9090
-  kubectl -n monitoring port-forward svc/alertmanager-operated 9093
-  ```
+    ```bash
+    kubectl -n monitoring port-forward svc/prometheus-operated 9090
+    kubectl -n monitoring port-forward svc/alertmanager-operated 9093
+    ```
 
 - **Your platform's knowledge**, the same files the cluster uses:
 
-  ```bash
-  alias kss='k8s-servant --values examples/knowledge-values.yaml --values my-values.yaml'
-  kss report           # the morning report, now
-  kss check --post     # a health check, posted to Teams (see [MS Teams setup](teams-setup.md))
-  kss serve            # the scheduler, as it runs in the cluster (Ctrl-C to stop)
-  ```
+    ```bash
+    alias kss='k8s-servant --values examples/knowledge-values.yaml --values my-values.yaml'
+    kss report           # the morning report, now
+    kss check --post     # a health check, posted to Teams (see [MS Teams setup](teams-setup.md))
+    kss serve            # the scheduler, as it runs in the cluster (Ctrl-C to stop)
+    ```
 
 `k8s-servant doctor` checks configuration, knowledge, memory, MCP, kubectl, RBAC,
 Prometheus, Alertmanager, Teams and the model, one line each. Run it first when

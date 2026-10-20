@@ -64,7 +64,7 @@ $ k8s-servant ask "Are there any unhealthy pods or nodes?"
 - Quotes are optional: `k8s-servant ask why is pod x pending` works.
 - Save just the answer: `k8s-servant ask "..." > answer.md`.
 - If the agent reaches `MAX_ITERATIONS`, it still answers with what it found, and the
-  summary line says `stopped at MAX_ITERATIONS`.
+    summary line says `stopped at MAX_ITERATIONS`.
 - The agent never changes anything. Ask it to fix something and it describes the fix.
 
 ## `check`
@@ -116,15 +116,16 @@ Exit codes:
 Produces the **morning report** now and prints it: how the cluster did since the
 previous morning report (usually the night; on Mondays the weekend; at most 72 h, 24 h
 if there was none) and what needs attention today:
+
 - it runs a fresh health check;
 - from memory: open findings; what appeared overnight and is still open, what was
-  resolved, and what **came and went** during the night; how many checks ran in full,
-  were skipped as unchanged, or failed;
+    resolved, and what **came and went** during the night; how many checks ran in full,
+    were skipped as unchanged, or failed;
 - alerts **firing now** (Alertmanager) and alerts that **fired overnight and stopped**
-  (Prometheus' `ALERTS` history; warning and critical only, without
-  `ALERTS_IGNORE_NAMES`);
+    (Prometheus' `ALERTS` history; warning and critical only, without
+    `ALERTS_IGNORE_NAMES`);
 - finally a short overview written by the model: how the night went and what to keep
-  an eye on today.
+    an eye on today.
 
 `--post` sends it to Teams unless `TEAMS_POST_MODE=off`.
 
@@ -156,6 +157,7 @@ UTC, see `MORNING_REPORT_TIMEZONE`) on weekdays. Running `report` by hand does n
 ## `serve`
 
 The scheduler, and the pod's main process in the cluster:
+
 - it runs a health check right away and then every `CHECK_INTERVAL_MINUTES` (default 60);
 - it runs the morning report when it is due;
 - it posts both to Teams according to `TEAMS_POST_MODE`;

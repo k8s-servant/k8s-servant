@@ -47,32 +47,32 @@ See [architecture.md](architecture.md#why-our-own-loop-and-no-framework).
 Honest notes from the first real runs:
 
 - **Run-to-run variation.** The model can judge the same evidence differently in two
-  runs (`azure-cns` restarts were "healthy now" once and "warning" the next time). A
-  finding can then appear and disappear in Teams. Explicit rules in the environment
-  description reduce this.
+    runs (`azure-cns` restarts were "healthy now" once and "warning" the next time). A
+    finding can then appear and disappear in Teams. Explicit rules in the environment
+    description reduce this.
 - **Name mix-ups.** It once reported a healthy workload whose name differed by one
-  character from the broken one. The prompt now asks for exact names; check the
-  evidence before acting.
+    character from the broken one. The prompt now asks for exact names; check the
+    evidence before acting.
 - **Detection comes from rules, explanation from the model.** On its own the model
-  missed firing alerts on a large cluster; `cluster_problems` (plain Python checks) is
-  what makes detection reliable. Problems outside those checks depend on the model
-  noticing them.
+    missed firing alerts on a large cluster; `cluster_problems` (plain Python checks) is
+    what makes detection reliable. Problems outside those checks depend on the model
+    noticing them.
 - **No measure of answer quality yet.** Tests prove the mechanics, not that the agent
-  finds the right problems. An evaluation set (saved cluster states with expected
-  findings) is planned.
+    finds the right problems. An evaluation set (saved cluster states with expected
+    findings) is planned.
 - **The summary cannot see everything** (Flux, node usage, certificates), so skipped
-  checks rely on a full check at least every 6 hours.
+    checks rely on a full check at least every 6 hours.
 - **One cluster per process**, single replica; memory is SQLite on a 1 Gi volume.
 - **Clusters that are recreated regularly** lose their memory with the volume, and a
-  new OIDC issuer needs the federated credential re-pointed
-  ([deployment.md](deployment.md#when-a-cluster-is-recreated)).
+    new OIDC issuer needs the federated credential re-pointed
+    ([deployment.md](deployment.md#when-a-cluster-is-recreated)).
 - **Model quality varies by provider and model.** All five providers are supported
-  ([model-providers.md](model-providers.md)), but small self-hosted models find
-  fewer problems than current hosted reasoning models. Bedrock and Vertex AI sign-in
-  are not supported yet.
+    ([model-providers.md](model-providers.md)), but small self-hosted models find
+    fewer problems than current hosted reasoning models. Bedrock and Vertex AI sign-in
+    are not supported yet.
 - **Notifications go to MS Teams only.** Slack and other channels are planned
-  ([#3](https://github.com/k8s-servant/k8s-servant/issues/3),
-  [#4](https://github.com/k8s-servant/k8s-servant/issues/4)).
+    ([#3](https://github.com/k8s-servant/k8s-servant/issues/3),
+    [#4](https://github.com/k8s-servant/k8s-servant/issues/4)).
 
 ## Cost and limits
 
@@ -89,19 +89,19 @@ tokens, at their own price:
 | Morning report | a full check + 1 overview call | a full check plus a small overview call | ~1–2 min |
 
 - **Rate limits.** A full check's busiest minute uses about 90k tokens, so your
-  provider's tokens-per-minute limit must cover that, or deep checks fail with
-  `HTTP 429`. On Azure AI Foundry, give the deployment 150–200k TPM (raising it costs
-  nothing).
+    provider's tokens-per-minute limit must cover that, or deep checks fail with
+    `HTTP 429`. On Azure AI Foundry, give the deployment 150–200k TPM (raising it costs
+    nothing).
 - **Monthly cost** depends on how often something changes, because unchanged hours
-  are free. For gpt-5.4-mini, a rough estimate from public price lists was about
-  $0.10–0.20 per full check, so from roughly $10–30 a month per cluster when most hours
-  are quiet to $70–160 if every hour ran in full. Prices change and differ by model and
-  region: check your provider's current price list.
+    are free. For gpt-5.4-mini, a rough estimate from public price lists was about
+    $0.10–0.20 per full check, so from roughly $10–30 a month per cluster when most hours
+    are quiet to $70–160 if every hour ran in full. Prices change and differ by model and
+    region: check your provider's current price list.
 - **Levers:** `CHECK_SKIP_UNCHANGED`, `CHECK_FULL_INTERVAL_HOURS`,
-  `CHECK_INTERVAL_MINUTES`, `TOOL_OUTPUT_MAX_CHARS`, `LLM_REASONING_EFFORT`.
+    `CHECK_INTERVAL_MINUTES`, `TOOL_OUTPUT_MAX_CHARS`, `LLM_REASONING_EFFORT`.
 - Every model call is logged with its tokens: `model call: N prompt (M cached) + K
-  completion tokens (R reasoning)`. Set a budget alert with your provider (on Foundry: the resource group).
+    completion tokens (R reasoning)`. Set a budget alert with your provider (on Foundry: the resource group).
 
 More: [model-providers.md](model-providers.md); for Azure AI Foundry,
-[foundry-setup.md](foundry-setup.md#9-cost-and-limits) and
-[foundry-concepts.md](foundry-concepts.md).
+[Foundry setup guide](providers/foundry/setup.md#9-cost-and-limits) and
+[Foundry concepts](providers/foundry/concepts.md).

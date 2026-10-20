@@ -41,10 +41,11 @@ check of scheduled runs.
 | `load_skill` | A skill's Markdown | Passed through | 2–5 KB |
 
 For the morning report's history, two more reductions happen without the model:
+
 - **Alerts that fired overnight** come from one Prometheus query that already
-  aggregates (`max by (alertname, severity, namespace, pod, node, job)`); Python then
-  drops always-firing alerts (`ALERTS_IGNORE_NAMES`), info-level alerts and those still
-  firing.
+    aggregates (`max by (alertname, severity, namespace, pod, node, job)`); Python then
+    drops always-firing alerts (`ALERTS_IGNORE_NAMES`), info-level alerts and those still
+    firing.
 - **Findings history** is computed from memory (below); only the result is sent.
 
 ## ② Size cap on every tool result
@@ -74,18 +75,18 @@ look anything up, so it can only summarise what Python gave it.
 The model's output is never trusted as-is:
 
 - **Findings JSON.** The answer of a health check must end with a JSON block. It is
-  parsed and validated: it must be an object with a `findings` list, and every finding
-  must have a fingerprint. An unknown severity becomes `warning` (logged); a missing
-  title falls back to the fingerprint. Invalid → one follow-up asking only for the
-  JSON; still invalid → the run is recorded as failed and **memory is not changed**.
+    parsed and validated: it must be an object with a `findings` list, and every finding
+    must have a fingerprint. An unknown severity becomes `warning` (logged); a missing
+    title falls back to the fingerprint. Invalid → one follow-up asking only for the
+    JSON; still invalid → the run is recorded as failed and **memory is not changed**.
 - **Fingerprints are normalised** (lower case, spaces around `/` removed, words joined
-  with `-`), because the model does not always spell them the same way.
+    with `-`), because the model does not always spell them the same way.
 - **Duplicate fingerprints** in one answer are merged, keeping the most severe one.
 - **Learned notes** (`save_note`): whitespace and newlines collapsed to one line; rejected
-  if empty or longer than 500 characters; logged at WARNING.
+    if empty or longer than 500 characters; logged at WARNING.
 - **Tool calls**: unknown tools, invalid JSON arguments and invalid values
-  (namespace, event reason, time window, kubectl flags) are refused with `ERROR:` text
-  before anything runs.
+    (namespace, event reason, time window, kubectl flags) are refused with `ERROR:` text
+    before anything runs.
 
 ## ⑤ Facts computed in Python, not by the model
 
@@ -102,27 +103,27 @@ The model never decides what is "new" or "resolved"; it only reports what it see
 ## ⑥ Shaping the output
 
 - **Markdown reports** (stdout, history): rendered from the parsed findings and the
-  facts, not copied from the model's free text (except the summary/overview).
+    facts, not copied from the model's free text (except the summary/overview).
 - **Teams cards**: built from the same data; if larger than 27,000 bytes, details are
-  shortened step by step and lists cut with "… and N more".
+    shortened step by step and lists cut with "… and N more".
 - **Logs**: tool calls are logged with their arguments and output **size**; full
-  outputs only at DEBUG. The webhook URL is never logged.
+    outputs only at DEBUG. The webhook URL is never logged.
 
 ## What is NOT done
 
 Being explicit matters here:
 
 - **No redaction or masking.** Text that is passed through (logs from `pods_log` or
-  `kubectl logs`, event messages, ConfigMap contents, annotations, describe output)
-  reaches the model as it is. If an application writes personal data or a credential
-  into its logs, the model can see it, and it can end up in an answer, the history and
-  Teams. Secrets themselves are never read (RBAC, MCP denied resources, the kubectl
-  guard).
+    `kubectl logs`, event messages, ConfigMap contents, annotations, describe output)
+    reaches the model as it is. If an application writes personal data or a credential
+    into its logs, the model can see it, and it can end up in an answer, the history and
+    Teams. Secrets themselves are never read (RBAC, MCP denied resources, the kubectl
+    guard).
 - **No anonymisation.** Object names, namespaces, node names and IP addresses in
-  messages are sent unchanged; the model needs them to investigate.
+    messages are sent unchanged; the model needs them to investigate.
 - **No local filtering of what the model asks for.** Within the read-only tools, the
-  model chooses what to read (for example which pod's logs). Limits apply (tail, size
-  cap), content filtering does not.
+    model chooses what to read (for example which pod's logs). Limits apply (tail, size
+    cap), content filtering does not.
 
 Mitigations: logs are read only when investigating a specific problem, with a tail;
 you choose the provider, so read its data and retention terms

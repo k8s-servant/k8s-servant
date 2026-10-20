@@ -5,6 +5,7 @@ drifted once already (2026-10-12), so every setting read in config.py must be li
 there, and every variable in the tables must still exist.
 """
 
+import itertools
 import re
 from pathlib import Path
 
@@ -94,11 +95,41 @@ def test_anchors_are_the_same_on_github_and_on_the_site():
     assert not differ, "reword the heading so its anchor has no '--' or trailing '-':\n" + "\n".join(differ)
 
 
+def _lines_outside_code(page: Path) -> list[tuple[int, str]]:
+    text = page.read_text()
+    # Skip YAML front matter (page settings such as `hide:`), which is not Markdown.
+    skip = text.split("\n---\n", 1)[0].count("\n") + 2 if text.startswith("---\n") else 0
+    lines, fenced = [], False
+    for number, line in enumerate(text.split("\n"), 1):
+        if number <= skip:
+            continue
+        if re.match(r"\s*(```|~~~)", line):
+            fenced = not fenced
+        elif not fenced:
+            lines.append((number, line))
+    return lines
+
+
+def test_lists_render_the_same_on_github_and_on_the_site():
+    # The site's Markdown needs 4 spaces to nest a list or a code block in a list item,
+    # and a blank line before a list that follows a paragraph. GitHub needs neither.
+    problems = []
+    for page in SITE_PAGES:
+        lines = _lines_outside_code(page)
+        for (_, prev), (number, line) in itertools.pairwise(lines):
+            if re.match(r" {1,3}([-*]|\d+\.) ", line):
+                problems.append(f"{page.name}:{number}: indent the nested list by 4 spaces")
+            elif re.match(r"([-*]|\d+\.) ", line) and prev.strip() and not re.match(r"\s*([-*]|\d+\.) |\s|[|#>]", prev):
+                problems.append(f"{page.name}:{number}: add a blank line before the list")
+    assert not problems, "\n".join(problems)
+
+
 # --- model providers ---------------------------------------------------------------
 
 PROVIDERS_PAGE = DOCS / "model-providers.md"
 # One recipe page per LLM_PROVIDER value, plus Claude on Foundry (anthropic on a Foundry endpoint).
-RECIPES = [*PROVIDERS, "foundry-claude"]
+# Foundry's pages live in their own folder, so its sidebar section has an index page.
+RECIPES = [*(p for p in PROVIDERS if p != "foundry"), "foundry/gpt", "foundry/claude"]
 
 
 def test_every_provider_has_a_recipe_page_linked_from_the_overview():

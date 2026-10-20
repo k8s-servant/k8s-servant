@@ -24,18 +24,18 @@
 ```
 
 1. A question (or "run the health check skill") and a system prompt go to the model.
-   The system prompt holds the rules, the environment description, cluster notes,
-   learned notes and the skill catalog.
+      The system prompt holds the rules, the environment description, cluster notes,
+      learned notes and the skill catalog.
 2. The model asks for tools. For health it starts with the **summary tools**:
-   `cluster_problems` returns only what is unhealthy across the whole cluster, and
-   `warning_events` returns grouped Warning events without policy-scan noise. Then it
-   follows each lead with MCP tools and kubectl (describe, events, logs, metrics).
+      `cluster_problems` returns only what is unhealthy across the whole cluster, and
+      `warning_events` returns grouped Warning events without policy-scan noise. Then it
+      follows each lead with MCP tools and kubectl (describe, events, logs, metrics).
 3. The agent runs the tools, cuts large outputs down and sends the results back. This
-   repeats until the model answers; at most 25 rounds.
+      repeats until the model answers; at most 25 rounds.
 4. A health check ends with a JSON list of findings. Memory compares them with the
-   previous check (new / still open / resolved) and decides what to post.
+      previous check (new / still open / resolved) and decides what to post.
 5. Scheduled checks first compare the summary with the last full check; if nothing
-   changed, the model is not called at all.
+      changed, the model is not called at all.
 
 There is no agent framework: the loop is about 100 commented lines in
 `k8s_servant/agent.py`. Why, and the rest of the design:
