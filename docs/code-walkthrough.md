@@ -47,7 +47,7 @@ k8s-servant = "k8s_servant.cli:main"
 The same four steps for every command:
 
 1. **Arguments**: `build_parser()` (argparse). For `ask`, `nargs="+"` collects one or
-   more words, which is why quotes around the question are optional.
+      more words, which is why quotes around the question are optional.
 2. **Settings**: `configure_app()`, from environment variables only.
 3. **Knowledge**: `load_knowledge()`, the environment description, cluster notes and skills.
 4. **Memory**: `Memory(...)`, a small SQLite database (part 4).
@@ -72,7 +72,7 @@ return asyncio.run(COMMANDS[args.command](args, config, knowledge, memory))
 4. `await session.agent.run(question)` runs the agent loop.
 5. `memory.record_run(...)` stores question and answer (`k8s-servant history`).
 6. The answer goes to **stdout**; the statistics line (`-- 4 model calls, 6 tool calls,
-   tools: ...`) goes to **stderr**.
+      tools: ...`) goes to **stderr**.
 
 "stdout carries only the answer" is a project rule: `k8s-servant ask "..." > answer.md`
 gives a clean file. A failed model call prints `Model call failed: ...`, records a
@@ -86,7 +86,7 @@ failed run and exits with 1.
 `open_agent()` calls `open_runtime()`, which fills the **tool registry** in this order:
 
 1. MCP tools from kubernetes-mcp-server (preferred; the first tool with a name wins),
-   minus `events_list` (`REPLACED_MCP_TOOLS`), which is too large on a big cluster.
+      minus `events_list` (`REPLACED_MCP_TOOLS`), which is too large on a big cluster.
 2. `kubectl`, always present; its description changes when MCP is down.
 3. `cluster_problems` and `warning_events`, compact summaries for a first look.
 4. Prometheus and Alertmanager tools, when their URLs are set.
@@ -131,8 +131,8 @@ The model never touches the cluster: it can only ask, and the code decides what 
 Two safety nets:
 
 - **`MAX_ITERATIONS`**: at the limit the agent appends `LIMIT_MESSAGE` ("answer with
-  what you have, list what you could not check") and makes one last call with tools
-  forbidden.
+    what you have, list what you could not check") and makes one last call with tools
+    forbidden.
 - **Truncation**: `_run_tool_call()` cuts every tool output to `TOOL_OUTPUT_MAX_CHARS`.
 
 ### Running a tool never raises (`ToolRegistry.run()` in `tools/registry.py`)
@@ -245,9 +245,9 @@ Every `complete()` does the same five steps:
 1. **Translate in**: neutral turns to the API's format.
 2. **Call** the official SDK (`openai` or `anthropic`).
 3. **Count tokens** and log one line (`model call: 5200 prompt (4800 cached) + 310
-   completion tokens in 3.2s`).
+      completion tokens in 3.2s`).
 4. **Reject bad endings**: a cut-off reply raises `ModelOutputTruncated`; a refusal,
-   failure or content filter raises `ModelCallFailed`. A partial reply is never an answer.
+      failure or content filter raises `ModelCallFailed`. A partial reply is never an answer.
 5. **Translate out**: text and tool calls back into a neutral `Turn`.
 
 The same tool call in the three formats:
@@ -300,7 +300,7 @@ errors → MODEL_ERRORS → model_error_text(): one actionable line, key removed
 
 1. A new provider speaks Chat Completions. What do you change?
 2. `LLM_PROVIDER=openai-compatible`, an https endpoint that is not Foundry, no key: is
-   Entra ID tried? Why does it matter?
+      Entra ID tried? Why does it matter?
 3. What would break without `provider_state`?
 4. Where is an API key removed from an error before it reaches Teams?
 
@@ -381,10 +381,10 @@ good ones. `check_kubectl_args()` walks the arguments:
 
 1. the verb must be in `READ_VERBS` (from `auth`, only `auth can-i`);
 2. each flag must be in `ALLOWED_FLAGS`, with values parsed the way kubectl parses
-   them (`-n x`, `-nx`, `-n=x`, `--namespace=x`);
+      them (`-n x`, `-nx`, `-n=x`, `--namespace=x`);
 3. `-o` must be `wide`, `yaml`, `json`, `name`, `jsonpath=...` or `custom-columns=...`;
 4. Secrets are refused in every spelling (`secret`, `secrets/name`, `pods,secrets`,
-   `secrets.v1.`); `externalsecrets` is a different resource and allowed.
+      `secrets.v1.`); `externalsecrets` is a different resource and allowed.
 
 | The model sends | Result |
 |---|---|
@@ -421,11 +421,11 @@ namespace, an event reason or a time window, each checked against a strict patte
 ### The other tools
 
 - **Prometheus and Alertmanager** (`tools/prometheus_tool.py`): HTTP GET only; range
-  results summarised per series; an empty result says it is not proof that all is well.
+    results summarised per series; an empty result says it is not proof that all is well.
 - **`load_skill`** (`knowledge.py`): returns a skill's full procedure on demand.
 - **`save_note`** (`memory.py`): writes only to the agent's own notes. Because a note
-  could be planted through prompt injection, every new note is logged as a warning
-  and listed in the morning report.
+    could be planted through prompt injection, every new note is logged as a warning
+    and listed in the morning report.
 
 The pod adds a last layer: non-root, read-only root filesystem, no privilege
 escalation, all capabilities dropped (`deployment.yaml`).
@@ -482,12 +482,12 @@ until stop:
 ```
 
 - **Heartbeat.** The liveness probe checks that the heartbeat file is younger than five
-  minutes. During a long job a background task (`_beat_while_running()`) keeps
-  touching it, so a busy agent is not taken for a dead one.
+    minutes. During a long job a background task (`_beat_while_running()`) keeps
+    touching it, so a busy agent is not taken for a dead one.
 - **One job at a time, and it never stops the loop.** `_run_job()` waits for the job,
-  the stop flag or `JOB_TIMEOUT_MINUTES`, whichever comes first; a failure is logged.
+    the stop flag or `JOB_TIMEOUT_MINUTES`, whichever comes first; a failure is logged.
 - **Today's date is recorded before the report runs**, so a failing report is not
-  retried every minute. The cost, a lost report that day, is deliberate and logged.
+    retried every minute. The cost, a lost report that day, is deliberate and logged.
 - `clock` and `wait` are parameters, so tests run a whole day in milliseconds (part 5).
 
 ### A health check (`healthcheck.py`)
@@ -497,11 +497,11 @@ tokens, and most hours nothing changes. So first, without the model:
 
 1. run `cluster_problems` and `alertmanager_alerts`;
 2. hash their stable parts (`sweep_signature()`): the problem lines and alert
-   identities (name, severity, location), without timestamps, live values or the
-   always-firing alerts in `ALERTS_IGNORE_NAMES`;
+      identities (name, severity, location), without timestamps, live values or the
+      always-firing alerts in `ALERTS_IGNORE_NAMES`;
 3. if the hash equals the one from the last successful full check, and that check is
-   younger than `CHECK_FULL_INTERVAL_HOURS`, record the run as unchanged and keep the
-   open findings open.
+      younger than `CHECK_FULL_INTERVAL_HOURS`, record the run as unchanged and keep the
+      open findings open.
 
 A full check still runs at that interval, because the summary tools cannot see
 everything (Flux, node usage, events). A manual `k8s-servant check` never skips.
@@ -509,7 +509,7 @@ everything (Flux, node usage, events). A manual `k8s-servant check` never skips.
 **The full check** (`run_check()`):
 
 1. `CHECK_PROMPT`: follow the `cluster-health-check` skill, re-verify the findings
-   still open (listed with their fingerprints), end with a JSON block.
+      still open (listed with their fingerprints), end with a JSON block.
 2. The agent loop investigates.
 3. `parse_findings()` reads the JSON block.
 4. If it is missing or invalid, `agent.follow_up()` asks once for only the JSON.
@@ -568,16 +568,16 @@ Checks post only on changes; the morning report goes out every (week)day even wh
 nothing happened, because silence looks the same as a broken agent.
 
 - **When** (`report_due()`): after `MORNING_REPORT_TIME` in `MORNING_REPORT_TIMEZONE`,
-  optionally weekdays only, once per day (the date in memory), so a restart never
-  sends it twice and a pod that was down at report time sends it when it is back.
+    optionally weekdays only, once per day (the date in memory), so a restart never
+    sends it twice and a pod that was down at report time sends it when it is back.
 - **Window**: since the previous report (the weekend on Mondays), at most 72 hours.
 - **Content** (`build_morning_report()`): a fresh health check; facts from memory
-  (open findings and their age, what appeared, resolved, or came and went; how many
-  checks ran, were skipped or failed); alerts firing now and alerts that fired
-  overnight; then an overview of 3 to 6 sentences written by the model **from those
-  facts only, with no tools** (`OVERVIEW_PROMPT`).
+    (open findings and their age, what appeared, resolved, or came and went; how many
+    checks ran, were skipped or failed); alerts firing now and alerts that fired
+    overnight; then an overview of 3 to 6 sentences written by the model **from those
+    facts only, with no tools** (`OVERVIEW_PROMPT`).
 - Every step has its own error handling: if the check or the model fails, the report
-  still goes out and says what failed.
+    still goes out and says what failed.
 
 ### Teams (`teams.py`)
 
@@ -603,7 +603,7 @@ later         last full check older than CHECK_FULL_INTERVAL_HOURS → full chec
 
 1. The model returns no JSON twice. What happens to the five open findings, and why?
 2. A crash-looping pod is deleted and recreated with a new name, still crash-looping.
-   New or still open?
+      New or still open?
 3. Nothing changed for three hours. How often was the model called, and what ran?
 4. Why is the morning report sent when everything is fine?
 
@@ -722,11 +722,11 @@ documents what the guard blocks.
 ### Time and network
 
 - **A fake clock** (`test_scheduler.py`): the scheduler receives `clock` and `wait`; the
-  test's `wait` advances a `FakeClock` instead of sleeping and sets the stop flag at
-  the end. Hours of scheduler life run in milliseconds.
+    test's `wait` advances a `FakeClock` instead of sleeping and sets the stop flag at
+    the end. Hours of scheduler life run in milliseconds.
 - **A fake network** (`test_teams.py`): `httpx2.MockTransport` answers HTTP requests as
-  the test decides, for example a connection error, after which the test asserts that
-  the webhook URL does not appear in `caplog.text`.
+    the test decides, for example a connection error, after which the test asserts that
+    the webhook URL does not appear in `caplog.text`.
 
 > **The pattern: dependency injection.** The code receives the clock, the model, the
 > MCP server and the HTTP transport as parameters with real defaults
@@ -747,10 +747,10 @@ documents what the guard blocks.
 `AGENTS.md` asks for a failing test before the change:
 
 1. **Red**: write the test (often one new `parametrize` row) and watch it fail for the
-   right reason.
+      right reason.
 2. **Green**: change the code until it passes.
 3. **Refactor** while it stays green, then run
-   `.venv/bin/pytest && .venv/bin/ruff check . && .venv/bin/ruff format --check .`
+      `.venv/bin/pytest && .venv/bin/ruff check . && .venv/bin/ruff format --check .`
 
 ```
 model?      ScriptedChat(answer(...), tool_call(...))

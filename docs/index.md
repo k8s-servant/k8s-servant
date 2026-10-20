@@ -65,23 +65,23 @@ terminal and to an MS Teams channel.
 ## What it does
 
 - **Answers questions.** "Are there unhealthy pods?", "why is X pending?", "is Flux
-  healthy?". It investigates with read-only tools and answers with evidence: object,
-  field, event, time.
+    healthy?". It investigates with read-only tools and answers with evidence: object,
+    field, event, time.
 - **Watches.** Every hour it runs a health check and remembers the result, so it
-  reports problems as **new**, **still open** or **resolved** instead of repeating
-  them. When nothing changed, it does not even call the model.
+    reports problems as **new**, **still open** or **resolved** instead of repeating
+    them. When nothing changed, it does not even call the model.
 - **Reports every morning.** On weekday mornings it posts how the cluster did since the
-  previous report, what came and went during the night, and what needs attention today.
+    previous report, what came and went during the night, and what needs attention today.
 - **Learns your platform.** What is normal on your platform goes into an environment
-  description and skills, plain Markdown delivered through Helm values
-  ([teaching the agent](knowledge-and-skills.md)).
+    description and skills, plain Markdown delivered through Helm values
+    ([teaching the agent](knowledge-and-skills.md)).
 
 ## What it never does
 
 - It never creates, changes or deletes anything in the cluster. Asked to fix
-  something, it describes the fix for you to apply.
+    something, it describes the fix for you to apply.
 - It never reads Secrets: its RBAC has no access to them, the kubectl guard refuses
-  them and the MCP server is configured to deny them.
+    them and the MCP server is configured to deny them.
 - It never runs a shell. kubectl runs with an allow-list of read-only verbs and flags.
 
 How it works: [the flow from a question to an answer](how-it-works.md). The source,

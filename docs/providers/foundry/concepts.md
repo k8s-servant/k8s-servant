@@ -1,7 +1,7 @@
 # MS Foundry concepts
 
 This page explains what Microsoft Foundry is, how its parts fit together, and which of
-them k8s-servant uses. Read it before [foundry-setup.md](foundry-setup.md), which is
+them k8s-servant uses. Read it before [Foundry setup guide](setup.md), which is
 the step-by-step runbook.
 
 ## Contents
@@ -26,13 +26,14 @@ is Azure's platform for hosting and using AI models. It is two things:
 
 1. **An Azure resource** that hosts models behind an API. This is what the agent uses.
 2. **A web portal**, [ai.azure.com](https://ai.azure.com), to manage that resource and
-   build on it: chat playground, agent builder, evaluations, prompt tools. The agent
-   uses none of these, but the playground is handy for trying a model by hand.
+      build on it: chat playground, agent builder, evaluations, prompt tools. The agent
+      uses none of these, but the playground is handy for trying a model by hand.
 
 **Foundry vs Azure OpenAI.**
+
 - An older **Azure OpenAI** resource (kind `OpenAI`) hosts only OpenAI models.
 - A **Foundry resource** (kind `AIServices`) hosts OpenAI models and other providers'
-  models, and also includes Speech, Vision and Language.
+    models, and also includes Speech, Vision and Language.
 - New work should use a Foundry resource.
 
 ## How it fits together
@@ -54,24 +55,25 @@ Subscription
 | **Project** | A workspace in the portal for agents, evaluations and datasets. | A team folder. The agent does not need one |
 
 **Why deployments matter.**
+
 - A model cannot be called until it is deployed on a resource.
 - Each deployment has its own name, model version and capacity.
 - Two teams can use the same model through two deployments without competing for each
-  other's throughput. That is what a "dedicated model" means in Foundry: a dedicated
-  **deployment**.
+    other's throughput. That is what a "dedicated model" means in Foundry: a dedicated
+    **deployment**.
 
 ## The model catalog
 
 - **Sold directly by Azure.** OpenAI's GPT family and selected models from other
-  providers, hosted and billed by Microsoft under Azure's data-privacy terms. The
-  agent's recommended `gpt-5.4-mini` is one of these.
+    providers, hosted and billed by Microsoft under Azure's data-privacy terms. The
+    agent's recommended `gpt-5.4-mini` is one of these.
 - **Partner and community models.** For example Llama, Mistral and DeepSeek. Some work
-  like the above; others are billed through Azure Marketplace.
+    like the above; others are billed through Azure Marketplace.
 - **Lifecycle.** Models have versions and retirement dates. For example, `gpt-4.1` is
-  closed to new deployments, `gpt-5` retires in Feb 2027 and `gpt-5.4-mini` in Sep 2027.
-  Expect to move to a newer version about once a year. That changes the deployment, not
-  the agent's code. See the
-  [retirement schedule](https://learn.microsoft.com/azure/foundry/openai/concepts/model-retirement-schedule).
+    closed to new deployments, `gpt-5` retires in Feb 2027 and `gpt-5.4-mini` in Sep 2027.
+    Expect to move to a newer version about once a year. That changes the deployment, not
+    the agent's code. See the
+    [retirement schedule](https://learn.microsoft.com/azure/foundry/openai/concepts/model-retirement-schedule).
 
 ## Deployment types: where data is processed
 
@@ -88,38 +90,38 @@ where requests are **processed**.
 ## Capacity and quota
 
 - **TPM (tokens per minute).** Every deployment gets a capacity; for example `50` means
-  50,000 tokens per minute. Going over it returns HTTP 429, and the agent's SDK retries
-  automatically.
+    50,000 tokens per minute. Going over it returns HTTP 429, and the agent's SDK retries
+    automatically.
 - **Quota.** The subscription has a total TPM per model, region and deployment type.
-  **All deployments of that model in that region draw from the same pool**, including
-  other teams' deployments in the same subscription.
+    **All deployments of that model in that region draw from the same pool**, including
+    other teams' deployments in the same subscription.
 - **Capacity is not cost.** It only limits speed. An idle deployment costs nothing.
 
 ## Cost
 
 - **Pay per token.** Input and output tokens are priced separately, per million tokens.
-  The internal "thinking" tokens of reasoning models are billed as output. Prices are
-  on the [pricing page](https://azure.microsoft.com/pricing/details/azure-openai/).
+    The internal "thinking" tokens of reasoning models are billed as output. Prices are
+    on the [pricing page](https://azure.microsoft.com/pricing/details/azure-openai/).
 - **Rough scale for the agent.** One question is about 100k–300k tokens, because the
-  conversation is resent on every round. An hourly health check is up to 24
-  such runs a day. Mini models keep this small.
+    conversation is resent on every round. An hourly health check is up to 24
+    such runs a day. Mini models keep this small.
 - **Billing granularity.** Cost reports show the **resource**, not individual
-  deployments. On a shared resource the agent's cost is mixed with everyone else's.
+    deployments. On a shared resource the agent's cost is mixed with everyone else's.
 - **Budgets.** Cost Management can alert on a budget but does not stop spending.
 
 ## The API: how the agent calls a model
 
 - **The v1 API** at `https://<resource>.openai.azure.com/openai/v1/` is OpenAI-compatible.
-  The standard `openai` Python SDK works unchanged; only the base URL differs. No
-  `api-version` parameter is needed.
+    The standard `openai` Python SDK works unchanged; only the base URL differs. No
+    `api-version` parameter is needed.
 - **Stateless.** Every request carries the whole conversation; the model remembers
-  nothing between requests. That is why:
-  - the agent has its own memory;
-  - long investigations get more expensive towards the end.
+    nothing between requests. That is why:
+    - the agent has its own memory;
+    - long investigations get more expensive towards the end.
 - **Tool calling.** The agent sends descriptions of its tools along with the
-  conversation. The model answers either with text, or with a request such as "call
-  `pods_list` with these arguments". The agent runs the tool, sends the result back,
-  and repeats. That loop is the whole agent; see [architecture.md](architecture.md).
+    conversation. The model answers either with text, or with a request such as "call
+    `pods_list` with these arguments". The agent runs the tool, sends the result back,
+    and repeats. That loop is the whole agent; see [architecture.md](../../architecture.md).
 
 ## Access: two separate layers
 
@@ -129,39 +131,39 @@ where requests are **processed**.
 | **Data plane** (the model API) | Calling models | **Cognitive Services OpenAI User** (OpenAI models only); Cognitive Services User or Foundry User (broader) | You, for local tests; the agent's identity in the cluster |
 
 - **Owner and Contributor cannot call models.** An Owner can, however, assign the
-  data-plane role to themselves. Role assignments take about 5 minutes to apply.
+    data-plane role to themselves. Role assignments take about 5 minutes to apply.
 - **Roles apply to the whole resource.** Whoever has the data-plane role can call
-  **every** deployment on that resource. Azure does not scope this role to a single
-  deployment.
+    **every** deployment on that resource. Azure does not scope this role to a single
+    deployment.
 - **How callers authenticate:**
-  - **Entra ID** (recommended): `az login` on a laptop, Workload Identity in the
-    cluster. There is no secret to store or rotate.
-  - **API keys**: two per resource. Anyone holding one can call every deployment.
-    Acceptable for quick tests; shared resources often disable keys altogether.
+    - **Entra ID** (recommended): `az login` on a laptop, Workload Identity in the
+        cluster. There is no secret to store or rotate.
+    - **API keys**: two per resource. Anyone holding one can call every deployment.
+        Acceptable for quick tests; shared resources often disable keys altogether.
 
 ## Network
 
 - A resource can be **public** (reachable from the internet, still requiring
-  authentication) or **private** (public access disabled, reached through a **private
-  endpoint**, which is an IP address in your VNet with matching private DNS).
+    authentication) or **private** (public access disabled, reached through a **private
+    endpoint**, which is an IP address in your VNet with matching private DNS).
 - If the cluster is private or sends egress through a firewall, the agent pod needs
-  either of these to reach the resource:
-  - a private endpoint, or
-  - a firewall rule for the resource's hostname.
+    either of these to reach the resource:
+    - a private endpoint, or
+    - a firewall rule for the resource's hostname.
 
-  See [foundry-setup.md, Step 5](foundry-setup.md#7-step-5-networking).
+    See [Foundry setup guide, Step 5](setup.md#7-step-5-networking).
 
 ## Safety and privacy
 
 - **Content filters.** Every deployment filters hate, sexual, violence and self-harm
-  content and detects jailbreak attempts. Normal cluster data does not trigger them.
+    content and detects jailbreak attempts. Normal cluster data does not trigger them.
 - **Privacy.**
-  - Prompts and answers are not used to train models and are not shared with OpenAI.
-  - Microsoft may keep content flagged for abuse for review, inside the EU for an EU
-    resource. See
-    [data privacy](https://learn.microsoft.com/azure/foundry/responsible-ai/openai/data-privacy).
+    - Prompts and answers are not used to train models and are not shared with OpenAI.
+    - Microsoft may keep content flagged for abuse for review, inside the EU for an EU
+        resource. See
+        [data privacy](https://learn.microsoft.com/azure/foundry/responsible-ai/openai/data-privacy).
 - **What the agent sends.** Object names, statuses, events and log lines; never
-  Secrets. Application logs can still contain sensitive data if applications log it.
+    Secrets. Application logs can still contain sensitive data if applications log it.
 
 ## Shared or dedicated resource
 
@@ -196,19 +198,20 @@ and `LLM_MODEL`.
 | Private endpoint (optional, if egress is not allowed) | non-prod VNet | prod VNet |
 
 Why two resources:
+
 - **Production data stays in production.** Prod cluster data only reaches a resource
-  in the production subscription, with its own access list.
+    in the production subscription, with its own access list.
 - **Separate quota, policies and cost.** Quota is per subscription, so experiments
-  cannot use up prod's throughput, and the bill shows prod and non-prod apart.
+    cannot use up prod's throughput, and the bill shows prod and non-prod apart.
 - **Network.** Each resource gets its private endpoint in the matching network, with
-  the same routing and DNS as everything else there.
+    the same routing and DNS as everything else there.
 - **Safe model upgrades.** A new model version goes to the non-prod deployment first,
-  then to prod, in the same order as other upgrades.
+    then to prod, in the same order as other upgrades.
 
 Why not one per cluster: non-prod clusters usually share a subscription and network
 already, so a resource per cluster adds work without real separation. Recreating a
 cluster does not affect the Foundry resource; only the agent's federated credential
-changes ([deployment.md](deployment.md#when-a-cluster-is-recreated)).
+changes ([deployment.md](../../deployment.md#when-a-cluster-is-recreated)).
 
 One deployment can serve several non-prod clusters. Add a second only if the agents
 start competing for throughput.
@@ -217,6 +220,7 @@ Names are examples. The custom subdomain must be globally unique, so confirm
 availability when creating the resource.
 
 Costs:
+
 - the resource and an idle Standard-type deployment cost nothing; you pay per token;
 - set a free budget alert on each resource group when you create it;
 - a private endpoint, if one is needed, adds a small hourly network charge.
@@ -230,4 +234,4 @@ Costs:
 | Entra ID with *Cognitive Services OpenAI User* | Evaluations, prompt flow, fine-tuning |
 | Default content filters | Provisioned throughput (PTU) |
 
-**Next:** [foundry-setup.md](foundry-setup.md), the step-by-step setup.
+**Next:** [Foundry setup guide](setup.md), the step-by-step setup.

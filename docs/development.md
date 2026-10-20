@@ -39,70 +39,70 @@ venv (see [troubleshooting.md](troubleshooting.md#local-setup)).
 ## Rules for every change
 
 - **Read-only, always.** No code path may change cluster objects or read Secrets. A
-  new tool reads; if it runs kubectl, it uses fixed arguments or goes through
-  `check_kubectl_args()`.
+    new tool reads; if it runs kubectl, it uses fixed arguments or goes through
+    `check_kubectl_args()`.
 - **The kubectl guard is an allow-list.** Add a flag only if it cannot change the
-  identity or target server, read or write local files, or block. Never switch to a
-  deny-list ([security.md](security.md#why-the-kubectl-guard-is-an-allow-list)).
+    identity or target server, read or write local files, or block. Never switch to a
+    deny-list ([security.md](security.md#why-the-kubectl-guard-is-an-allow-list)).
 - **Model text never becomes a command-line flag.** Validate every argument the model
-  passes (see `_check_namespace()` in `cluster_tools.py`).
+    passes (see `_check_namespace()` in `cluster_tools.py`).
 - **No shell.** `asyncio.create_subprocess_exec` with an argument list.
 - **stdout carries only the answer**; logs go to stderr.
 - **Settings only from environment variables**, through `config.configure_app()`, each
-  with a comment that says why it exists.
+    with a comment that says why it exists.
 - **A failed or unparseable health check never changes the findings in memory.**
 - **The Teams webhook URL is a credential.** Never log it, not even inside an error.
 - **Times are UTC**, except the morning report's schedule and title.
 - **Built-in skills stay generic**: no site names, no write commands
-  (`tests/test_builtin_skills.py`). Site facts go into the environment description.
+    (`tests/test_builtin_skills.py`). Site facts go into the environment description.
 - **Test first.** Write the failing test, watch it fail for the right reason, then the
-  code. One test file per module.
+    code. One test file per module.
 - **Document as you go.** Every module starts with a docstring that explains what and
-  why; every public function and every function longer than 15 lines has a Google-style
-  docstring (`tests/test_docs.py` enforces this). Comments explain intent, not syntax.
+    why; every public function and every function longer than 15 lines has a Google-style
+    docstring (`tests/test_docs.py` enforces this). Comments explain intent, not syntax.
 - **Conventional commit messages and PR titles** (`feat:`, `fix:`, `docs:`, `refactor:`,
-  `test:`); release-please writes `CHANGELOG.md` from them, so never edit it by hand.
+    `test:`); release-please writes `CHANGELOG.md` from them, so never edit it by hand.
 
 ## Tests
 
 - `tests/fakes.py` holds the shared test doubles:
-  - `ScriptedChat(*replies)`: a fake model that returns the replies in order (an
-    exception instance is raised instead) and records every request in `.calls`.
-  - `answer(text)`, `tool_call(name, args)`: model replies.
-  - `findings_answer(summary, findings)`: a health-check answer with the JSON block.
+    - `ScriptedChat(*replies)`: a fake model that returns the replies in order (an
+        exception instance is raised instead) and records every request in `.calls`.
+    - `answer(text)`, `tool_call(name, args)`: model replies.
+    - `findings_answer(summary, findings)`: a health-check answer with the JSON block.
 - MCP is tested with an in-process `mcp.server.MCPServer`; HTTP with
-  `httpx2.MockTransport`; kubectl-based tools with a fake `fetch` function or, in CLI
-  tests, a fake `kubectl` script (CLI tests must never read a real cluster).
+    `httpx2.MockTransport`; kubectl-based tools with a fake `fetch` function or, in CLI
+    tests, a fake `kubectl` script (CLI tests must never read a real cluster).
 - `cli.main()` reconfigures logging to stderr, so CLI tests read stderr with `capsys`,
-  not `caplog`.
+    not `caplog`.
 - `tests/test_docs.py` checks the documentation: every setting in the
-  `docs/configuration.md` tables, links between docs, docstrings.
+    `docs/configuration.md` tables, links between docs, docstrings.
 - There is **no automated test of answer quality** yet. After changing the prompt, a
-  skill, the model or the summary tools, run `ask` and `check` against a real cluster
-  and compare with what you find by hand (`kubectl`).
+    skill, the model or the summary tools, run `ask` and `check` against a real cluster
+    and compare with what you find by hand (`kubectl`).
 
 ## Recipes
 
 ### Add a setting
 
 1. Add it to `configure_app()` in `config.py` with a comment, using the helpers
-   (`_int`, `_bool`, `_choice`, `_name_list`, ...) so a bad value names the variable.
+      (`_int`, `_bool`, `_choice`, `_name_list`, ...) so a bad value names the variable.
 2. Test it in `tests/test_config.py` (default, a valid value, an invalid value).
 3. Add a row to the right table in `docs/configuration.md`. `tests/test_docs.py` fails until you do.
 4. Add a commented line to `.env.example`.
 5. If it has a sensible per-cluster value, add it to `appConfig` in `charts/k8s-servant/values.yaml`
-   (with a comment) or to the environment files.
+      (with a comment) or to the environment files.
 
 ### Add a check to `cluster_problems`
 
 1. Write a pure function `xyz_problems(items: list[dict]) -> list[str]` in
-   `tools/cluster_tools.py` that returns Markdown lines `- Kind namespace/name: what is wrong`.
-   Report only real problems; say in the docstring what is deliberately not reported.
+      `tools/cluster_tools.py` that returns Markdown lines `- Kind namespace/name: what is wrong`.
+      Report only real problems; say in the docstring what is deliberately not reported.
 2. Test it in `tests/test_cluster_tools.py` with hand-written minimal JSON, including
-   a healthy object that must not be reported.
+      a healthy object that must not be reported.
 3. Add the resource to `_RESOURCES` and a section in `cluster_problems()`.
 4. Make sure the chart's RBAC can list the resource type (`charts/k8s-servant/templates/clusterrole.yaml`;
-   `view` covers most namespaced types).
+      `view` covers most namespaced types).
 5. Mention it in the `cluster-health-check` skill and in [tools.md](tools.md).
 6. Try it on a real cluster: run the tool directly and compare with `kubectl`.
 
@@ -113,25 +113,25 @@ check run in full. Keep lines stable.
 ### Add a tool
 
 1. Build a `Tool(name, description, parameters, run, surface)`
-   (`tools/registry.py`). `run(arguments: dict) -> str` must never raise for expected
-   failures: return `ERROR: ...` text the model can react to.
+      (`tools/registry.py`). `run(arguments: dict) -> str` must never raise for expected
+      failures: return `ERROR: ...` text the model can react to.
 2. Write the description for the model: what it returns, when to use it, limits.
 3. Register it in `runtime.open_runtime()`; registration order decides precedence on
-   name clashes (MCP first).
+      name clashes (MCP first).
 4. A new surface needs a name in `SURFACE_NAMES` (`agent.py`).
 5. Tests: arguments validated, output format, failure as `ERROR:` text, registration.
 6. Document it in [tools.md](tools.md); review [security.md](security.md) if it reads
-   something new.
+      something new.
 
 ### Add or change a skill
 
 1. A built-in skill: `charts/k8s-servant/knowledge/skills/<name>/SKILL.md` with `name` and
-   `description` frontmatter. It must stay generic.
+      `description` frontmatter. It must stay generic.
 2. A site-specific skill: `knowledge.extraSkills` in the environment values.
 3. The description decides whether the model ever loads it: start with "Use when ...".
 4. Check: `k8s-servant --values ... tools` lists it; `ask` a question that should
-   trigger it and look for `load_skill` in the log.
-   See [knowledge-and-skills.md](knowledge-and-skills.md).
+      trigger it and look for `load_skill` in the log.
+      See [knowledge-and-skills.md](knowledge-and-skills.md).
 
 ### Change the system prompt
 
@@ -143,7 +143,7 @@ it as an instruction with the reason, and add a test that the rule is present (s
 ### Add a CLI command
 
 1. `cmd_<name>(args, config, knowledge, memory) -> int` in `cli.py`; register the
-   sub-parser in `build_parser()`.
+      sub-parser in `build_parser()`.
 2. Exit codes: 0 ok, 1 runtime failure, 2 configuration error.
 3. Test it through `cli.main([...])` in `tests/test_cli.py`.
 4. Document it in [cli.md](cli.md).

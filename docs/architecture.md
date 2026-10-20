@@ -84,28 +84,28 @@ The loop step by step:
 2. Send them to the model together with the definitions of every registered tool.
 3. If the reply has **no tool calls**, it is the answer and the loop is done.
 4. Otherwise, run each requested tool and append its output as a `tool` message. Large
-   output is truncated first. Then go back to step 2.
+      output is truncated first. Then go back to step 2.
 5. After `MAX_ITERATIONS` rounds (default 25), ask the model one last time, with no
-   tools, for the best answer it has so far. This stops a confused model from looping
-   forever, and you still get a useful partial answer.
+      tools, for the best answer it has so far. This stops a confused model from looping
+      forever, and you still get a useful partial answer.
 
 ### The system prompt
 
 `build_system_prompt()` assembles the prompt at the start of every run, in this order:
 
 1. **Rules.** Read-only; evidence for every statement and never invent anything; copy
-   object names exactly; check the skill catalog first; use the environment description
-   and notes; save lasting facts; work on your own (never end with "if you want, I
-   can…"); start health questions with the summary tools; keep tool output small; UTC;
-   conclusion first.
+      object names exactly; check the skill catalog first; use the environment description
+      and notes; save lasting facts; work on your own (never end with "if you want, I
+      can…"); start health questions with the summary tools; keep tool output small; UTC;
+      conclusion first.
 2. **Live tools.** Which tool surfaces are available. If MCP is down, an explicit note
-   says so.
+      says so.
 3. **Environment description**, from `knowledge.environment`.
 4. **Cluster notes**, from `knowledge.clusterNotes`.
 5. **Learned notes**, the newest up to `NOTES_MAX_CHARS`.
 6. **Skill catalog.** Only the names and descriptions. The model loads a full skill with
-   `load_skill` when it needs one, so the prompt stays small as the number of skills
-   grows.
+      `load_skill` when it needs one, so the prompt stays small as the number of skills
+      grows.
 
 On a typical platform this is about 10,000 characters (~2,500 tokens). The whole path from the
 files in Git to the model, with an example: [how-the-agent-learns.md](how-the-agent-learns.md).
@@ -117,15 +117,15 @@ this loop in their own classes and add memory, prompt templates, plugins and
 multi-agent orchestration. We chose not to use one:
 
 - **Transparency.** The loop is about 100 commented lines in `agent.py`. You can see
-  exactly what goes to the model and what comes back.
+    exactly what goes to the model and what comes back.
 - **Stability.** In 2026 the Python APIs of these frameworks changed several times;
-  for example, Microsoft Agent Framework removed its Azure OpenAI classes. A project built
-  on one can break on an upgrade.
+    for example, Microsoft Agent Framework removed its Azure OpenAI classes. A project built
+    on one can break on an upgrade.
 - **Debugging.** When the agent misbehaves you read our log lines and our code, not a
-  framework's internals.
+    framework's internals.
 - **Few dependencies.** The core runtime libraries are `openai`, `anthropic`,
-  `mcp`, `pyyaml`, `httpx2` and `tzdata`; `azure-identity` is the optional `azure` extra
-  (included in the image).
+    `mcp`, `pyyaml`, `httpx2` and `tzdata`; `azure-identity` is the optional `azure` extra
+    (included in the image).
 
 **What we give up.** We write the loop, output truncation and error handling ourselves,
 which is a few dozen lines. If a later stage needs what a framework offers, such as
@@ -151,7 +151,7 @@ Kubernetes read operations as MCP tools, for example `pods_list`, `pods_log`,
 `resources_list` and `nodes_top`. We chose it because:
 
 - It runs in a cluster and speaks streamable HTTP. Microsoft's `aks-mcp`, by contrast,
-  is stdio-only and is documented as not to be run in a cluster.
+    is stdio-only and is documented as not to be run in a cluster.
 - `read_only = true` exposes only read tools, and `[[denied_resources]]` hides Secrets.
 - Its tool descriptions are written for models.
 
@@ -159,7 +159,7 @@ The configuration is in [`deploy/local/mcp-config.toml`](https://github.com/k8s-
 Only the `core` toolset is enabled:
 
 - **`config` is off.** Its `configuration_view` tool returns the raw kubeconfig,
-  including tokens and client keys, which must never reach the model.
+    including tokens and client keys, which must never reach the model.
 - **`helm` is off.** Helm stores releases in Secrets, which are denied anyway.
 
 **The fallback rule:**
@@ -177,8 +177,9 @@ limit. `warning_events` covers the same need.
 
 The first run against a large test cluster (615 Deployments, 1,252 pods, 597 namespaces, 3,700
 Warning events) showed that a model cannot read a large cluster object by object:
+
 - the Deployment table alone was 78,000 characters, four times the output limit, so
-  the model saw only the first part;
+    the model saw only the first part;
 - the event list did not fit into one MCP message;
 - the model reported "healthy" while alerts were firing.
 
@@ -203,24 +204,24 @@ The MCP server runs as a second container in the agent's pod rather than as its 
 Deployment:
 
 - It is reached on `localhost` (`bind_address = "127.0.0.1"`), with no Service and no
-  NetworkPolicy to manage.
+    NetworkPolicy to manage.
 - It uses the pod's ServiceAccount, so read-only RBAC is defined once.
 - It starts and stops with the agent.
 
 ## Safety: read-only in layers
 
 1. **Kubernetes RBAC.** This is the real security boundary. The agent's
-   ServiceAccount is bound to the built-in `view` role and to its own cluster reader
-   role (get/list/watch only); neither grants Secrets ([security.md](security.md#in-the-cluster)).
+      ServiceAccount is bound to the built-in `view` role and to its own cluster reader
+      role (get/list/watch only); neither grants Secrets ([security.md](security.md#in-the-cluster)).
 2. **The MCP server** in `read_only` mode, with Secrets denied.
 3. **The kubectl guard.** Only read verbs, no Secrets, and only **allow-listed flags**,
-   parsed the way kubectl parses them (`-n x`, `-nx`, `-n=x`). `-o` accepts only
-   `wide`, `yaml`, `json`, `name`, `jsonpath=` and `custom-columns=`. A deny-list is not
-   enough here: kubectl has many flags that send its token to another server (`-s`,
-   `--server`), read local files (`-o go-template-file=...` would print the
-   ServiceAccount token) or never return (`--follow`, `--watch`). It never uses a shell.
+      parsed the way kubectl parses them (`-n x`, `-nx`, `-n=x`). `-o` accepts only
+      `wide`, `yaml`, `json`, `name`, `jsonpath=` and `custom-columns=`. A deny-list is not
+      enough here: kubectl has many flags that send its token to another server (`-s`,
+      `--server`), read local files (`-o go-template-file=...` would print the
+      ServiceAccount token) or never return (`--follow`, `--watch`). It never uses a shell.
 4. **The prompt.** It tells the model it is read-only and should describe fixes, not
-   apply them.
+      apply them.
 
 Layers 2–4 keep the agent from wasting turns and make the intent visible. Layer 1
 would hold even if they all failed. See [security.md](security.md) for what data
@@ -229,15 +230,15 @@ leaves the cluster.
 ## Errors never stop an investigation
 
 - `ToolRegistry.run()` never raises. These all come back to the model as text that
-  starts with `ERROR:`, so it can react, for example by trying the kubectl fallback:
-  - an unknown tool;
-  - invalid JSON arguments;
-  - a tool that crashes;
-  - kubectl exiting with a non-zero code or timing out;
-  - an MCP tool reporting an error, or an MCP call failing (too large an answer, a
-    timeout). The text then tells the model to narrow the query or use another tool.
+    starts with `ERROR:`, so it can react, for example by trying the kubectl fallback:
+    - an unknown tool;
+    - invalid JSON arguments;
+    - a tool that crashes;
+    - kubectl exiting with a non-zero code or timing out;
+    - an MCP tool reporting an error, or an MCP call failing (too large an answer, a
+        timeout). The text then tells the model to narrow the query or use another tool.
 - Model-call failures (401, 403, 404, 429, network, token) stop the command with an
-  explanation from `model_error_text()`, and the exit code is 1.
+    explanation from `model_error_text()`, and the exit code is 1.
 
 ## Output truncation
 
@@ -273,24 +274,25 @@ Scheduler.run  (loop, at least once a minute; touches HEARTBEAT_FILE)
 ```
 
 What happens when something fails:
+
 - **One failing run** (model timeout, network glitch) is logged and recorded in the
-  history. The loop continues and the next run happens on time.
+    history. The loop continues and the next run happens on time.
 - **A stuck run** is cancelled after `JOB_TIMEOUT_MINUTES`. The heartbeat is touched
-  by a background task while a run is in progress, so a long check does not trip the
-  liveness probe.
+    by a background task while a run is in progress, so a long check does not trip the
+    liveness probe.
 - **Shutdown (SIGTERM)** cancels the running check or report at once. If that was the
-  morning report, that day's report is lost: its date was marked before it ran, so that
-  a failing report is not retried every minute. The log says so.
+    morning report, that day's report is lost: its date was marked before it ran, so that
+    a failing report is not retried every minute. The log says so.
 - **A health check whose answer has no valid findings** is recorded as failed and
-  does not change memory. Otherwise every open problem would be marked resolved.
+    does not change memory. Otherwise every open problem would be marked resolved.
 - **The morning report always goes out.** If its check or the overview fails, it is
-  built from memory and says what failed: a silent morning would look like "all is
-  fine". The date is marked before the report runs, so a report that keeps failing
-  is not retried every minute.
+    built from memory and says what failed: a silent morning would look like "all is
+    fine". The date is marked before the report runs, so a report that keeps failing
+    is not retried every minute.
 - **Teams being down** never fails a check. The post failure is logged, without the
-  URL.
+    URL.
 - **Restarts.** A restart re-runs a check right away. The morning report is not sent
-  twice on the same day, because the date it was last sent is kept in memory.
+    twice on the same day, because the date it was last sent is kept in memory.
 
 Each run opens a fresh session (MCP connection, tools, system prompt with the newest
 learned notes), so a restarted MCP sidecar or a new note is picked up on the next run.

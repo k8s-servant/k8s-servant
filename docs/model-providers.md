@@ -14,11 +14,12 @@ Entra ID), and what `doctor` should print.
 | [OpenAI](providers/openai.md) | `openai` | API key |
 | [Ollama](providers/ollama.md), on a laptop or in the cluster | `ollama` | none |
 | [OpenAI-compatible](providers/openai-compatible.md): vLLM, LiteLLM, Gemini, LM Studio, ... | `openai-compatible` | API key (optional) |
-| [GPT and other models on Azure AI Foundry](providers/foundry.md) | `foundry` | Entra ID or API key |
-| [Claude on Azure AI Foundry](providers/foundry-claude.md) | `anthropic` | Entra ID |
+| [GPT and other models on Azure AI Foundry](providers/foundry/gpt.md) | `foundry` | Entra ID or API key |
+| [Claude on Azure AI Foundry](providers/foundry/claude.md) | `anthropic` | Entra ID |
 
-No provider is the "main" one. For Azure AI Foundry there is also a
-[concepts page](foundry-concepts.md) and a [step-by-step setup guide](foundry-setup.md).
+No provider is the "main" one. Azure AI Foundry also has an
+[overview](providers/foundry/index.md), a [concepts page](providers/foundry/concepts.md)
+and a [step-by-step setup guide](providers/foundry/setup.md).
 
 On this page:
 
@@ -44,13 +45,13 @@ call to the next. The newest GPT models therefore refuse to combine tools with r
 on it, and the exact cut-off differs by platform:
 
 - **OpenAI API:** "Starting with GPT-5.4, Chat Completions does not support tool calling
-  with `reasoning_effort` values other than `none`"
-  ([OpenAI: migrate to Responses](https://developers.openai.com/api/docs/guides/migrate-to-responses)).
+    with `reasoning_effort` values other than `none`"
+    ([OpenAI: migrate to Responses](https://developers.openai.com/api/docs/guides/migrate-to-responses)).
 - **Microsoft Foundry:** the `gpt-5.6` models "support the Chat Completions API and tools,
-  but can't combine reasoning with tools on Chat Completions". A request with tools fails
-  even without `reasoning_effort`, because these models default to `medium`. `gpt-5.4` and
-  `gpt-5.5` still allow it on Foundry
-  ([Microsoft Learn](https://learn.microsoft.com/azure/foundry/openai/how-to/reasoning#tool-calling-with-reasoning-models)).
+    but can't combine reasoning with tools on Chat Completions". A request with tools fails
+    even without `reasoning_effort`, because these models default to `medium`. `gpt-5.4` and
+    `gpt-5.5` still allow it on Foundry
+    ([Microsoft Learn](https://learn.microsoft.com/azure/foundry/openai/how-to/reasoning#tool-calling-with-reasoning-models)).
 
 So an older deployment such as `gpt-5.4-mini` on Foundry works on Chat Completions (the
 agent's first release ran that way), but moving to the Responses API keeps current and
@@ -85,31 +86,31 @@ Rules that hold for every provider:
 
 - `LLM_MODEL` is required. On Foundry it is the **deployment** name.
 - `LLM_AUTH` is `auto` (default), `entra` or `api-key`. `auto` uses a key when one is
-  configured, otherwise Entra ID where the endpoint is a Foundry address, otherwise no
-  sign-in for `ollama` and `openai-compatible`, otherwise it refuses to start.
-  `entra` and `api-key` are strict: `entra` refuses to start if a key is also set,
-  `api-key` refuses to start without one.
+    configured, otherwise Entra ID where the endpoint is a Foundry address, otherwise no
+    sign-in for `ollama` and `openai-compatible`, otherwise it refuses to start.
+    `entra` and `api-key` are strict: `entra` refuses to start if a key is also set,
+    `api-key` refuses to start without one.
 - **Entra ID is only ever used for Foundry endpoints**, so its tokens can never reach a
-  third-party server. A Foundry endpoint is a host ending in `.openai.azure.com`,
-  `.services.ai.azure.com` or `.cognitiveservices.azure.com`. These hosts are always
-  https.
+    third-party server. A Foundry endpoint is a host ending in `.openai.azure.com`,
+    `.services.ai.azure.com` or `.cognitiveservices.azure.com`. These hosts are always
+    https.
 - With `auto`, a configured key wins over Workload Identity. `doctor` then prints a
-  warning; set `LLM_AUTH=entra` and remove the key to use Workload Identity.
+    warning; set `LLM_AUTH=entra` and remove the key to use Workload Identity.
 - Keys are read from `LLM_API_KEY_FILE` (a file; in the cluster the chart mounts your
-  Secret there) or `LLM_API_KEY`; the file wins. The key is never logged.
+    Secret there) or `LLM_API_KEY`; the file wins. The key is never logged.
 - Entra ID needs the Azure extra: `pip install 'k8s-servant[azure]'`, or
-  `pip install -e '.[dev,azure]'` in a clone. The container image already includes it.
+    `pip install -e '.[dev,azure]'` in a clone. The container image already includes it.
 - `LLM_REASONING_EFFORT` defaults to `medium` for `foundry`, `openai` and `anthropic`,
-  and to empty (not sent) for `ollama` and `openai-compatible`. On Anthropic,
-  `minimal` is sent as `low` (with a warning in the log, as the Messages API has no
-  `minimal`) and `none` turns thinking off.
+    and to empty (not sent) for `ollama` and `openai-compatible`. On Anthropic,
+    `minimal` is sent as `low` (with a warning in the log, as the Messages API has no
+    `minimal`) and `none` turns thinking off.
 - `LLM_MAX_OUTPUT_TOKENS` (default `32000`, thinking included) is sent only on the
-  Messages API, which requires a limit. A reply that is cut off by a limit is an
-  error and the run is recorded as failed, as is a failed, cancelled or
-  content-filtered reply. Raise `LLM_MAX_OUTPUT_TOKENS` or lower the effort.
+    Messages API, which requires a limit. A reply that is cut off by a limit is an
+    error and the run is recorded as failed, as is a failed, cancelled or
+    content-filtered reply. Raise `LLM_MAX_OUTPUT_TOKENS` or lower the effort.
 - `temperature` is never sent (reasoning models reject it).
 - The full settings table is in [configuration.md](configuration.md). To start from
-  a ready-made Helm values file, copy one from `examples/` (listed in each recipe).
+    a ready-made Helm values file, copy one from `examples/` (listed in each recipe).
 
 Every recipe installs with plain Helm. Flux or another GitOps tool works the same
 way: see [`examples/flux-helmrelease.yaml`](https://github.com/k8s-servant/k8s-servant/blob/main/examples/flux-helmrelease.yaml) if you
@@ -130,12 +131,12 @@ A setting a provider has no use for has no effect; the agent does not warn about
 ## Data handling and errors
 
 - The Responses API is called with `store=false`: OpenAI and Foundry do not keep the
-  conversation. For Anthropic and every other provider, read the provider's own data and
-  retention terms: [Anthropic privacy centre](https://privacy.anthropic.com/),
-  [OpenAI API data controls](https://platform.openai.com/docs/guides/your-data),
-  [Gemini API terms](https://ai.google.dev/gemini-api/terms). More in
-  [data-processing.md](data-processing.md) and [security.md](security.md).
+    conversation. For Anthropic and every other provider, read the provider's own data and
+    retention terms: [Anthropic privacy centre](https://privacy.anthropic.com/),
+    [OpenAI API data controls](https://platform.openai.com/docs/guides/your-data),
+    [Gemini API terms](https://ai.google.dev/gemini-api/terms). More in
+    [data-processing.md](data-processing.md) and [security.md](security.md).
 - Errors name the setting to fix and never contain the key. Foundry gets hints about
-  role assignment, private endpoints and deployment names; other providers get generic
-  ones (key rejected, unknown model, rate limit, cannot reach `LLM_ENDPOINT`). See
-  [troubleshooting.md](troubleshooting.md).
+    role assignment, private endpoints and deployment names; other providers get generic
+    ones (key rejected, unknown model, rate limit, cannot reach `LLM_ENDPOINT`). See
+    [troubleshooting.md](troubleshooting.md).

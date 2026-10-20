@@ -88,9 +88,9 @@ the provenance and the cosign signature. Releases store the signature as an OCI
 referrer, attached to the digest. Two common ways of copying lose it:
 
 - `docker pull` + `docker push` copies one platform and drops the signature and the
-  attestations.
+    attestations.
 - `cosign copy` (tested with cosign 3.1) copied the image but not its signature, and
-  `cosign verify` on the copy failed with "no signatures found".
+    `cosign verify` on the copy failed with "no signatures found".
 
 If your tool of choice is different (a registry's import command, a pull-through
 cache, a replication rule), run step 4 once to see whether it keeps the signature. If it
@@ -184,18 +184,18 @@ chart reads them from Secrets you create
 ## Upgrading
 
 1. **Hear about the release.** On GitHub, Watch → Custom → Releases on this repository,
-   or let a dependency bot watch the chart version in your configuration repository.
+      or let a dependency bot watch the chart version in your configuration repository.
 2. **Read the release notes.** Settings that are renamed or removed are listed under
-   breaking changes, and the agent refuses to start with an old name, saying which name
-   replaced it.
+      breaking changes, and the agent refuses to start with an old name, saying which name
+      replaced it.
 3. **Mirror** the new version (the steps above).
 4. **Change the version** in your configuration repository, in one pull request.
 5. **Roll out to a non-production cluster first.** `k8s-servant doctor` in the pod checks
-   the model, MCP, kubectl, RBAC and Teams settings:
+      the model, MCP, kubectl, RBAC and Teams settings:
 
-   ```bash
-   kubectl -n k8s-servant exec deploy/k8s-servant -c agent -- k8s-servant doctor
-   ```
+      ```bash
+      kubectl -n k8s-servant exec deploy/k8s-servant -c agent -- k8s-servant doctor
+      ```
 
 6. Then the other clusters.
 
@@ -207,13 +207,13 @@ mirror.
 Ask one question first: would another organisation want this too?
 
 - **Yes:** open an issue or a pull request here, written generically, and use it after
-  the next release. Bug fixes, new checks, new providers and new chart options all
-  belong here.
+    the next release. Bug fixes, new checks, new providers and new chart options all
+    belong here.
 - **No:** solve it in your configuration repository through the platform description,
-  your own skills, or the chart's extension points (`extraEnv`, `extraEnvFrom`,
-  `extraVolumes`, `extraVolumeMounts`, `extraObjects`;
-  [deployment.md](deployment.md#extension-points)). A proxy, a corporate CA bundle or
-  your own ExternalSecret all fit there.
+    your own skills, or the chart's extension points (`extraEnv`, `extraEnvFrom`,
+    `extraVolumes`, `extraVolumeMounts`, `extraObjects`;
+    [deployment.md](deployment.md#extension-points)). A proxy, a corporate CA bundle or
+    your own ExternalSecret all fit there.
 
 If neither works, the chart is missing an extension point. That is a change for this
 repository too, so open an issue.
@@ -225,9 +225,9 @@ registries, IDs or hostnames in code, tests, examples or screenshots.
 
 - **Drift.** Every release turns into a merge, and fixes arrive late.
 - **Signatures.** Images built from a fork are not signed by this project's release
-  workflow, so the policies above can't tell them from anyone else's.
+    workflow, so the policies above can't tell them from anyone else's.
 - **Leaks.** Company details written into a fork tend to end up in a public pull
-  request sooner or later.
+    request sooner or later.
 
 If you are moving from an internal copy or an older version, note that the `FOUNDRY_*`
 settings were renamed to `LLM_*`; the agent names each new setting when it finds an old

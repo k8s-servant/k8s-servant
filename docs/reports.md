@@ -44,14 +44,14 @@ Every problem the model reports is a **finding**:
 ```
 
 - **Fingerprint** = `<category>/<namespace or _cluster>/<Kind>/<name>`, normalised to
-  lower case. It identifies *what* is broken, not when or how it was seen, so the same
-  problem keeps the same identity across checks and pod restarts. It names the owning
-  workload, not the pod.
+    lower case. It identifies *what* is broken, not when or how it was seen, so the same
+    problem keeps the same identity across checks and pod restarts. It names the owning
+    workload, not the pod.
 - **Categories:** `crashloop`, `pending`, `oom`, `image-pull`, `not-ready`, `rollout`,
-  `job-failed`, `node-not-ready`, `node-pressure`, `capacity`, `pvc`, `flux-not-ready`,
-  `alert-firing`, `quota`, `pdb`, `certificate`, `other`.
+    `job-failed`, `node-not-ready`, `node-pressure`, `capacity`, `pvc`, `flux-not-ready`,
+    `alert-firing`, `quota`, `pdb`, `certificate`, `other`.
 - **Severity:** `critical` (user impact likely: node NotReady, system component down,
-  zero ready replicas, PVC lost), `warning` (degraded but working), `info`.
+    zero ready replicas, PVC lost), `warning` (degraded but working), `info`.
 
 How memory turns fingerprints into new / still open / resolved:
 [memory.md](memory.md#findings-new-still-open-resolved).
@@ -82,10 +82,10 @@ hours nothing changes. So **scheduled** checks first run the summary tools witho
 model and compare a fingerprint of:
 
 - the problem lines of `cluster_problems` (not its header, which has a timestamp and
-  object counts);
+    object counts);
 - the firing alerts' name, severity and location (not their start time or text, which
-  contain live values), without `ALERTS_IGNORE_NAMES` (`InfoInhibitor` re-fires every
-  few minutes).
+    contain live values), without `ALERTS_IGNORE_NAMES` (`InfoInhibitor` re-fires every
+    few minutes).
 
 If it equals the fingerprint of the last **successful full** check, and that check is
 less than `CHECK_FULL_INTERVAL_HOURS` (default 6) old, the run is recorded as:
@@ -98,9 +98,10 @@ alerts, so the model was not called.
 The open findings stay open, nothing is posted, no tokens are used (about 6 s).
 
 A full check still runs:
+
 - when anything in the summary or the alerts changed;
 - at least every `CHECK_FULL_INTERVAL_HOURS`, because the summary cannot see
-  everything the model checks (Flux, node usage, events);
+    everything the model checks (Flux, node usage, events);
 - after a failed check, or when the summary could not read everything;
 - always for `k8s-servant check` (manual) and the morning report's own check.
 
@@ -128,24 +129,24 @@ when there was no earlier report.
 ### How it is built
 
 1. A fresh full health check, so the report reflects the cluster right now. If it
-   fails, the report still goes out and says so.
+      fails, the report still goes out and says so.
 2. From memory, for the window:
-   - **open findings** and how long each has been open;
-   - **new overnight, still open**;
-   - **resolved overnight** (open before the window);
-   - **came and went overnight**: appeared and resolved within the window, with times.
-     These are easy to miss and often worth a look (a rollout blocked by a quota for
-     three minutes, a pod crash-looping at 03:00);
-   - **health checks**: how many ran in full, were skipped as unchanged, failed.
+      - **open findings** and how long each has been open;
+      - **new overnight, still open**;
+      - **resolved overnight** (open before the window);
+      - **came and went overnight**: appeared and resolved within the window, with times.
+          These are easy to miss and often worth a look (a rollout blocked by a quota for
+          three minutes, a pod crash-looping at 03:00);
+      - **health checks**: how many ran in full, were skipped as unchanged, failed.
 3. **Alerts firing now** (Alertmanager), without `ALERTS_IGNORE_NAMES`.
 4. **Alerts that fired overnight and stopped**: from Prometheus' `ALERTS` history for
-   the window (`max_over_time(ALERTS{alertstate="firing"}[window])`). Only warning and
-   critical; info alerts are muted by Alertmanager too, and a large cluster can fire dozens per
-   night. Needs `PROMETHEUS_URL`.
+      the window (`max_over_time(ALERTS{alertstate="firing"}[window])`). Only warning and
+      critical; info alerts are muted by Alertmanager too, and a large cluster can fire dozens per
+      night. Needs `PROMETHEUS_URL`.
 5. **Notes the agent saved overnight**, so people can remove wrong ones.
 6. **The overview:** the model (no tools) writes 3–6 sentences from these facts only:
-   how the night went, what needs attention today (most important first), and what
-   recovered by itself but is worth a look.
+      how the night went, what needs attention today (most important first), and what
+      recovered by itself but is worth a look.
 
 ### Example (test cluster, 2026-10-12)
 
@@ -184,12 +185,12 @@ come back.
 ### When it is sent
 
 - `serve` checks every minute whether it is due: at `MORNING_REPORT_TIME` in
-  `MORNING_REPORT_TIMEZONE` (summer time handled), on weekdays when
-  `MORNING_REPORT_WEEKDAYS_ONLY`, and not yet sent today.
+    `MORNING_REPORT_TIMEZONE` (summer time handled), on weekdays when
+    `MORNING_REPORT_WEEKDAYS_ONLY`, and not yet sent today.
 - The date it was sent is kept in memory, so a restart never sends it twice, and a pod
-  that was down at 08:00 sends it as soon as it is back the same day.
+    that was down at 08:00 sends it as soon as it is back the same day.
 - `k8s-servant report` produces one on demand. It counts as a morning report: the next
-  scheduled one covers the time since it.
+    scheduled one covers the time since it.
 
 ## Teams cards
 

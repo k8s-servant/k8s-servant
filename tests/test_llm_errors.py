@@ -55,8 +55,8 @@ def test_connection_and_timeout_hints():
     request = openai.APIConnectionError(request=None)
     assert "cannot reach LLM_ENDPOINT" in explain_model_error(request, "ollama")
     assert "docs/model-providers.md" in explain_model_error(request, "ollama")
-    assert "docs/foundry-setup.md" not in explain_model_error(request, "ollama")
-    assert "docs/foundry-setup.md, section Networking" in explain_model_error(request, "foundry")
+    assert "docs/providers/foundry/setup.md" not in explain_model_error(request, "ollama")
+    assert "docs/providers/foundry/setup.md, section Networking" in explain_model_error(request, "foundry")
     timeout = openai.APITimeoutError(request=None)
     assert "LLM_TIMEOUT_SECONDS" in explain_model_error(timeout, "ollama")
 
@@ -105,7 +105,7 @@ FOUNDRY_HOST = "https://my-resource.services.ai.azure.com"
 
 def test_connection_hint_for_a_foundry_endpoint_points_at_the_networking_docs():
     config = _config("anthropic", FOUNDRY_HOST, LLM_API_KEY="sk-test-key")
-    assert "docs/foundry-setup.md" in model_error_text(openai.APIConnectionError(request=None), config)
+    assert "docs/providers/foundry/setup.md" in model_error_text(openai.APIConnectionError(request=None), config)
 
 
 def test_claude_on_foundry_with_entra_gets_the_foundry_role_hint():

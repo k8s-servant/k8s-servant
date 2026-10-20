@@ -80,7 +80,7 @@ signatures, and how to keep your settings in a private repository without a fork
 
 | What | How to check |
 |---|---|
-| A chat model with tool calling | Pick a provider ([model-providers.md](model-providers.md)); for Azure AI Foundry, `scripts/setup-foundry.sh` ([foundry-setup.md](foundry-setup.md)) |
+| A chat model with tool calling | Pick a provider ([model-providers.md](model-providers.md)); for Azure AI Foundry, `scripts/setup-foundry.sh` ([Foundry setup guide](providers/foundry/setup.md)) |
 | (AKS) OIDC issuer and Workload Identity on the cluster | `az aks show -g my-cluster-rg -n my-cluster --query "[oidcIssuerProfile.enabled, securityProfile.workloadIdentity.enabled]"` → `[true, true]` |
 | (Optional) The Teams webhook URL, as a Kubernetes Secret or in your secret store | [MS Teams setup](teams-setup.md); see [Credentials](#credentials-bring-your-own-secrets) |
 | (Optional, Azure example) External Secrets Operator, to sync it from Key Vault | `kubectl get crd externalsecrets.external-secrets.io secretstores.external-secrets.io` |
@@ -112,16 +112,17 @@ Run `./scripts/setup-workload-identity.sh` without arguments for the full list,
 including the optional secret name and ServiceAccount namespace and name.
 
 The script does the following:
+
 - creates the identity in the cluster's region;
 - creates (or re-points) the federated credential for
-  `system:serviceaccount:k8s-servant:k8s-servant` on the cluster's OIDC issuer;
+    `system:serviceaccount:k8s-servant:k8s-servant` on the cluster's OIDC issuer;
 - gives the identity read access to the one Key Vault secret. On a vault that uses
-  Azure RBAC, the role is scoped to that secret only. A vault with access policies
-  cannot limit access to one secret, so the script stops there. It continues only
-  when you accept vault-wide read access with `ALLOW_VAULT_WIDE_SECRET_READ=yes`;
+    Azure RBAC, the role is scoped to that secret only. A vault with access policies
+    cannot limit access to one secret, so the script stops there. It continues only
+    when you accept vault-wide read access with `ALLOW_VAULT_WIDE_SECRET_READ=yes`;
 - gives the identity *Cognitive Services OpenAI User* on the Foundry resource, which
-  covers OpenAI models only; for Claude and other non-OpenAI models set
-  `MODEL_ROLE="Cognitive Services User"` when running the script;
+    covers OpenAI models only; for Claude and other non-OpenAI models set
+    `MODEL_ROLE="Cognitive Services User"` when running the script;
 - prints the values snippet (client ID, tenant ID) and an equivalent Terraform snippet.
 
 For a second cluster, run the same command with that cluster's resource group and name
@@ -139,15 +140,16 @@ annotations go into `serviceAccount.annotations` (for example
 ## 2. Network
 
 If the cluster's egress is restricted, the pod needs HTTPS (443) to:
+
 - the model endpoint (`LLM_ENDPOINT`, or the provider's default), e.g. `api.anthropic.com`,
-  `api.openai.com` or `my-foundry.openai.azure.com`; nothing for an in-cluster Ollama;
+    `api.openai.com` or `my-foundry.openai.azure.com`; nothing for an in-cluster Ollama;
 - `login.microsoftonline.com`, for Entra ID tokens (Foundry with Workload Identity only);
 - the Teams webhook host;
 - your Prometheus and Alertmanager, if they are outside the cluster.
 
 If `k8s-servant doctor` in the pod shows a timeout for the model, open the egress; on
 Foundry you can also use a private endpoint
-([foundry-setup.md](foundry-setup.md#7-step-5-networking)).
+([Foundry setup guide](providers/foundry/setup.md#7-step-5-networking)).
 
 ## 3. Values for the cluster
 
@@ -179,8 +181,8 @@ where the file comes from:
 
 - `existingSecret`: a Kubernetes Secret you create; the chart mounts it; or
 - `file`: the absolute path of a file you mount yourself with `extraVolumes` and
-  `extraVolumeMounts` (Secrets Store CSI driver, Vault Agent, ...). No Kubernetes
-  Secret is involved.
+    `extraVolumeMounts` (Secrets Store CSI driver, Vault Agent, ...). No Kubernetes
+    Secret is involved.
 
 Set one or the other, not both. With `file`, the mount is yours: the chart checks only
 that the path is absolute, so a path without a matching `extraVolumeMounts` entry shows
@@ -195,17 +197,17 @@ example through `extraEnvFrom`, that is your choice; the chart's own wiring neve
 How the Secret gets there is your choice:
 
 - **kubectl:** put the value in a file named after the key, then
-  `kubectl -n k8s-servant create secret generic teams-webhook --from-file=./webhook-url`
-  (see `examples/values-minimal.yaml`).
+    `kubectl -n k8s-servant create secret generic teams-webhook --from-file=./webhook-url`
+    (see `examples/values-minimal.yaml`).
 - **External Secrets Operator:** put a `SecretStore` and an `ExternalSecret` that
-  creates the Secret into `extraObjects`, so they are installed with the release.
-  `examples/values-azure.yaml` does this for Azure Key Vault with Workload Identity.
+    creates the Secret into `extraObjects`, so they are installed with the release.
+    `examples/values-azure.yaml` does this for Azure Key Vault with Workload Identity.
 - **Sealed Secrets, SOPS, Vault Agent, ...:** create the Secret as you usually do, and
-  set its name.
+    set its name.
 - **Secrets Store CSI driver:** mount the volume with `extraVolumes` and
-  `extraVolumeMounts`, put the `SecretProviderClass` into `extraObjects`, and point
-  `file` at the mounted file. `examples/values-azure-csi.yaml` does this for Azure Key
-  Vault: nothing is stored in a Kubernetes Secret.
+    `extraVolumeMounts`, put the `SecretProviderClass` into `extraObjects`, and point
+    `file` at the mounted file. `examples/values-azure-csi.yaml` does this for Azure Key
+    Vault: nothing is stored in a Kubernetes Secret.
 
 ### Extension points
 
@@ -271,13 +273,14 @@ kubectl auth can-i list helmreleases.helm.toolkit.fluxcd.io --as=$SA -A   # yes 
 ```
 
 Then:
+
 - ask a question inside the pod (it shares memory with the scheduler):
-  `kubectl -n k8s-servant exec -it deploy/k8s-servant -c agent -- k8s-servant ask "Anything unhealthy?"`;
+    `kubectl -n k8s-servant exec -it deploy/k8s-servant -c agent -- k8s-servant ask "Anything unhealthy?"`;
 - compare the first check's findings with what you see by hand;
 - post once to Teams:
-  `kubectl -n k8s-servant exec deploy/k8s-servant -c agent -- env TEAMS_POST_MODE=always k8s-servant check --post`;
+    `kubectl -n k8s-servant exec deploy/k8s-servant -c agent -- env TEAMS_POST_MODE=always k8s-servant check --post`;
 - after a restart (`kubectl -n k8s-servant rollout restart deploy/k8s-servant`),
-  open findings must stay open and not come back as new. Memory lives on the volume.
+    open findings must stay open and not come back as new. Memory lives on the volume.
 
 ## When a cluster is recreated
 

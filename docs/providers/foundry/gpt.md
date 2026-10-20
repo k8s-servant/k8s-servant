@@ -7,12 +7,12 @@ through the Responses API. *Cognitive Services OpenAI User*, the role the setup 
 assigns by default, covers only OpenAI models: for DeepSeek, Llama, Grok and other
 non-OpenAI models run the script with `MODEL_ROLE="Cognitive Services User"`
 ([Microsoft Learn](https://learn.microsoft.com/azure/foundry/foundry-models/how-to/configure-entra-id#troubleshooting)). Partner models that offer only Chat Completions use
-[`openai-compatible`](openai-compatible.md) with a Foundry endpoint,
-and Claude has [its own recipe](foundry-claude.md).
+[`openai-compatible`](../openai-compatible.md) with a Foundry endpoint,
+and Claude has [its own recipe](claude.md).
 
 The Azure side (resource, deployment, roles, network) is in
-[foundry-setup.md](../foundry-setup.md) and the background in
-[foundry-concepts.md](../foundry-concepts.md); `scripts/setup-foundry.sh` does it in one go.
+[Foundry setup guide](setup.md) and the background in
+[Foundry concepts](concepts.md); `scripts/setup-foundry.sh` does it in one go.
 
 Laptop `.env` (sign in with `az login`; no key; needs the `azure` extra):
 
@@ -44,11 +44,11 @@ appConfig:
 Entra ID setup: run `scripts/setup-workload-identity.sh` (identity, federated credential,
 the *Cognitive Services OpenAI User* role on the Foundry resource), put the client and
 tenant IDs it prints into `azureWorkloadIdentity`, then follow
-[foundry-setup.md](../foundry-setup.md). With `LLM_AUTH=entra` no key is ever needed, and you
+[Foundry setup guide](setup.md). With `LLM_AUTH=entra` no key is ever needed, and you
 can set `disableLocalAuth: true` on the resource so keys cannot be used at all.
 
 If you must use a key instead (a quick experiment, or another tenant), create the Secret
-as in [OpenAI](openai.md), set `LLM_AUTH: api-key` and `llmApiKey.existingSecret`.
+as in [OpenAI](../openai.md), set `LLM_AUTH: api-key` and `llmApiKey.existingSecret`.
 
 Expected `doctor` model line:
 

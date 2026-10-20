@@ -21,6 +21,7 @@ DATA_DIR/
 ```
 
 SQLite was chosen because:
+
 - it is part of Python and needs no server;
 - "what is new since last time" is a simple query;
 - the whole memory is one file on the volume.
@@ -106,22 +107,22 @@ Notes are short facts the agent should not have to rediscover, for example:
 ```
 
 - **Who writes them.** The agent writes them with its `save_note` tool when it learns a
-  lasting fact during an investigation. People can add or remove lines too.
+    lasting fact during an investigation. People can add or remove lines too.
 - **Size limits.** One sentence, at most 500 characters per note. Only the newest notes
-  up to `NOTES_MAX_CHARS` (default 8000 characters) go into the system prompt, so a
-  growing file cannot crowd out the investigation. Older notes are skipped, with a
-  marker.
+    up to `NOTES_MAX_CHARS` (default 8000 characters) go into the system prompt, so a
+    growing file cannot crowd out the investigation. Older notes are skipped, with a
+    marker.
 - **What does not belong in a note.** Secrets, and temporary states. Findings are
-  tracked separately.
+    tracked separately.
 - **Every new note is visible.** It is logged at WARNING, and the morning report has a
-  section **"Notes saved overnight"**. A note changes what every future run
-  treats as normal, and it could be planted by text in logs or events (prompt
-  injection), so somebody should look at new notes and delete wrong ones.
+    section **"Notes saved overnight"**. A note changes what every future run
+    treats as normal, and it could be planted by text in logs or events (prompt
+    injection), so somebody should look at new notes and delete wrong ones.
 - **Notes vs the environment description.** Notes are the agent's scratchpad.
-  Facts that stay true and matter to everyone should be promoted into the
-  environment description or cluster notes in the values files, which are
-  reviewed through Git (see [knowledge-and-skills.md](knowledge-and-skills.md)).
-  After promoting a note, delete it from `notes.md`.
+    Facts that stay true and matter to everyone should be promoted into the
+    environment description or cluster notes in the values files, which are
+    reviewed through Git (see [knowledge-and-skills.md](knowledge-and-skills.md)).
+    After promoting a note, delete it from `notes.md`.
 
 **Editing notes in the cluster.** The agent's container has no editor:
 
@@ -160,9 +161,9 @@ operation is one short transaction.
 ## Backup, loss and reset
 
 - **Losing the volume loses only history and notes.** The next health check sees the
-  cluster as it is and reports the current problems as new again. That is one noisy
-  Teams post, nothing worse.
+    cluster as it is and reports the current problems as new again. That is one noisy
+    Teams post, nothing worse.
 - **To reset memory**, delete `memory.db` (and `notes.md` for the notes) and let the
-  agent start fresh. In the cluster, delete them in the pod or recreate the PVC.
+    agent start fresh. In the cluster, delete them in the pod or recreate the PVC.
 - No backup is configured by default. If the history becomes valuable, add the PVC
-  to the cluster's backup.
+    to the cluster's backup.

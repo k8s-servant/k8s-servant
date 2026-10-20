@@ -159,8 +159,8 @@ which also explains in plain words why the agent speaks three different APIs.
 
 | `LLM_PROVIDER` | Model | Sign-in | Recipe | Helm example |
 |---|---|---|---|---|
-| `foundry` | GPT and others on Azure AI Foundry | Entra ID or API key | [Foundry](docs/providers/foundry.md) | `examples/values-azure.yaml` |
-| `anthropic` (Foundry endpoint) | Claude on Azure AI Foundry | Entra ID | [Claude on Foundry](docs/providers/foundry-claude.md) | `examples/values-azure-claude.yaml` |
+| `foundry` | GPT and others on Azure AI Foundry | Entra ID or API key | [Foundry](docs/providers/foundry/gpt.md) | `examples/values-azure.yaml` |
+| `anthropic` (Foundry endpoint) | Claude on Azure AI Foundry | Entra ID | [Claude on Foundry](docs/providers/foundry/claude.md) | `examples/values-azure-claude.yaml` |
 | `openai` | OpenAI | API key | [OpenAI](docs/providers/openai.md) | `examples/values-openai.yaml` |
 | `anthropic` | Claude from Anthropic | API key | [Anthropic](docs/providers/anthropic.md) | `examples/values-anthropic.yaml` |
 | `ollama` | A model you host, e.g. in the cluster | none | [Ollama](docs/providers/ollama.md) | `examples/values-ollama.yaml` |
@@ -288,9 +288,9 @@ search and navigation. The same pages, in the repository:
 | [docs/ci-and-releases.md](docs/ci-and-releases.md) | CI workflows, required checks, PR title rules, release-please and published artifacts |
 | [docs/code-walkthrough.md](docs/code-walkthrough.md) | A guided tour of the code in six parts: one question end to end, the model layer, tools and safety, the scheduler and memory, the tests, packaging and release |
 | [docs/development.md](docs/development.md) | Working on the code: code map, rules, tests and fakes, recipes (add a setting, a check, a tool, a skill, a command) |
-| [docs/model-providers.md](docs/model-providers.md) | Choosing a provider, why three APIs, rules every provider shares, data handling; links to one recipe per provider in [docs/providers/](docs/providers/) |
-| [docs/foundry-concepts.md](docs/foundry-concepts.md) | What Azure AI Foundry is: resources, deployments, quota, cost, access, network |
-| [docs/foundry-setup.md](docs/foundry-setup.md) | Setting up the model in Azure AI Foundry, step by step |
+| [docs/model-providers.md](docs/model-providers.md) | Choosing a provider, why three APIs, rules every provider shares, data handling; links to one recipe per provider in [docs/providers/](docs/providers) |
+| [docs/providers/foundry/concepts.md](docs/providers/foundry/concepts.md) | What Azure AI Foundry is: resources, deployments, quota, cost, access, network |
+| [docs/providers/foundry/setup.md](docs/providers/foundry/setup.md) | Setting up the model in Azure AI Foundry, step by step |
 | [docs/roadmap.md](docs/roadmap.md) | What exists, what is next and ideas for later |
 | [Releases](https://github.com/k8s-servant/k8s-servant/releases) | What changed, release by release (also in `CHANGELOG.md`) |
 

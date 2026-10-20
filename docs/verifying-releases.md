@@ -52,12 +52,12 @@ Why you can trust this without a key:
 
 - **Nothing to steal.** The private key exists for seconds, inside the GitHub runner.
 - **Forks can't sign as this project.** A fork's workflow gets a certificate naming
-  the fork's repository, and verification rejects it.
+    the fork's repository, and verification rejects it.
 - **Signing is public.** Every signature is in the Rekor log, which anyone can search
-  ([search.sigstore.dev](https://search.sigstore.dev/)) and nobody can rewrite.
-  A signature made outside the release workflow would be visible there.
+    ([search.sigstore.dev](https://search.sigstore.dev/)) and nobody can rewrite.
+    A signature made outside the release workflow would be visible there.
 - **Any change breaks the signature.** It covers the digest, so a modified image, or a
-  different image pushed under the same tag, fails verification.
+    different image pushed under the same tag, fails verification.
 
 ## The identity to check
 
@@ -94,7 +94,7 @@ cosign checks that:
 
 1. the signature matches this exact digest, so nothing was altered;
 2. the certificate was issued by Sigstore's CA and was valid at signing time. The
-   Rekor log entry proves the time, so an expired certificate is expected and fine;
+      Rekor log entry proves the time, so an expired certificate is expected and fine;
 3. the identity and issuer in the certificate are the ones you asked for.
 
 On success it prints the verified signatures as JSON and exits with status 0. Any
@@ -117,14 +117,14 @@ certificate.
 **What a successful verification rests on:**
 
 1. **Sigstore's root of trust**, shipped with cosign and kept up to date through
-   Sigstore's signed update channel (TUF). It vouches for Fulcio, the certificate
-   authority, and for Rekor, the log.
+      Sigstore's signed update channel (TUF). It vouches for Fulcio, the certificate
+      authority, and for Rekor, the log.
 2. **GitHub's OIDC tokens.** Only a workflow run of this repository's
-   `release-please.yml` on `main` gets a token with that identity, and only that token
-   gets a certificate with it. A fork or another branch gets a different identity.
+      `release-please.yml` on `main` gets a token with that identity, and only that token
+      gets a certificate with it. A fork or another branch gets a different identity.
 3. **Whoever can change `main`.** The repository's ruleset requires a pull request and
-   passing checks for `main` and blocks force pushes; organisation admins can bypass
-   it. Tags `v*` are protected by a second ruleset.
+      passing checks for `main` and blocks force pushes; organisation admins can bypass
+      it. Tags `v*` are protected by a second ruleset.
 
 The identity you pass to `cosign verify` is not a secret and not something to take on
 faith: it is the repository address plus the workflow file and the branch. Once you
@@ -251,9 +251,9 @@ Each release image also carries two attestations, attached by the build and cove
 by the signed digest:
 
 - **SBOM:** every package inside the image, in SPDX format. Feed it to a vulnerability
-  scanner, or check licenses.
+    scanner, or check licenses.
 - **Provenance (SLSA, `mode=max`):** how the image was built: the source repository
-  and commit, the workflow, and the build parameters.
+    and commit, the workflow, and the build parameters.
 
 ```bash
 docker buildx imagetools inspect ghcr.io/k8s-servant/k8s-servant:<version> --format '{{ json .SBOM }}'

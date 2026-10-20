@@ -76,13 +76,13 @@ The root cause, the evidence, the suggested fix, and what is still unknown.
 ```
 
 - The YAML **frontmatter** between the `---` lines has `name` and `description`. The
-  description should be under 1024 characters.
+    description should be under 1024 characters.
 - The **skill's identity is its folder name**, or its key under `extraSkills`. If the
-  frontmatter `name` differs, a warning is logged and the folder name or key wins.
+    frontmatter `name` differs, a warning is logged and the folder name or key wins.
 - The **body** is Markdown that the model reads after calling `load_skill`.
 - Files saved on Windows (CRLF, BOM) are accepted. A skill without frontmatter still
-  loads, but has no description, which triggers a warning. A skill with broken YAML
-  keeps its body and loses its description.
+    loads, but has no description, which triggers a warning. A skill with broken YAML
+    keeps its body and loses its description.
 
 ## Where knowledge is loaded from
 
@@ -127,6 +127,7 @@ knowledge:
 
 **Order and precedence.** The folder is loaded first. Then each `--values` file is
 applied in order:
+
 - a non-empty `environment` or `clusterNotes` replaces the earlier value;
 - `extraSkills` add to the built-in skills, and replace one that has the same name.
 
@@ -140,17 +141,17 @@ Write down what an experienced colleague would tell a new SRE on day one. Concen
 on what the API cannot show and what would otherwise look like a problem:
 
 - **What is normal here:** maintenance and reboot windows, clusters that are stopped or
-  recreated on a schedule, components that restart by design.
+    recreated on a schedule, components that restart by design.
 - **What is absent on purpose:** for example "no service-mesh server pods, the servers
-  are external VMs" or "no log shipping in the test cluster".
+    are external VMs" or "no log shipping in the test cluster".
 - **Where things live:** namespaces of platform components, the URLs of Prometheus and
-  Alertmanager, which namespaces are business vs system, how to tell what manages a
-  resource (Flux vs pipelines).
+    Alertmanager, which namespaces are business vs system, how to tell what manages a
+    resource (Flux vs pipelines).
 - **Policies that cause symptoms:** quotas generated per namespace, admission policies
-  that block images or root containers, a descheduler that evicts crashing pods (and so
-  erases their restart counts and previous logs).
+    that block images or root containers, a descheduler that evicts crashing pods (and so
+    erases their restart counts and previous logs).
 - **What it is not:** no secrets, passwords, tokens or internal credentials. The text
-  is sent to the model with every request.
+    is sent to the model with every request.
 
 Keep it factual, in short bullet points grouped by component. Remove facts as soon as
 they are no longer true. Stale knowledge misleads the agent more than missing knowledge.
@@ -158,34 +159,34 @@ they are no longer true. Stale knowledge misleads the agent more than missing kn
 ## Writing a good skill
 
 - **Description = when to use it.** Start with "Use when ..." and list the symptoms and
-  keywords people actually ask about. The model chooses skills by description alone.
+    keywords people actually ask about. The model chooses skills by description alone.
 - **Read-only steps.** Every step reads something. Where something needs fixing, the
-  skill says "name the fix for the administrators", never "do X".
+    skill says "name the fix for the administrators", never "do X".
 - **Numbered steps, broad to narrow.** Tell the model what to look at *and what each
-  result means* (for example "exit code 137 = killed").
+    result means* (for example "exit code 137 = killed").
 - **Say what to report.** Root cause, evidence, suggested fix, unknowns.
 - **Built-in skills stay generic.** Anything site-specific goes into the environment
-  description or into an `extraSkills` skill. A test (`tests/test_builtin_skills.py`)
-  rejects site names and write commands in the built-in skills.
+    description or into an `extraSkills` skill. A test (`tests/test_builtin_skills.py`)
+    rejects site names and write commands in the built-in skills.
 - **Name tools generically** ("list pods", "describe the pod"). The model picks the
-  MCP tool or kubectl itself.
+    MCP tool or kubectl itself.
 
 ## Testing a new skill or environment change locally
 
 1. Check that it loads:
 
-   ```bash
-   k8s-servant --values my-values.yaml tools      # the skill appears under "Skills:" with its source
-   k8s-servant --values my-values.yaml doctor     # "knowledge" line: environment yes/no, skill count
-   ```
+      ```bash
+      k8s-servant --values my-values.yaml tools      # the skill appears under "Skills:" with its source
+      k8s-servant --values my-values.yaml doctor     # "knowledge" line: environment yes/no, skill count
+      ```
 
 2. Ask a question that should trigger it, and watch the INFO log for the `load_skill`
-   call:
+      call:
 
-   ```bash
-   k8s-servant --values my-values.yaml ask "Why can't service A reach service B?" 2> trace.log
-   grep load_skill trace.log
-   ```
+      ```bash
+      k8s-servant --values my-values.yaml ask "Why can't service A reach service B?" 2> trace.log
+      grep load_skill trace.log
+      ```
 
 3. If the skill is not loaded, improve its description, not the question. Real users
-   will not phrase questions to match a skill.
+      will not phrase questions to match a skill.

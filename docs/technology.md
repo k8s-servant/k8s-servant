@@ -52,9 +52,9 @@ What the agent needs from it:
 
 - **Tool calling**, or the agent cannot read the cluster.
 - **A reasoning model** for good investigations. Small local models work, but follow
-  fewer leads (see [Getting started](getting-started.md)).
+    fewer leads (see [Getting started](getting-started.md)).
 - **Room for about 90k tokens in a minute** during a full health check (a provider's
-  rate limit below that gives `HTTP 429`).
+    rate limit below that gives `HTTP 429`).
 
 Recipes, data handling and the reason for three APIs: [model-providers.md](model-providers.md).
 
@@ -75,7 +75,7 @@ these docs come from:
 | Authentication | Entra ID, role *Cognitive Services OpenAI User* | No keys; Workload Identity in the cluster |
 | Resources | One for non-prod, one for prod (e.g. `my-foundry-nonprod`, `my-foundry-prod`) | Dedicated resources: own quota, network rules, cost |
 
-Details: [foundry-concepts.md](foundry-concepts.md), [foundry-setup.md](foundry-setup.md).
+Details: [Foundry concepts](providers/foundry/concepts.md), [Foundry setup guide](providers/foundry/setup.md).
 
 ## Reading the cluster
 
