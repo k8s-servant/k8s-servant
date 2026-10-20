@@ -39,8 +39,8 @@ reasoning set `LLM_REASONING_EFFORT=` (empty). Recipes:
 Workload Identity and Key Vault parts are optional and AKS-specific.
 
 **Why not an agent framework or HolmesGPT?** A small own loop is easy to read, test
-and secure. HolmesGPT covers much of the same ground and is worth a fair comparison.
-See [architecture.md](architecture.md#why-our-own-loop-and-no-framework).
+and secure. [HolmesGPT](https://github.com/HolmesGPT/holmesgpt) covers much of the same
+ground and is worth a look if it fits you better. See [architecture.md](architecture.md#why-our-own-loop-and-no-framework).
 
 ## Known limitations
 

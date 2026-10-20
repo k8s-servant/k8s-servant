@@ -52,5 +52,4 @@ channels ([#3](https://github.com/k8s-servant/k8s-servant/issues/3),
 | A log-search MCP server (for example Elasticsearch or Loki) | Logs older than the pod's tail and across pods |
 | Read-only cloud-provider access through Workload Identity (for example the Azure Activity Log, the AKS resource, the node resource group) | Explain node pool, upgrade and network problems that the Kubernetes API cannot show |
 | Redaction of tool output before the model | Only if logs turn out to carry personal data or credentials ([data-processing.md](data-processing.md#what-is-not-done)) |
-| A fair comparison with HolmesGPT on the evaluation set | Show where each tool is stronger, with numbers |
 | An agent team: an investigator and a verifier that tries to disprove the diagnosis, then parallel sweeps across the fleet, shown as working robots in the command centre ([#47](https://github.com/k8s-servant/k8s-servant/issues/47)) | Fewer wrong answers and faster fleet checks; only once the scoreboard ([#28](https://github.com/k8s-servant/k8s-servant/issues/28)) shows it beats one agent |
