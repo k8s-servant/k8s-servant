@@ -149,7 +149,7 @@ where requests are **processed**.
   - a private endpoint, or
   - a firewall rule for the resource's hostname.
 
-  See [foundry-setup.md, Step 5](foundry-setup.md#7-step-5--networking).
+  See [foundry-setup.md, Step 5](foundry-setup.md#7-step-5-networking).
 
 ## Safety and privacy
 

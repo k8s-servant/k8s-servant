@@ -6,7 +6,7 @@
 #   2. a platform description shared by your clusters (see examples/knowledge-values.yaml)
 #   3. the cluster's own settings and notes (see examples/values-azure.yaml)
 # The CLI reads the same files with `k8s-servant --values ...`, so it knows the same.
-# Every setting of the agent itself is documented in README.md#configuration.
+# Every setting of the agent itself is documented in docs/configuration.md.
 
 # Extra labels added to every object, e.g. {team: platform, environment: production}.
 labels: {}
@@ -106,7 +106,7 @@ llmApiKey:
   file: ""
 
 # The agent's settings, rendered as environment variables (ConfigMap + envFrom).
-# Any setting from README.md#configuration may be added; empty values are left out,
+# Any setting from docs/configuration.md may be added; empty values are left out,
 # so the code's default applies. Not allowed here:
 #   - in-cluster paths (KNOWLEDGE_DIR, DATA_DIR, HEARTBEAT_FILE, MCP_URL and
 #     KUBECTL_PATH are set by the chart);

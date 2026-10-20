@@ -7,7 +7,7 @@ body:
     id: page
     attributes:
       label: Page or section
-      placeholder: "README.md#configuration, docs/deployment.md, ..."
+      placeholder: "docs/configuration.md, docs/deployment.md, ..."
     validations:
       required: true
   - type: textarea

@@ -52,7 +52,7 @@ What the agent needs from it:
 
 - **Tool calling**, or the agent cannot read the cluster.
 - **A reasoning model** for good investigations. Small local models work, but follow
-  fewer leads (see the README's quickstart).
+  fewer leads (see [Getting started](getting-started.md)).
 - **Room for about 90k tokens in a minute** during a full health check (a provider's
   rate limit below that gives `HTTP 429`).
 

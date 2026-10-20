@@ -36,12 +36,12 @@ Links to the sources are at the end of each section and in [Reference](#12-refer
 
 1. [What you are setting up and why](#1-what-you-are-setting-up-and-why)
 2. [Prerequisites](#2-prerequisites)
-3. [Step 1 – Create the Foundry resource](#3-step-1--create-the-foundry-resource)
-4. [Step 2 – Deploy a chat model](#4-step-2--deploy-a-chat-model)
-5. [Step 3 – Find the endpoint and deployment name](#5-step-3--find-the-endpoint-and-deployment-name)
-6. [Step 4 – Give access](#6-step-4--give-access)
-7. [Step 5 – Networking](#7-step-5--networking)
-8. [Step 6 – Smoke test](#8-step-6--smoke-test)
+3. [Step 1 – Create the Foundry resource](#3-step-1-create-the-foundry-resource)
+4. [Step 2 – Deploy a chat model](#4-step-2-deploy-a-chat-model)
+5. [Step 3 – Find the endpoint and deployment name](#5-step-3-find-the-endpoint-and-deployment-name)
+6. [Step 4 – Give access](#6-step-4-give-access)
+7. [Step 5 – Networking](#7-step-5-networking)
+8. [Step 6 – Smoke test](#8-step-6-smoke-test)
 9. [Cost and limits](#9-cost-and-limits)
 10. [Content safety and data handling](#10-content-safety-and-data-handling)
 11. [Troubleshooting](#11-troubleshooting)
@@ -97,7 +97,7 @@ FOUNDRY=my-foundry            # resource name; also used as the custom subdomain
 DEPLOYMENT=gpt-5-4-mini        # name you give the deployment; the agent uses it as LLM_MODEL
 ```
 
-## 3. Step 1 – Create the Foundry resource
+## 3. Step 1: Create the Foundry resource
 
 **Portal:** [ai.azure.com](https://ai.azure.com), then **Create new** → **Foundry
 resource**. Pick the subscription, resource group, region and name. Alternatively, in the
@@ -136,7 +136,7 @@ az cognitiveservices account project create --name "$FOUNDRY" --resource-group "
 Sources: [Quickstart: create Foundry resources](https://learn.microsoft.com/azure/foundry/tutorials/quickstart-create-foundry-resources),
 [Create projects](https://learn.microsoft.com/azure/foundry/how-to/create-projects).
 
-## 4. Step 2 – Deploy a chat model
+## 4. Step 2: Deploy a chat model
 
 ### Choose a model
 
@@ -246,7 +246,7 @@ Sources: [Deploy models](https://learn.microsoft.com/azure/foundry/foundry-model
 [Retirements](https://learn.microsoft.com/azure/foundry/openai/concepts/model-retirements),
 [Upgrade policy](https://learn.microsoft.com/azure/foundry/openai/how-to/working-with-models#model-deployment-upgrade-configuration).
 
-## 5. Step 3 – Find the endpoint and deployment name
+## 5. Step 3: Find the endpoint and deployment name
 
 **Portal:** Azure portal → the Foundry resource → **Overview** (or **Resource Management** →
 **Keys and Endpoint**). The Foundry portal shows the same values on the resource's overview page.
@@ -276,7 +276,7 @@ LLM_AUTH=entra
   `normalize_endpoint` in `k8s_servant/llm/providers.py`). The endpoint must start with `https://`.
 - `LLM_MODEL` is the **deployment name** from Step 2, not the model name.
 
-## 6. Step 4 – Give access
+## 6. Step 4: Give access
 
 The agent authenticates with **Entra ID**. Whoever calls the model needs a
 **data-plane role** on the resource. *Owner* and *Contributor* are not enough: they
@@ -372,7 +372,7 @@ Sources: [Configure Entra ID](https://learn.microsoft.com/azure/foundry/foundry-
 [Foundry RBAC](https://learn.microsoft.com/azure/foundry/concepts/rbac-foundry),
 [Disable local auth](https://learn.microsoft.com/azure/ai-services/disable-local-auth).
 
-## 7. Step 5 – Networking
+## 7. Step 5: Networking
 
 **From a laptop.** If the resource allows public network access (the default), nothing
 else is needed.
@@ -419,7 +419,7 @@ Sources: [Private link for Foundry](https://learn.microsoft.com/azure/foundry/ho
 [Private endpoint DNS](https://learn.microsoft.com/azure/private-link/private-endpoint-dns),
 [Virtual networks](https://learn.microsoft.com/azure/ai-services/cognitive-services-virtual-networks).
 
-## 8. Step 6 – Smoke test
+## 8. Step 6: Smoke test
 
 ### With curl (independent of the agent)
 

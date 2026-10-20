@@ -82,7 +82,7 @@ signatures, and how to keep your settings in a private repository without a fork
 |---|---|
 | A chat model with tool calling | Pick a provider ([model-providers.md](model-providers.md)); for Azure AI Foundry, `scripts/setup-foundry.sh` ([foundry-setup.md](foundry-setup.md)) |
 | (AKS) OIDC issuer and Workload Identity on the cluster | `az aks show -g my-cluster-rg -n my-cluster --query "[oidcIssuerProfile.enabled, securityProfile.workloadIdentity.enabled]"` → `[true, true]` |
-| (Optional) The Teams webhook URL, as a Kubernetes Secret or in your secret store | [MS Teams setup](../README.md#ms-teams-setup); see [Credentials](#credentials-bring-your-own-secrets) |
+| (Optional) The Teams webhook URL, as a Kubernetes Secret or in your secret store | [MS Teams setup](teams-setup.md); see [Credentials](#credentials-bring-your-own-secrets) |
 | (Optional, Azure example) External Secrets Operator, to sync it from Key Vault | `kubectl get crd externalsecrets.external-secrets.io secretstores.external-secrets.io` |
 | Approval to send this cluster's data to the model | your organisation's data-processing rules ([data-processing.md](data-processing.md)) |
 | (AKS) Rights | Contributor on the identity's resource group; Owner or User Access Administrator on the Key Vault and the Foundry resource |
@@ -147,7 +147,7 @@ If the cluster's egress is restricted, the pod needs HTTPS (443) to:
 
 If `k8s-servant doctor` in the pod shows a timeout for the model, open the egress; on
 Foundry you can also use a private endpoint
-([foundry-setup.md](foundry-setup.md#7-step-5--networking)).
+([foundry-setup.md](foundry-setup.md#7-step-5-networking)).
 
 ## 3. Values for the cluster
 

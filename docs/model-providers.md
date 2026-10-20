@@ -17,7 +17,7 @@ supported nothing else.
 - [OpenAI](#openai)
 - [Anthropic](#anthropic)
 - [Ollama](#ollama-laptop-and-in-cluster)
-- [OpenAI-compatible (vLLM, LiteLLM, Gemini, ...)](#openai-compatible-vllm-litellm-gemini-)
+- [OpenAI-compatible (vLLM, LiteLLM, Gemini, ...)](#openai-compatible-vllm-litellm-gemini-and-others)
 - [Settings each provider ignores](#settings-each-provider-ignores)
 - [Migrating from FOUNDRY_* settings](#migrating-from-foundry_-settings)
 
@@ -102,11 +102,11 @@ Rules that hold for every provider:
   error and the run is recorded as failed, as is a failed, cancelled or
   content-filtered reply. Raise `LLM_MAX_OUTPUT_TOKENS` or lower the effort.
 - `temperature` is never sent (reasoning models reject it).
-- The full settings table is in the [README](../README.md#configuration). To start from
+- The full settings table is in [configuration.md](configuration.md). To start from
   a ready-made Helm values file, copy one from `examples/` (listed in each recipe).
 
 Every recipe below installs with plain Helm. Flux or another GitOps tool works the same
-way: see [`examples/flux-helmrelease.yaml`](../examples/flux-helmrelease.yaml) if you
+way: see [`examples/flux-helmrelease.yaml`](https://github.com/k8s-servant/k8s-servant/blob/main/examples/flux-helmrelease.yaml) if you
 prefer it.
 
 ## Foundry (GPT and other Responses models)
@@ -118,7 +118,7 @@ through the Responses API. *Cognitive Services OpenAI User*, the role the setup 
 assigns by default, covers only OpenAI models: for DeepSeek, Llama, Grok and other
 non-OpenAI models run the script with `MODEL_ROLE="Cognitive Services User"`
 ([Microsoft Learn](https://learn.microsoft.com/azure/foundry/foundry-models/how-to/configure-entra-id#troubleshooting)). Partner models that offer only Chat Completions use
-[`openai-compatible`](#openai-compatible-vllm-litellm-gemini-) with a Foundry endpoint,
+[`openai-compatible`](#openai-compatible-vllm-litellm-gemini-and-others) with a Foundry endpoint,
 and Claude has [its own recipe](#claude-on-foundry).
 
 The Azure side (resource, deployment, roles, network) is in
@@ -134,9 +134,9 @@ LLM_MODEL=my-deployment                              # the deployment name
 LLM_AUTH=entra
 ```
 
-Cluster: [`examples/values-azure.yaml`](../examples/values-azure.yaml) (Workload Identity,
+Cluster: [`examples/values-azure.yaml`](https://github.com/k8s-servant/k8s-servant/blob/main/examples/values-azure.yaml) (Workload Identity,
 Teams webhook synced from Key Vault by External Secrets) or
-[`examples/values-azure-csi.yaml`](../examples/values-azure-csi.yaml) (no Kubernetes
+[`examples/values-azure-csi.yaml`](https://github.com/k8s-servant/k8s-servant/blob/main/examples/values-azure-csi.yaml) (no Kubernetes
 Secrets at all). The relevant part:
 
 ```yaml
@@ -184,7 +184,7 @@ LLM_MODEL=claude-sonnet-5-5                              # the deployment name
 LLM_AUTH=entra
 ```
 
-Cluster: [`examples/values-azure-claude.yaml`](../examples/values-azure-claude.yaml).
+Cluster: [`examples/values-azure-claude.yaml`](https://github.com/k8s-servant/k8s-servant/blob/main/examples/values-azure-claude.yaml).
 
 ```yaml
 azureWorkloadIdentity:
@@ -228,7 +228,7 @@ LLM_API_KEY_FILE=/path/to/openai-api-key   # or LLM_API_KEY=... for a quick test
 
 No `LLM_ENDPOINT` is needed (it defaults to `https://api.openai.com/v1`).
 
-Cluster: [`examples/values-openai.yaml`](../examples/values-openai.yaml). Put the key in a
+Cluster: [`examples/values-openai.yaml`](https://github.com/k8s-servant/k8s-servant/blob/main/examples/values-openai.yaml). Put the key in a
 file named `api-key` and create the Secret (this keeps it out of your shell history):
 
 ```bash
@@ -276,7 +276,7 @@ LLM_API_KEY_FILE=/path/to/anthropic-api-key   # or LLM_API_KEY=... for a quick t
 
 No `LLM_ENDPOINT` is needed (it defaults to `https://api.anthropic.com`).
 
-Cluster: [`examples/values-anthropic.yaml`](../examples/values-anthropic.yaml). Create the
+Cluster: [`examples/values-anthropic.yaml`](https://github.com/k8s-servant/k8s-servant/blob/main/examples/values-anthropic.yaml). Create the
 Secret exactly as for [OpenAI](#openai) (a file named `api-key`, secret
 `k8s-servant-llm`), then:
 
@@ -321,7 +321,7 @@ LLM_MODEL=qwen3
 
 **In the cluster**: run Ollama as a Deployment with a Service (any way you like; the
 model must be pulled into it), then use
-[`examples/values-ollama.yaml`](../examples/values-ollama.yaml):
+[`examples/values-ollama.yaml`](https://github.com/k8s-servant/k8s-servant/blob/main/examples/values-ollama.yaml):
 
 ```yaml
 appConfig:
@@ -348,7 +348,7 @@ Expected `doctor` model line:
 model: ollama / qwen3 via Chat Completions API, no key
 ```
 
-## OpenAI-compatible (vLLM, LiteLLM, Gemini, ...)
+## OpenAI-compatible: vLLM, LiteLLM, Gemini and others
 
 **Choose it when** your server speaks the OpenAI Chat Completions API and is not one of
 the providers above: self-hosted vLLM or LM Studio, a LiteLLM gateway in front of many
@@ -358,7 +358,7 @@ only offers Chat Completions. `LLM_ENDPOINT` is the full base URL including its 
 is not sent unless you set `LLM_REASONING_EFFORT`, because the model behind the endpoint
 is unknown and many reject it. The model must support tool calling.
 
-Cluster base: [`examples/values-minimal.yaml`](../examples/values-minimal.yaml) is exactly
+Cluster base: [`examples/values-minimal.yaml`](https://github.com/k8s-servant/k8s-servant/blob/main/examples/values-minimal.yaml) is exactly
 this provider with an API key and a Teams webhook:
 
 ```yaml

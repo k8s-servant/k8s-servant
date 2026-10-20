@@ -15,7 +15,7 @@ issues.
 ## Direction
 
 The project's direction is written down in the
-[vision](superpowers/specs/2026-10-17-teammate-vision-design.md): k8s-servant should
+[vision](https://github.com/k8s-servant/k8s-servant/blob/main/docs/superpowers/specs/2026-10-17-teammate-vision-design.md): k8s-servant should
 feel like **one more person on the team**. It explains what is wrong, why, and how to
 fix it; it shows up on its own and remembers; it works where the team already is; and
 it earns the right to do more through a visible track record. Being read-only stays the

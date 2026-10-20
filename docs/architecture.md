@@ -155,7 +155,7 @@ Kubernetes read operations as MCP tools, for example `pods_list`, `pods_log`,
 - `read_only = true` exposes only read tools, and `[[denied_resources]]` hides Secrets.
 - Its tool descriptions are written for models.
 
-The configuration is in [`deploy/local/mcp-config.toml`](../deploy/local/mcp-config.toml).
+The configuration is in [`deploy/local/mcp-config.toml`](https://github.com/k8s-servant/k8s-servant/blob/main/deploy/local/mcp-config.toml).
 Only the `core` toolset is enabled:
 
 - **`config` is off.** Its `configuration_view` tool returns the raw kubeconfig,

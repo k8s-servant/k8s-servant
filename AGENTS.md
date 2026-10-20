@@ -49,7 +49,7 @@ docker build -t k8s-servant:dev .                               # image
 - **No shell.** Use `asyncio.create_subprocess_exec` with an argument list.
 - **stdout carries only the answer.** Logs go to stderr.
 - **Settings come only from environment variables**, via `config.configure_app()`, with
-  a comment per key.
+  a comment per key and a row in `docs/configuration.md` (a test checks both ways).
 - **No `temperature`** on model calls (reasoning models reject it).
 - **Comments:** every module starts with a docstring explaining what and why. Google-style
   docstrings. Comments explain intent, not mechanics.
