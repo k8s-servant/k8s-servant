@@ -13,5 +13,5 @@ maintainers:
     url: https://github.com/orgs/k8s-servant/teams/maintainers
 # Chart version and app version are kept equal with pyproject.toml; release-please
 # bumps all three together. Do not edit them by hand.
-version: 0.3.0 # x-release-please-version
-appVersion: "0.3.0" # x-release-please-version
+version: 0.3.1 # x-release-please-version
+appVersion: "0.3.1" # x-release-please-version
