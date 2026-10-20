@@ -17,41 +17,49 @@ exclude_docs = """
 """
 nav = [
   { "Home" = "index.md" },
-  { "Getting started" = [
+  { "Get started" = [
     { "Quickstart" = "getting-started.md" },
-    { "Deploying to a cluster" = "deployment.md" },
-    { "Running from a mirror" = "running-from-a-mirror.md" },
+    { "Deploy to a cluster" = "deployment.md" },
+    { "Run from a mirror" = "running-from-a-mirror.md" },
   ] },
   { "Model providers" = [
-    { "Choosing a provider" = "model-providers.md" },
-    { "Azure AI Foundry concepts" = "foundry-concepts.md" },
-    { "Azure AI Foundry setup" = "foundry-setup.md" },
+    { "Overview" = "model-providers.md" },
+    { "Anthropic" = "providers/anthropic.md" },
+    { "OpenAI" = "providers/openai.md" },
+    { "Ollama" = "providers/ollama.md" },
+    { "OpenAI-compatible" = "providers/openai-compatible.md" },
+    { "Azure AI Foundry" = [
+      { "GPT and other models" = "providers/foundry.md" },
+      { "Claude on Foundry" = "providers/foundry-claude.md" },
+      { "Concepts" = "foundry-concepts.md" },
+      { "Setup guide" = "foundry-setup.md" },
+    ] },
   ] },
-  { "Configuration" = [
+  { "Configure" = [
     { "Settings" = "configuration.md" },
-    { "MS Teams setup" = "teams-setup.md" },
+    { "MS Teams" = "teams-setup.md" },
     { "Teaching the agent" = "knowledge-and-skills.md" },
-    { "How the agent learns" = "how-the-agent-learns.md" },
   ] },
-  { "Using it" = [
+  { "Use" = [
     { "The command" = "cli.md" },
     { "Reports" = "reports.md" },
-    { "Memory" = "memory.md" },
-    { "Tools" = "tools.md" },
     { "Troubleshooting" = "troubleshooting.md" },
     { "FAQ and limitations" = "faq.md" },
   ] },
   { "How it works" = [
     { "Overview" = "how-it-works.md" },
     { "Architecture" = "architecture.md" },
-    { "Technology" = "technology.md" },
+    { "Tools" = "tools.md" },
+    { "Memory" = "memory.md" },
+    { "How the agent learns" = "how-the-agent-learns.md" },
     { "Data processing" = "data-processing.md" },
+    { "Technology" = "technology.md" },
   ] },
   { "Security" = [
     { "Security model" = "security.md" },
     { "Verifying releases" = "verifying-releases.md" },
   ] },
-  { "Contributing" = [
+  { "Contribute" = [
     { "Code walkthrough" = "code-walkthrough.md" },
     { "Development guide" = "development.md" },
     { "CI and releases" = "ci-and-releases.md" },

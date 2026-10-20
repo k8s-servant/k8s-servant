@@ -148,9 +148,7 @@ def configure_app(env: Mapping[str, str] | None = None) -> dict:
     env = os.environ if env is None else env
     renamed = [f"{old} -> {new}" for old, new in OLD_SETTINGS.items() if old in env]
     if renamed:
-        raise ValueError(
-            f"These settings were renamed: {', '.join(renamed)}. See docs/model-providers.md for the new names."
-        )
+        raise ValueError(f"These settings were renamed: {', '.join(renamed)}. Rename them in your .env or Helm values.")
     provider_name = env.get("LLM_PROVIDER", "").strip().lower()
     if provider_name and provider_name not in PROVIDERS:
         raise ValueError(

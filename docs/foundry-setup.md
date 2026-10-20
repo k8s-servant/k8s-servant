@@ -362,7 +362,7 @@ Foundry resource (for example because the resource lives in another tenant or
 subscription that you do not control), use a Foundry **API key** kept in Key Vault:
 Workload Identity still reads the key from Key Vault, and `LLM_AUTH: api-key` uses it.
 Deliver the key as a Secret or mounted file as in
-[model-providers.md](model-providers.md#openai) (`llmApiKey.existingSecret` or
+[model-providers.md](providers/openai.md) (`llmApiKey.existingSecret` or
 `llmApiKey.file`). In that case do not disable local auth on that resource.
 
 **Token scope.** The agent requests tokens for `https://ai.azure.com/.default`, the
