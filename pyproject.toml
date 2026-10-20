@@ -34,9 +34,11 @@ dependencies = [
 [project.optional-dependencies]
 azure = ["azure-identity>=1.26,<2"] # Entra ID tokens for Foundry: Workload Identity in the cluster, az login locally
 dev = ["pytest>=9,<10", "pytest-asyncio>=1.4,<2", "pytest-cov>=7", "ruff>=0.17", "pre-commit>=4"]
+docs = ["zensical==0.0.71"] # The documentation site (zensical.toml); pinned while Zensical is alpha
 
 [project.urls]
 Homepage = "https://github.com/k8s-servant/k8s-servant"
+Documentation = "https://k8s-servant.dev"
 Issues = "https://github.com/k8s-servant/k8s-servant/issues"
 Changelog = "https://github.com/k8s-servant/k8s-servant/blob/main/CHANGELOG.md"
 

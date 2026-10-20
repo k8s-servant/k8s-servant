@@ -11,6 +11,7 @@
 ![Python](https://img.shields.io/badge/Python-3.12%2B-3776AB)
 ![Access](https://img.shields.io/badge/Cluster_access-read--only-success)
 ![Status](https://img.shields.io/badge/Status-early_alpha-orange)
+[![Docs](https://img.shields.io/badge/docs-k8s--servant.dev-blue)](https://k8s-servant.dev)
 
 A **read-only AI SRE** for Kubernetes clusters. It looks at a cluster the way an
 experienced cluster administrator would: it finds what is wrong, explains why with
@@ -260,6 +261,9 @@ environment description or the cluster notes instead of changing code.
 
 ## Documentation
 
+The documentation is published at **[k8s-servant.dev](https://k8s-servant.dev)**, with
+search and navigation. The same pages, in the repository:
+
 | Document | What it covers |
 |---|---|
 | [docs/getting-started.md](docs/getting-started.md) | The full local quickstart on a throwaway kind cluster, then the MCP server, Prometheus and your platform's knowledge |
@@ -301,7 +305,7 @@ tools, summary tools with skipping of unchanged checks, a signed container image
 the Helm chart.
 
 Where it is going: k8s-servant should feel like **one more person on the team**. Next
-come a documentation site, an **initial scan** in which the agent drafts the
+comes an **initial scan** in which the agent drafts the
 description of your platform ([#35](https://github.com/k8s-servant/k8s-servant/issues/35)),
 then a **two-way MS Teams bot** for the whole fleet
 ([#27](https://github.com/k8s-servant/k8s-servant/issues/27)), a **command centre** web
