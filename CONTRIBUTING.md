@@ -23,6 +23,10 @@ helm lint charts/k8s-servant      # chart
 docker build -t k8s-servant:dev . # image
 ```
 
+New to the code? [docs/code-walkthrough.md](docs/code-walkthrough.md) is a guided tour
+in six parts, and [docs/development.md](docs/development.md) has the code map and
+recipes for common changes.
+
 ## Workflow
 
 1. For anything bigger than a small fix, open an issue first so we can agree on the approach.
