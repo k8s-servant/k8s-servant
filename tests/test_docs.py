@@ -8,12 +8,15 @@ there, and every variable in the tables must still exist.
 import re
 from pathlib import Path
 
-from k8s_servant.llm.providers import OLD_SETTINGS
+from k8s_servant.llm.providers import OLD_SETTINGS, PROVIDERS
 
 ROOT = Path(__file__).resolve().parent.parent
 CONFIG = (ROOT / "k8s_servant" / "config.py").read_text()
 README = (ROOT / "README.md").read_text()
 CONFIGURATION = (ROOT / "docs" / "configuration.md").read_text()
+DOCS = ROOT / "docs"
+# Every page of the site (design documents in docs/superpowers/ are not part of it).
+SITE_PAGES = sorted(p for p in DOCS.rglob("*.md") if "superpowers" not in p.parts)
 
 
 def _settings_in_code() -> set[str]:
@@ -48,7 +51,7 @@ def _slug(heading: str) -> str:
 
 
 def test_links_between_docs_point_to_existing_files_and_headings():
-    pages = [ROOT / "README.md", *sorted((ROOT / "docs").glob("*.md"))]
+    pages = [ROOT / "README.md", *SITE_PAGES]
     broken = []
     for page in pages:
         for target in re.findall(r"\]\(([^)\s]+)\)", page.read_text()):
@@ -70,33 +73,39 @@ def _links(page: Path) -> list[str]:
     return re.findall(r"\]\(([^)\s]+)\)", page.read_text())
 
 
+def _leaves_docs(page: Path, target: str) -> bool:
+    if target.startswith(("http://", "https://", "mailto:", "#")):
+        return False
+    return not (page.parent / target.partition("#")[0]).resolve().is_relative_to(DOCS)
+
+
 def test_docs_pages_link_only_inside_docs():
-    # The site is built from docs/ alone; a ../ link has no page to land on there.
-    outside = [f"{p.name}: {t}" for p in sorted((ROOT / "docs").glob("*.md")) for t in _links(p) if t.startswith("../")]
+    # The site is built from docs/ alone; a link that leaves it has no page to land on.
+    outside = [f"{p.name}: {t}" for p in SITE_PAGES for t in _links(p) if _leaves_docs(p, t)]
     assert not outside, "use https://github.com/k8s-servant/k8s-servant/blob/main/... instead:\n" + "\n".join(outside)
 
 
 def test_anchors_are_the_same_on_github_and_on_the_site():
     # GitHub keeps every hyphen; the site's renderer merges runs of them and drops a
     # trailing one. Anchors without either work in both places.
-    pages = [ROOT / "README.md", *sorted((ROOT / "docs").glob("*.md"))]
+    pages = [ROOT / "README.md", *SITE_PAGES]
     anchors = [f"{p.name}: {t}" for p in pages for t in _links(p) if "#" in t and not t.startswith("http")]
     differ = [a for a in anchors if "--" in a.split("#", 1)[1] or a.endswith("-")]
     assert not differ, "reword the heading so its anchor has no '--' or trailing '-':\n" + "\n".join(differ)
 
 
-# --- model providers page ------------------------------------------------------------
+# --- model providers ---------------------------------------------------------------
 
-PROVIDERS_PAGE = ROOT / "docs" / "model-providers.md"
-MIGRATION_HEADING = "Migrating from FOUNDRY_* settings"
+PROVIDERS_PAGE = DOCS / "model-providers.md"
+# One recipe page per LLM_PROVIDER value, plus Claude on Foundry (anthropic on a Foundry endpoint).
+RECIPES = [*PROVIDERS, "foundry-claude"]
 
 
-def test_model_providers_page_has_a_recipe_per_provider():
-    page = PROVIDERS_PAGE.read_text()
-    for heading in ["Foundry", "Claude on Foundry", "OpenAI", "Anthropic", "Ollama", "OpenAI-compatible"]:
-        assert re.search(rf"^## .*{re.escape(heading)}", page, re.MULTILINE), heading
-    for old, new in OLD_SETTINGS.items():
-        assert f"`{old}`" in page and f"`{new}`" in page
+def test_every_provider_has_a_recipe_page_linked_from_the_overview():
+    overview = PROVIDERS_PAGE.read_text()
+    for name in RECIPES:
+        assert (DOCS / "providers" / f"{name}.md").exists(), f"add docs/providers/{name}.md"
+        assert f"(providers/{name}.md)" in overview, f"link providers/{name}.md from model-providers.md"
 
 
 def test_every_example_values_file_is_listed_in_the_readme():
@@ -104,23 +113,24 @@ def test_every_example_values_file_is_listed_in_the_readme():
     assert not missing, f"list in the README examples table: {missing}"
 
 
-def test_no_doc_mentions_old_foundry_settings_outside_the_migration_table():
-    pages = [ROOT / "README.md", *sorted((ROOT / "docs").glob("*.md"))]
-    offenders = []
-    for page in pages:
-        text = page.read_text()
-        if page == PROVIDERS_PAGE:
-            # The migration section is the one place the old names belong.
-            text = text.split(f"## {MIGRATION_HEADING}")[0]
-        offenders += [f"{page.name}: {old}" for old in OLD_SETTINGS if re.search(rf"\b{old}\b", text)]
+def test_no_doc_mentions_old_foundry_settings():
+    # The agent names the new setting when it finds an old one; the docs only use the new names.
+    pages = [ROOT / "README.md", *SITE_PAGES]
+    offenders = [f"{p.name}: {old}" for p in pages for old in OLD_SETTINGS if re.search(rf"\b{old}\b", p.read_text())]
     assert not offenders, "\n".join(offenders)
 
 
-def test_model_providers_page_explains_the_apis_and_privacy():
+def test_model_providers_pages_explain_the_apis_and_privacy():
     page = PROVIDERS_PAGE.read_text()
-    for needle in ["Why three APIs", "Chat Completions", "Responses", "Messages", "store=false", "unencrypted"]:
+    for needle in ["Why three APIs", "Chat Completions", "Responses", "Messages", "store=false"]:
         assert needle in page, needle
-    assert "https://generativelanguage.googleapis.com/v1beta/openai/" in page
+    # The plain-http warning sits where in-cluster http endpoints are configured.
+    for name in ["ollama", "openai-compatible"]:
+        assert "unencrypted" in (DOCS / "providers" / f"{name}.md").read_text(), name
+    assert (
+        "https://generativelanguage.googleapis.com/v1beta/openai/"
+        in (DOCS / "providers" / "openai-compatible.md").read_text()
+    )
 
 
 def test_the_providers_page_is_linked_from_the_readme():

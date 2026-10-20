@@ -230,5 +230,5 @@ registries, IDs or hostnames in code, tests, examples or screenshots.
   request sooner or later.
 
 If you are moving from an internal copy or an older version, note that the `FOUNDRY_*`
-settings were renamed to `LLM_*`
-([model-providers.md](model-providers.md#migrating-from-foundry_-settings)).
+settings were renamed to `LLM_*`; the agent names each new setting when it finds an old
+one.
