@@ -245,7 +245,7 @@ def configure_app(env: Mapping[str, str] | None = None) -> dict:
         "alertmanager_url": env.get("ALERTMANAGER_URL", "").strip().rstrip("/"),
         # One Prometheus or Alertmanager request may not take longer than this.
         "prometheus_timeout_seconds": _int(env, "PROMETHEUS_TIMEOUT_SECONDS", 30),
-        # --- MS Teams (docs: README, Teams section) ---
+        # --- MS Teams (docs/teams-setup.md) ---
         # Workflows webhook URL. It is a credential: in the cluster it comes from a
         # Secret mounted as a file (TEAMS_WEBHOOK_URL_FILE), which wins when set.
         "teams_webhook_url": env.get("TEAMS_WEBHOOK_URL", "").strip(),

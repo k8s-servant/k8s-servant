@@ -3,7 +3,7 @@
 How to work on the code: where things are, the rules every change follows, and
 step-by-step recipes for the most common changes. Read [architecture.md](architecture.md)
 first for the big picture, and [code-walkthrough.md](code-walkthrough.md) for a guided
-tour of how the code works; [AGENTS.md](../AGENTS.md) holds the same conventions in
+tour of how the code works; [AGENTS.md](https://github.com/k8s-servant/k8s-servant/blob/main/AGENTS.md) holds the same conventions in
 short form.
 
 ## Setup
@@ -21,7 +21,7 @@ venv (see [troubleshooting.md](troubleshooting.md#local-setup)).
 
 | If you want to change ... | Look at |
 |---|---|
-| A setting | `config.py` (and the README table, see below) |
+| A setting | `config.py` (and the table in `docs/configuration.md`, see below) |
 | How the model is called (endpoint, auth, reasoning, token log) | `llm/` |
 | The system prompt or the tool-calling loop | `agent.py` |
 | Which tools a session gets, and in which order | `runtime.py` |
@@ -75,8 +75,8 @@ venv (see [troubleshooting.md](troubleshooting.md#local-setup)).
   tests, a fake `kubectl` script (CLI tests must never read a real cluster).
 - `cli.main()` reconfigures logging to stderr, so CLI tests read stderr with `capsys`,
   not `caplog`.
-- `tests/test_docs.py` checks the documentation: every setting in the README table,
-  links between docs, docstrings.
+- `tests/test_docs.py` checks the documentation: every setting in the
+  `docs/configuration.md` tables, links between docs, docstrings.
 - There is **no automated test of answer quality** yet. After changing the prompt, a
   skill, the model or the summary tools, run `ask` and `check` against a real cluster
   and compare with what you find by hand (`kubectl`).
@@ -88,7 +88,7 @@ venv (see [troubleshooting.md](troubleshooting.md#local-setup)).
 1. Add it to `configure_app()` in `config.py` with a comment, using the helpers
    (`_int`, `_bool`, `_choice`, `_name_list`, ...) so a bad value names the variable.
 2. Test it in `tests/test_config.py` (default, a valid value, an invalid value).
-3. Add a row to the right table in `README.md`. `tests/test_docs.py` fails until you do.
+3. Add a row to the right table in `docs/configuration.md`. `tests/test_docs.py` fails until you do.
 4. Add a commented line to `.env.example`.
 5. If it has a sensible per-cluster value, add it to `appConfig` in `charts/k8s-servant/values.yaml`
    (with a comment) or to the environment files.
@@ -157,4 +157,4 @@ git diff --stat             # only what you meant to change
 
 Then a pull request with a [Conventional Commit](https://www.conventionalcommits.org/)
 title that says *why*: release-please builds the CHANGELOG from those titles. See
-[CONTRIBUTING.md](../CONTRIBUTING.md).
+[CONTRIBUTING.md](https://github.com/k8s-servant/k8s-servant/blob/main/CONTRIBUTING.md).

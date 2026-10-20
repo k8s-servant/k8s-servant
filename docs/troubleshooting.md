@@ -30,11 +30,11 @@ each provider's recipe in [model-providers.md](model-providers.md) shows the exp
 | `Entra ID sign-in needs azure-identity` | The `azure` extra is missing outside the image | `pip install -e '.[azure]'` |
 | `HTTP 401` right after setup | The data-plane role takes ~5–10 minutes to apply | Wait, run `doctor` again |
 | `HTTP 401` with Claude or another non-OpenAI model | *Cognitive Services OpenAI User* covers only OpenAI models | Assign *Cognitive Services User* (`MODEL_ROLE="Cognitive Services User" scripts/setup-workload-identity.sh ...`) |
-| `HTTP 401` later | `az login` expired, wrong tenant, or the identity lacks the role | `az login`; check the role on the Foundry resource ([foundry-setup.md](foundry-setup.md#6-step-4--give-access)) |
-| `HTTP 403` | Network rules of the Foundry resource (public access disabled, IP not allowed) | Private endpoint / firewall ([foundry-setup.md](foundry-setup.md#7-step-5--networking)) |
+| `HTTP 401` later | `az login` expired, wrong tenant, or the identity lacks the role | `az login`; check the role on the Foundry resource ([foundry-setup.md](foundry-setup.md#6-step-4-give-access)) |
+| `HTTP 403` | Network rules of the Foundry resource (public access disabled, IP not allowed) | Private endpoint / firewall ([foundry-setup.md](foundry-setup.md#7-step-5-networking)) |
 | `HTTP 404` | `LLM_MODEL` is the model name instead of the deployment name, wrong resource, or a deployment younger than ~5 min | `az cognitiveservices account deployment list -g <rg> -n <resource> -o table` |
 | `HTTP 429 ... exceeded token rate limit` | The deployment's capacity is too low | Raise it to 150–200k TPM (Foundry portal → the deployment → Edit). It costs nothing extra: you pay per token |
-| `cannot reach LLM_ENDPOINT` | DNS or private endpoint | `nslookup <resource>.openai.azure.com`; the curl test in [foundry-setup.md](foundry-setup.md#8-step-6--smoke-test) |
+| `cannot reach LLM_ENDPOINT` | DNS or private endpoint | `nslookup <resource>.openai.azure.com`; the curl test in [foundry-setup.md](foundry-setup.md#8-step-6-smoke-test) |
 
 ### Anthropic
 
@@ -76,7 +76,7 @@ each provider's recipe in [model-providers.md](model-providers.md) shows the exp
 | Symptom | Cause | Fix |
 |---|---|---|
 | A check is not posted | `TEAMS_POST_MODE=changes` and nothing is new or resolved | Expected. `TEAMS_POST_MODE=always` to see every check |
-| `Teams webhook is not configured` | Neither `TEAMS_WEBHOOK_URL_FILE` nor `TEAMS_WEBHOOK_URL` is set | [README](../README.md#ms-teams-setup) |
+| `Teams webhook is not configured` | Neither `TEAMS_WEBHOOK_URL_FILE` nor `TEAMS_WEBHOOK_URL` is set | [MS Teams setup](teams-setup.md) |
 | `Posting to Teams failed: HTTP 4xx` | Wrong or revoked URL, or the flow is turned off | Check the Workflow in Teams; copy the URL again |
 | No morning report | Weekend, already sent today, `MORNING_REPORT_ENABLED=false`, or `serve` not running | `k8s-servant history` shows `morning` runs |
 

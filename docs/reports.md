@@ -194,7 +194,7 @@ come back.
 ## Teams cards
 
 Cards are Adaptive Cards posted to a Teams **Workflows** webhook (setup:
-[README](../README.md#ms-teams-setup)).
+[MS Teams setup](teams-setup.md)).
 
 | Card | Headline | Content |
 |---|---|---|

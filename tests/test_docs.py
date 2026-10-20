@@ -1,8 +1,8 @@
 """Documentation drift checks.
 
-The README's configuration table is the reference people read. It drifted once
-already (2026-10-12), so every setting read in config.py must be listed there, and
-every variable in the table must still exist.
+The configuration tables in docs/configuration.md are the reference people read. They
+drifted once already (2026-10-12), so every setting read in config.py must be listed
+there, and every variable in the tables must still exist.
 """
 
 import re
@@ -13,6 +13,7 @@ from k8s_servant.llm.providers import OLD_SETTINGS
 ROOT = Path(__file__).resolve().parent.parent
 CONFIG = (ROOT / "k8s_servant" / "config.py").read_text()
 README = (ROOT / "README.md").read_text()
+CONFIGURATION = (ROOT / "docs" / "configuration.md").read_text()
 
 
 def _settings_in_code() -> set[str]:
@@ -21,18 +22,18 @@ def _settings_in_code() -> set[str]:
     return names | {f"{n}_FILE" for n in re.findall(r'_secret\(env, "([A-Z][A-Z0-9_]+)"\)', CONFIG)}
 
 
-def _settings_in_readme() -> set[str]:
-    return set(re.findall(r"^\| `([A-Z][A-Z0-9_]+)` \|", README, flags=re.MULTILINE))
+def _settings_in_docs() -> set[str]:
+    return set(re.findall(r"^\| `([A-Z][A-Z0-9_]+)` \|", CONFIGURATION, flags=re.MULTILINE))
 
 
-def test_every_setting_is_documented_in_the_readme():
-    missing = _settings_in_code() - _settings_in_readme()
-    assert not missing, f"add to the README configuration table: {sorted(missing)}"
+def test_every_setting_is_documented():
+    missing = _settings_in_code() - _settings_in_docs()
+    assert not missing, f"add to the tables in docs/configuration.md: {sorted(missing)}"
 
 
-def test_the_readme_lists_no_removed_settings():
-    stale = _settings_in_readme() - _settings_in_code()
-    assert not stale, f"remove from the README configuration table: {sorted(stale)}"
+def test_the_docs_list_no_removed_settings():
+    stale = _settings_in_docs() - _settings_in_code()
+    assert not stale, f"remove from the tables in docs/configuration.md: {sorted(stale)}"
 
 
 def test_the_code_side_of_this_check_finds_the_settings():
@@ -63,6 +64,25 @@ def test_links_between_docs_point_to_existing_files_and_headings():
                 if anchor not in slugs:
                     broken.append(f"{page.name}: {target} (no such heading)")
     assert not broken, "\n".join(broken)
+
+
+def _links(page: Path) -> list[str]:
+    return re.findall(r"\]\(([^)\s]+)\)", page.read_text())
+
+
+def test_docs_pages_link_only_inside_docs():
+    # The site is built from docs/ alone; a ../ link has no page to land on there.
+    outside = [f"{p.name}: {t}" for p in sorted((ROOT / "docs").glob("*.md")) for t in _links(p) if t.startswith("../")]
+    assert not outside, "use https://github.com/k8s-servant/k8s-servant/blob/main/... instead:\n" + "\n".join(outside)
+
+
+def test_anchors_are_the_same_on_github_and_on_the_site():
+    # GitHub keeps every hyphen; the site's renderer merges runs of them and drops a
+    # trailing one. Anchors without either work in both places.
+    pages = [ROOT / "README.md", *sorted((ROOT / "docs").glob("*.md"))]
+    anchors = [f"{p.name}: {t}" for p in pages for t in _links(p) if "#" in t and not t.startswith("http")]
+    differ = [a for a in anchors if "--" in a.split("#", 1)[1] or a.endswith("-")]
+    assert not differ, "reword the heading so its anchor has no '--' or trailing '-':\n" + "\n".join(differ)
 
 
 # --- model providers page ------------------------------------------------------------
@@ -145,8 +165,9 @@ def test_code_is_documented():
     assert not missing, "add docstrings:\n" + "\n".join(missing)
 
 
-def test_readme_repository_structure_lists_every_module():
-    tree = README.split("## Repository Structure", 1)[1].split("```", 2)[1]
+def test_repository_structure_lists_every_module():
+    page = (ROOT / "docs" / "how-it-works.md").read_text()
+    tree = page.split("## Repository structure", 1)[1].split("```", 2)[1]
     modules = {p.name for p in PACKAGE.rglob("*.py") if p.name not in ("__init__.py", "__main__.py")}
     missing = sorted(name for name in modules if name not in tree)
-    assert not missing, f"add to the README repository structure: {missing}"
+    assert not missing, f"add to the repository structure in docs/how-it-works.md: {missing}"

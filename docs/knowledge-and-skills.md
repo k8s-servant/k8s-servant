@@ -22,8 +22,8 @@ The environment description and cluster notes always go into the system prompt i
 full. Skills work differently, as described next.
 
 **An example** for a fictional platform is in
-[`examples/knowledge-values.yaml`](../examples/knowledge-values.yaml) (environment
-description) and [`examples/values-azure.yaml`](../examples/values-azure.yaml) (cluster
+[`examples/knowledge-values.yaml`](https://github.com/k8s-servant/k8s-servant/blob/main/examples/knowledge-values.yaml) (environment
+description) and [`examples/values-azure.yaml`](https://github.com/k8s-servant/k8s-servant/blob/main/examples/values-azure.yaml) (cluster
 notes). Copy them and describe your own platform.
 
 **Built-in skills:** `cluster-health-check` (used by every scheduled check),

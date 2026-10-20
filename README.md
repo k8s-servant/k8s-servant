@@ -29,36 +29,19 @@ the terminal and to an **MS Teams** channel.
 > you act on them**, try it on a non-critical cluster first, and please
 > [report what breaks](https://github.com/k8s-servant/k8s-servant/issues/new/choose).
 
-## Table of Contents
+## Contents
 
 - [Description](#description)
-- [Repository Structure](#repository-structure)
 - [What You Get](#what-you-get)
 - [How It Works](#how-it-works)
 - [Choose a Model Provider](#choose-a-model-provider)
-- [Quickstart (Local)](#quickstart-local)
+- [Quickstart](#quickstart)
 - [Deploying to a Cluster](#deploying-to-a-cluster)
-- [Configuration](#configuration)
-  - [Cluster and model](#cluster-and-model)
-  - [Reading the cluster](#reading-the-cluster)
-  - [The agent loop](#the-agent-loop)
-  - [Knowledge and memory](#knowledge-and-memory)
-  - [Prometheus and Alertmanager (optional)](#prometheus-and-alertmanager-optional)
-  - [MS Teams](#ms-teams)
-  - [Scheduling (`k8s-servant serve`)](#scheduling-k8s-servant-serve)
-  - [Logging](#logging)
-- [Secrets: Local vs Cluster](#secrets-local-vs-cluster)
-- [MS Teams Setup](#ms-teams-setup)
-- [Cost and Limits](#cost-and-limits)
 - [Teaching the Agent](#teaching-the-agent)
-- [Known Limitations](#known-limitations)
-- [FAQ](#faq)
 - [Documentation](#documentation)
 - [Roadmap](#roadmap)
 - [Development](#development)
 - [Contributing](#contributing)
-- [Security](#security)
-- [License](#license)
 
 ---
 
@@ -91,80 +74,10 @@ the terminal and to an **MS Teams** channel.
 - **Not a replacement for alerting.** Alertmanager stays the source of alerts. The
   agent adds investigation, grouping, prioritisation and explanation on top.
 - **Not infallible.** A language model can misjudge or mix up names; every statement
-  carries evidence so you can check it. See [Known limitations](#known-limitations).
+  carries evidence so you can check it. See [Known limitations](docs/faq.md#known-limitations).
 - **Runs in the cluster or on a laptop.** In a cluster it is one pod (the agent and a
   kubernetes-mcp-server sidecar), installed from the Helm chart in this repository
   ([Deploying to a Cluster](#deploying-to-a-cluster)).
-
----
-
-## Repository Structure
-
-```text
-k8s-servant/
-├── k8s_servant/                    # The agent (Python package, `k8s-servant` command)
-│   ├── cli.py                      # Commands: ask, check, report, serve, findings, history, notes, tools, doctor
-│   ├── config.py                   # Every setting, from environment variables; logging
-│   ├── agent.py                    # System prompt + tool-calling loop
-│   ├── llm/                        # Model client
-│   │   ├── types.py                # Neutral Turn, ToolCall, ToolSpec; the agent depends only on these
-│   │   ├── providers.py            # The provider table (wire API, default endpoint and effort) and endpoint rules
-│   │   ├── auth.py                 # LLM_AUTH: API key, Entra ID or none; Entra tokens only for Foundry endpoints
-│   │   ├── errors.py               # Model errors and their actionable, key-free messages
-│   │   ├── chat_completions.py     # Chat Completions client: reasoning effort, token log
-│   │   ├── responses.py            # Responses API client: stateless, encrypted reasoning carried between calls
-│   │   └── messages.py             # Messages API client for Claude: signed thinking and prompt caching
-│   ├── runtime.py                  # Wires tools, prompt and model for one run
-│   ├── knowledge.py                # Environment description, cluster notes, skills; load_skill tool
-│   ├── healthcheck.py              # One health check; skipping the model when nothing changed
-│   ├── findings.py                 # Findings, fingerprints, parsing the model's JSON
-│   ├── memory.py                   # SQLite memory (findings, runs, meta) + learned notes; save_note tool
-│   ├── report.py                   # The morning report
-│   ├── teams.py                    # Adaptive Cards, posting to the Teams Workflows webhook
-│   ├── scheduler.py                # `serve`: hourly checks + the morning report, heartbeat, SIGTERM
-│   └── tools/
-│       ├── registry.py             # Common Tool shape, registry, output size cap
-│       ├── cluster_tools.py        # cluster_problems + warning_events: summaries for large clusters
-│       ├── mcp_tools.py            # Tools from kubernetes-mcp-server
-│       ├── kubectl_tool.py         # Guarded read-only kubectl (allow-listed verbs and flags)
-│       └── prometheus_tool.py      # PromQL, Alertmanager, alert history
-├── charts/k8s-servant/             # Helm chart: agent + MCP sidecar, RBAC, PVC (values.yaml: every key commented)
-│   ├── Chart.yaml                  # version = appVersion = image version
-│   ├── values.yaml                 # Defaults
-│   ├── templates/                  # Deployment, ConfigMaps (settings, knowledge, MCP), RBAC, PVC, extraObjects
-│   └── knowledge/skills/           # Built-in generic skills, one SKILL.md each (rendered into the knowledge ConfigMap)
-│       ├── cluster-health-check/
-│       ├── workload-troubleshooting/
-│       ├── node-troubleshooting/
-│       ├── flux-gitops-status/
-│       └── prometheus-queries/
-├── examples/
-│   ├── knowledge-values.yaml       # Example environment description and cluster notes for a fictional platform
-│   ├── values-azure.yaml           # The complete Azure setup: Foundry + Workload Identity + Key Vault via External Secrets
-│   ├── values-azure-csi.yaml       # Azure without Kubernetes Secrets: Key Vault mounted by the CSI driver
-│   ├── values-azure-claude.yaml    # Claude on Foundry with Workload Identity
-│   ├── values-anthropic.yaml       # Claude from Anthropic, key from a Secret
-│   ├── values-openai.yaml          # OpenAI, key from a Secret
-│   ├── values-ollama.yaml          # An in-cluster Ollama, no key
-│   ├── values-minimal.yaml         # Any cluster: OpenAI-compatible endpoint and Teams webhook from kubectl-created Secrets
-│   └── flux-helmrelease.yaml       # Flux HelmRelease installing the OCI chart
-├── deploy/local/
-│   └── mcp-config.toml             # kubernetes-mcp-server config for local runs (read-only, core toolset)
-├── scripts/
-│   ├── setup-foundry.sh            # Create the Foundry resource + model deployment, grant your role
-│   └── setup-workload-identity.sh  # The pod's managed identity: federated credential, Key Vault secret + Foundry roles
-├── tests/                          # pytest suite: one file per module, fakes.py, documentation checks
-├── docs/                           # Documentation (see Documentation below)
-│   └── images/                     # Logo (light and dark), icon, avatar and social preview
-├── .github/                        # CI (GitHub Actions), release-please, issue and PR templates
-├── Dockerfile                      # Image: Python alpine, pinned kubectl, non-root, read-only root fs
-├── pyproject.toml                  # Package, dependencies, the `k8s-servant` entry point
-├── .env.example                    # Template for local settings (no secrets)
-├── CHANGELOG.md                    # What changed (generated by release-please)
-├── CONTRIBUTING.md                 # How to contribute
-├── AGENTS.md                       # Conventions for AI coding assistants
-└── CLAUDE.md                       # Imports AGENTS.md for Claude Code
-```
 
 ---
 
@@ -223,46 +136,17 @@ Formats, rules and the Teams cards: [docs/reports.md](docs/reports.md).
 
 ## How It Works
 
-```
- you ──▶ k8s-servant ask / check / report ──┐
- scheduler (serve): hourly + 08:00 ─────────┤
-                                            ▼
-              scheduled check: summary tools first, without the model
-              (cluster_problems + alerts) ── unchanged? ──▶ "unchanged", done (0 tokens)
-                                            │ changed / manual / every 6 h
-                                            ▼
-                                       agent loop ──────▶ chat model (your LLM_PROVIDER)
-                                       │  ▲                (e.g. gpt-5.4-mini, reasoning medium)
-                           tool calls  ▼  │ results (cut to 8,000 chars)
- ┌──────────────────┬───────────────┬──────────────┬──────────────┬───────────┬──────────┐
- cluster_problems   kubernetes-mcp  kubectl         Prometheus /   load_skill  save_note
- warning_events     server          (fallback,      Alertmanager   (skills)    (notes)
- (summaries)        (read-only)     allow-listed)
- └──────────────────┴───────┬───────┘
-                            ▼
-                Kubernetes API (read-only; Secrets never read)
-
- memory (DATA_DIR): findings (new / still open / resolved), run history, learned notes
- results ──▶ stdout, history, MS Teams (changes after a check; the morning report)
-```
-
-1. A question (or "run the health check skill") and a system prompt go to the model.
-   The system prompt holds the rules, the environment description, cluster notes,
-   learned notes and the skill catalog.
-2. The model asks for tools. For health it starts with the **summary tools**:
-   `cluster_problems` returns only what is unhealthy across the whole cluster, and
-   `warning_events` returns grouped Warning events without policy-scan noise. Then it
-   follows each lead with MCP tools and kubectl (describe, events, logs, metrics).
-3. The agent runs the tools, cuts large outputs down and sends the results back. This
-   repeats until the model answers; at most 25 rounds.
-4. A health check ends with a JSON list of findings. Memory compares them with the
-   previous check (new / still open / resolved) and decides what to post.
-5. Scheduled checks first compare the summary with the last full check; if nothing
-   changed, the model is not called at all.
+A question or a scheduled health check goes to the model with a system prompt (rules,
+your environment description, cluster notes, learned notes, the skill catalog). The
+model asks for read-only tools (summary tools first, then kubernetes-mcp-server and a
+guarded `kubectl`, Prometheus and Alertmanager); the agent runs them, cuts large
+outputs down and sends the results back until the model answers. Memory compares a
+check's findings with the previous one (new / still open / resolved), and scheduled
+checks skip the model entirely when nothing changed.
 
 There is no agent framework: the loop is about 100 commented lines in
-`k8s_servant/agent.py`. Why, and the rest of the design:
-[docs/architecture.md](docs/architecture.md). Every tool: [docs/tools.md](docs/tools.md).
+`k8s_servant/agent.py`. The diagram and the steps: [docs/how-it-works.md](docs/how-it-works.md);
+the design and why: [docs/architecture.md](docs/architecture.md).
 
 ---
 
@@ -279,127 +163,29 @@ which also explains in plain words why the agent speaks three different APIs.
 | `openai` | OpenAI | API key | [OpenAI](docs/model-providers.md#openai) | `examples/values-openai.yaml` |
 | `anthropic` | Claude from Anthropic | API key | [Anthropic](docs/model-providers.md#anthropic) | `examples/values-anthropic.yaml` |
 | `ollama` | A model you host, e.g. in the cluster | none | [Ollama](docs/model-providers.md#ollama-laptop-and-in-cluster) | `examples/values-ollama.yaml` |
-| `openai-compatible` | vLLM, LiteLLM, Gemini, LM Studio, ... | API key (optional) | [OpenAI-compatible](docs/model-providers.md#openai-compatible-vllm-litellm-gemini-) | `examples/values-minimal.yaml` |
+| `openai-compatible` | vLLM, LiteLLM, Gemini, LM Studio, ... | API key (optional) | [OpenAI-compatible](docs/model-providers.md#openai-compatible-vllm-litellm-gemini-and-others) | `examples/values-minimal.yaml` |
 
 ---
 
-## Quickstart (Local)
+## Quickstart
 
-Try it on a throwaway cluster with something broken in it, in about 10 minutes. You
-need Python 3.12 or newer (`python3 --version`), `kubectl`, Docker and
-[kind](https://kind.sigs.k8s.io/).
-
-**1. Install**
+You need Python 3.12 or newer, `kubectl`, and a model: a local
+[Ollama](https://ollama.com/) (`ollama pull qwen3`) or an API key from Anthropic or
+OpenAI.
 
 ```bash
 git clone https://github.com/k8s-servant/k8s-servant.git && cd k8s-servant
-python3 -m venv .venv
-.venv/bin/pip install -e .
-source .venv/bin/activate
-```
-
-`pip install -e .` is all a user needs. Developers add the test tools with
-`'.[dev]'`; Azure AI Foundry with Entra ID sign-in also needs the `azure` extra, for
-example `'.[dev,azure]'`.
-
-**2. A cluster with something broken**
-
-```bash
-kind create cluster --name k8s-servant-demo    # kubectl now points at kind-k8s-servant-demo
-kubectl create deployment web --image=nginx:1.27
-kubectl create deployment api --image=busybox:1.36 -- \
-  sh -c 'echo "connecting to db:5432"; sleep 2; echo "error: connection refused"; exit 1'
-kubectl create deployment worker --image=nginx:9.99-does-not-exist
-```
-
-`web` is healthy, `api` crash-loops and `worker` cannot pull its image. To use one of
-your own clusters instead, skip this step: the agent reads whichever cluster
-`kubectl config current-context` names, and only reads.
-
-**3. Choose a model**
-
-*Option A: Ollama, free and local.* Install [Ollama](https://ollama.com/), then:
-
-```bash
-ollama pull qwen3                                 # about 5 GB
-export LLM_PROVIDER=ollama LLM_MODEL=qwen3
-```
-
-Good enough to see how it works, not to rely on. On this demo, qwen3 found both broken
-Deployments and wrote a correct health check, but it stopped after the first tool call
-and did not read the crash logs. With Claude on the same demo, the agent read the logs,
-the pod's events and the container command, and named the exact cause of both failures.
-
-*Option B: an API key from Anthropic or OpenAI.* Keep the key in a file only you can
-read, not on the command line (it would stay in your shell history):
-
-```bash
-mkdir -p ~/.config/k8s-servant && chmod 700 ~/.config/k8s-servant
-nano ~/.config/k8s-servant/llm-api-key          # paste the key, save
-chmod 600 ~/.config/k8s-servant/llm-api-key
-export LLM_API_KEY_FILE=~/.config/k8s-servant/llm-api-key
-export LLM_PROVIDER=anthropic LLM_MODEL=claude-sonnet-5-5   # or: LLM_PROVIDER=openai LLM_MODEL=gpt-5
-```
-
-Azure AI Foundry (Entra ID, no key), Claude on Foundry and any OpenAI-compatible server
-have their own recipes in [docs/model-providers.md](docs/model-providers.md).
-
-**4. Ask**
-
-```bash
-export CLUSTER_NAME=demo MCP_URL=     # empty MCP_URL: kubectl only (MCP server: see below)
-k8s-servant doctor                    # OK for config, kubectl and model; WARN lines are optional extras
+python3 -m venv .venv && .venv/bin/pip install -e . && source .venv/bin/activate
+export LLM_PROVIDER=ollama LLM_MODEL=qwen3        # or anthropic / openai with LLM_API_KEY_FILE
+export CLUSTER_NAME=demo MCP_URL=                 # kubectl only; reads your current context
+k8s-servant doctor
 k8s-servant ask "Are there any unhealthy pods? Why?"
-k8s-servant check                     # one health check, remembered in ./.data
-k8s-servant findings                  # what is open now
 ```
 
-On a laptop `doctor` warns that your identity can read Secrets: that is expected with
-an admin kubeconfig. In the cluster the agent's own RBAC must say no.
-
-**5. Clean up**
-
-```bash
-kind delete cluster --name k8s-servant-demo && rm -rf .data
-```
-
-### Going further
-
-- **Keep your settings.** `cp .env.example .env`, fill it in (no secrets in it: see
-  [Secrets: local vs cluster](#secrets-local-vs-cluster)), then load it into each new
-  shell with `set -a; source .env; set +a`.
-- **The MCP server** (recommended; the agent falls back to kubectl without it). In its
-  own terminal, with the binary from its GitHub releases or through npm:
-
-  ```bash
-  npx -y kubernetes-mcp-server@0.0.67 --config deploy/local/mcp-config.toml
-  ```
-
-  Then `unset MCP_URL` in the shell you use for the agent (step 4 set it to empty, which
-  turns MCP off); unset, it defaults to `http://localhost:8080/mcp`.
-- **Prometheus and Alertmanager**, through port-forwards in their own terminals (adjust
-  namespace and service names to your monitoring stack), then set
-  `PROMETHEUS_URL=http://localhost:9090` and `ALERTMANAGER_URL=http://localhost:9093`.
-  Port-forwards drop now and then; restart them when `doctor` reports FAIL.
-
-  ```bash
-  kubectl -n monitoring port-forward svc/prometheus-operated 9090
-  kubectl -n monitoring port-forward svc/alertmanager-operated 9093
-  ```
-
-- **Your platform's knowledge**, the same files the cluster uses:
-
-  ```bash
-  alias kss='k8s-servant --values examples/knowledge-values.yaml --values my-values.yaml'
-  kss report           # the morning report, now
-  kss check --post     # a health check, posted to Teams (see "MS Teams setup")
-  kss serve            # the scheduler, as it runs in the cluster (Ctrl-C to stop)
-  ```
-
-`k8s-servant doctor` checks configuration, knowledge, memory, MCP, kubectl, RBAC,
-Prometheus, Alertmanager, Teams and the model, one line each. Run it first when
-something does not work, then see [docs/troubleshooting.md](docs/troubleshooting.md).
-All commands: [docs/cli.md](docs/cli.md).
+The full walkthrough, with a throwaway kind cluster that has something broken in it,
+a safe way to keep the API key, the MCP server and Prometheus:
+[docs/getting-started.md](docs/getting-started.md). Every setting:
+[docs/configuration.md](docs/configuration.md).
 
 ---
 
@@ -448,196 +234,6 @@ OCI artifact. The full guide is [docs/deployment.md](docs/deployment.md). In sho
 
 ---
 
-## Configuration
-
-All settings are environment variables. Locally they come from `.env`; in the cluster
-from the Helm chart (`appConfig` in the values, rendered into a ConfigMap). A test keeps this table in sync with
-`k8s_servant/config.py`.
-
-### Cluster and model
-
-| Variable | Default | Meaning |
-|---|---|---|
-| `CLUSTER_NAME` | `unknown-cluster` | Friendly cluster name used in answers, reports and Teams cards. |
-| `LLM_PROVIDER` | *(required)* | Who serves the model: `foundry`, `openai`, `anthropic`, `ollama` or `openai-compatible`. It decides the wire API, the default endpoint and the default reasoning effort. |
-| `LLM_ENDPOINT` | provider default | Base URL. Required for `foundry` (the resource endpoint, e.g. `https://<name>.openai.azure.com/`; `/openai/v1/` is appended automatically) and `openai-compatible`. Defaults: `https://api.openai.com/v1`, `https://api.anthropic.com`, `http://localhost:11434/v1` (ollama). Plain `http` is accepted for localhost and, for `ollama` and `openai-compatible`, in-cluster hosts. |
-| `LLM_MODEL` | *(required)* | Model name. For `foundry` the **deployment** name. |
-| `LLM_API_KEY` | *(empty)* | API key, for providers that need one. Prefer `LLM_API_KEY_FILE`. Leave it empty for Azure AI Foundry with Entra ID and for servers without a key (Ollama). |
-| `LLM_API_KEY_FILE` | *(empty)* | File containing the API key (the mounted Secret in the cluster, set by the chart from `llmApiKey.existingSecret`); wins over `LLM_API_KEY`. An unreadable or empty file stops the agent with an error. |
-| `LLM_AUTH` | `auto` | `auto`: the API key when one is set; otherwise Entra ID for Azure AI Foundry endpoints, no sign-in for `ollama` and `openai-compatible`, and an error for the other providers. `entra` or `api-key` force one method. |
-| `LLM_TOKEN_SCOPE` | `https://ai.azure.com/.default` | Scope requested for the Entra ID token. |
-| `LLM_TIMEOUT_SECONDS` | `120` | Timeout of one model request (the SDK retries up to 3 times; retries are logged). |
-| `LLM_MAX_OUTPUT_TOKENS` | `32000` | Output token limit of one model reply (reasoning tokens count against it). |
-| `LLM_REASONING_EFFORT` | `medium` for `foundry`, `openai`, `anthropic`; empty otherwise | How hard a reasoning model thinks: `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max`. gpt-5.4-mini does not reason at all unless asked. Empty = not sent (for models that reject it). |
-| `AZURE_FEDERATED_TOKEN_FILE` | *(set by the platform)* | Injected by the Azure Workload Identity webhook; its presence tells the agent the pod authenticates with Workload Identity (used to explain Entra ID failures). Do not set it by hand. |
-
-### Reading the cluster
-
-| Variable | Default | Meaning |
-|---|---|---|
-| `MCP_URL` | `http://localhost:8080/mcp` | kubernetes-mcp-server endpoint. Empty = MCP disabled, kubectl only. |
-| `MCP_TIMEOUT_SECONDS` | `60` | Timeout of one MCP tool call; a timed-out call reaches the model as an `ERROR:` result. |
-| `KUBECTL_PATH` | `kubectl` | kubectl binary (fallback tool and summary tools). |
-| `KUBECTL_TIMEOUT_SECONDS` | `30` | Timeout of one kubectl call (also used by `cluster_problems` and `warning_events`). |
-| `EVENTS_EXCLUDE_REASONS` | `PolicyViolation` | Warning event reasons `warning_events` hides unless asked (comma-separated). Policy scanners such as Kyverno emit thousands of these. Empty = hide nothing. |
-
-### The agent loop
-
-| Variable | Default | Meaning |
-|---|---|---|
-| `MAX_ITERATIONS` | `25` | Maximum model round-trips per question. |
-| `TOOL_OUTPUT_MAX_CHARS` | `8000` | Tool output longer than this is cut (head and tail kept). Every later model call resends it, so it drives the token cost. |
-
-### Knowledge and memory
-
-| Variable | Default | Meaning |
-|---|---|---|
-| `KNOWLEDGE_DIR` | chart folder `charts/k8s-servant/knowledge` | Folder with `environment.md`, `cluster.md` and skills. |
-| `DATA_DIR` | `.data` | Memory folder: findings, run history, learned notes ([docs/memory.md](docs/memory.md)). `/data` in the cluster. |
-| `NOTES_MAX_CHARS` | `8000` | How much of the newest learned notes goes into the system prompt. |
-
-### Prometheus and Alertmanager (optional)
-
-| Variable | Default | Meaning |
-|---|---|---|
-| `PROMETHEUS_URL` | *(empty)* | Prometheus base URL; enables the PromQL tools and "alerts that stopped overnight" in the morning report. |
-| `ALERTMANAGER_URL` | *(empty)* | Alertmanager base URL; enables the alerts tool and "alerts firing now". |
-| `PROMETHEUS_TIMEOUT_SECONDS` | `30` | Timeout of one Prometheus or Alertmanager request. |
-| `ALERTS_IGNORE_NAMES` | `Watchdog,InfoInhibitor` | Always-firing alerts, left out of the morning report and of the "anything changed?" comparison. Empty = use all. |
-
-### MS Teams
-
-| Variable | Default | Meaning |
-|---|---|---|
-| `TEAMS_WEBHOOK_URL` | *(empty)* | Teams Workflows webhook URL (a credential). |
-| `TEAMS_WEBHOOK_URL_FILE` | *(empty)* | File containing the webhook URL (the mounted Secret in the cluster); wins over `TEAMS_WEBHOOK_URL`. |
-| `TEAMS_POST_MODE` | `changes` | `changes`: post a check only when something is new or resolved; `always`; `off`. The morning report is posted unless `off`. |
-
-### Scheduling (`k8s-servant serve`)
-
-| Variable | Default | Meaning |
-|---|---|---|
-| `CHECK_INTERVAL_MINUTES` | `60` | Minutes between scheduled health checks. |
-| `CHECK_SKIP_UNCHANGED` | `true` | Scheduled checks skip the model when problems and firing alerts are identical to the last full check (saves ~150k tokens per check). Manual `check` and the morning report always run in full. |
-| `CHECK_FULL_INTERVAL_HOURS` | `6` | Run a full check at least this often even when nothing changed. |
-| `JOB_TIMEOUT_MINUTES` | `30` | A scheduled check or morning report running longer than this is cancelled. |
-| `MORNING_REPORT_ENABLED` | `true` | Post the morning report. |
-| `MORNING_REPORT_TIME` | `08:00` | Local time of the morning report. |
-| `MORNING_REPORT_TIMEZONE` | `UTC` | IANA time zone of `MORNING_REPORT_TIME`, e.g. `Europe/Berlin` (summer time handled). |
-| `MORNING_REPORT_WEEKDAYS_ONLY` | `true` | Skip Saturdays and Sundays (Monday's report then covers the weekend). |
-| `HEARTBEAT_FILE` | *(empty)* | File touched every scheduler loop for a liveness probe (`/tmp/heartbeat` in the cluster). |
-
-### Logging
-
-| Variable | Default | Meaning |
-|---|---|---|
-| `LOG_LEVEL` | `INFO` | `DEBUG`, `INFO` or `WARNING`. Logs go to stderr; answers go to stdout. |
-
----
-
-## Secrets: Local vs Cluster
-
-`.env` is only a convenience for running the CLI on a laptop: it collects your local
-settings so you can load them into your shell with `set -a; source .env; set +a`. The
-agent itself only reads environment variables. In the cluster there is no `.env` at
-all.
-
-Almost nothing in `.env` is secret:
-
-| Value | Secret? | Local (laptop) | Cluster |
-|---|---|---|---|
-| Endpoints, names, URLs of Prometheus etc., timeouts | No | `.env` | ConfigMap rendered by the Helm chart |
-| **The model's API key** (OpenAI, Anthropic, most hosted providers) | **Yes** | a file only you can read, named in `LLM_API_KEY_FILE` ([Quickstart](#quickstart-local)) | a Kubernetes Secret you create, named in `llmApiKey.existingSecret`, mounted as a file (`LLM_API_KEY_FILE`) |
-| **Model access without a key** | — | Ollama: nothing. Azure AI Foundry with Entra ID: your `az login` session | Ollama in the cluster: nothing. Foundry on AKS: **Workload Identity**, the pod's ServiceAccount federated with a managed identity that has *Cognitive Services OpenAI User* on the Foundry resource (*Cognitive Services User* for Claude and other non-OpenAI models) |
-| **`TEAMS_WEBHOOK_URL`** | **Yes**: anyone with it can post to the channel | load it from your secret store into your shell (below) | A Kubernetes Secret you create any way you like (kubectl, External Secrets, Sealed Secrets, ...), named in `teamsWebhook.existingSecret`, mounted as a file and read through `TEAMS_WEBHOOK_URL_FILE`. `examples/values-azure.yaml` syncs it from Azure Key Vault with External Secrets |
-
-In the Azure example, one managed identity does both jobs: it calls the model and
-reads the webhook secret from Key Vault (for External Secrets).
-`scripts/setup-workload-identity.sh` creates it
-([docs/deployment.md](docs/deployment.md#1-workload-identity-aks)). The chart itself
-never creates Secrets; see
-[Credentials](docs/deployment.md#credentials-bring-your-own-secrets).
-
-**What protects `.env` locally.** It is listed in `.gitignore`, so git never commits it,
-and neither the agent's memory (`.data/`). It is still a plain-text file on your disk,
-readable by anything that runs as you (backups, sync tools). So keep secrets out of it:
-
-```bash
-# Recommended: load the webhook URL from Key Vault into this shell session only.
-set -a; source .env; set +a
-export TEAMS_WEBHOOK_URL=$(az keyvault secret show --vault-name my-keyvault \
-  --name teams-webhook-url --query value -o tsv)
-
-# Alternative: a private file outside the repository, read the same way as in the pod.
-mkdir -p ~/.config/k8s-servant && chmod 700 ~/.config/k8s-servant
-printf '%s' '<webhook-url>' > ~/.config/k8s-servant/webhook-url && chmod 600 ~/.config/k8s-servant/webhook-url
-export TEAMS_WEBHOOK_URL_FILE=~/.config/k8s-servant/webhook-url
-```
-
-Do not paste secrets directly into commands you type: they end up in your shell
-history. The agent never writes the webhook URL to its logs, history or Teams cards.
-
----
-
-## MS Teams Setup
-
-The agent posts through a Teams **Workflows** webhook (the old "Incoming Webhook"
-connectors were retired). The cards look and behave as described in
-[docs/reports.md](docs/reports.md#teams-cards).
-
-1. **Webhook.** In the channel, **…** → **Workflows** → template **"Send webhook
-   alerts to a channel"** → name it (e.g. *k8s-servant my-cluster*) → **Save**, and copy
-   the URL. Add a co-owner to the flow so it does not depend on one person. Reusing the
-   webhook of an existing channel (for example the one Alertmanager posts to) also works.
-2. **Secret store.** The URL is a password. Keep it in a secret store (for example
-   Azure Key Vault, secret `teams-webhook-url` in `my-keyvault`). In the cluster the
-   agent reads it from a Kubernetes Secret named in `teamsWebhook.existingSecret`,
-   which you create with kubectl, External Secrets or any other tool
-   ([how](docs/deployment.md#credentials-bring-your-own-secrets)).
-3. **Test.** Load the URL into your shell (see
-   [Secrets: local vs cluster](#secrets-local-vs-cluster)). `k8s-servant doctor` should
-   show `[OK] teams`. Then `TEAMS_POST_MODE=always k8s-servant check --post` posts a
-   check card, and `k8s-servant report --post` the morning report.
-
-Cards stay under Teams' size limit: with many findings, details are shortened and
-lists end with "… and N more".
-
----
-
-## Cost and Limits
-
-With a hosted model you pay **per token**; an idle agent costs nothing, and a local
-Ollama costs only your hardware. Measured on a test cluster (~600 Deployments, ~1,250
-pods) with gpt-5.4-mini on Azure AI Foundry; other models use a similar number of
-tokens, at their own price:
-
-| Run | Model calls | Tokens | Time |
-|---|---|---|---|
-| Full health check | ~10 | 150k–225k (mostly input; ~85% of it served from the prompt cache, billed at a discount) | 45–80 s |
-| Scheduled check, nothing changed | 0 | **0** | ~6 s |
-| `ask` | 3–10 | depends on the question (not measured separately; less than a full check) | 10–60 s |
-| Morning report | a full check + 1 overview call | a full check plus a small overview call | ~1–2 min |
-
-- **Rate limits.** A full check's busiest minute uses about 90k tokens, so your
-  provider's tokens-per-minute limit must cover that, or deep checks fail with
-  `HTTP 429`. On Azure AI Foundry, give the deployment 150–200k TPM (raising it costs
-  nothing).
-- **Monthly cost** depends on how often something changes, because unchanged hours
-  are free. For gpt-5.4-mini, a rough estimate from public price lists was about
-  $0.10–0.20 per full check, so from roughly $10–30 a month per cluster when most hours
-  are quiet to $70–160 if every hour ran in full. Prices change and differ by model and
-  region: check your provider's current price list.
-- **Levers:** `CHECK_SKIP_UNCHANGED`, `CHECK_FULL_INTERVAL_HOURS`,
-  `CHECK_INTERVAL_MINUTES`, `TOOL_OUTPUT_MAX_CHARS`, `LLM_REASONING_EFFORT`.
-- Every model call is logged with its tokens: `model call: N prompt (M cached) + K
-  completion tokens (R reasoning)`. Set a budget alert with your provider (on Foundry: the resource group).
-
-More: [docs/model-providers.md](docs/model-providers.md); for Azure AI Foundry,
-[docs/foundry-setup.md](docs/foundry-setup.md#9-cost-and-limits) and
-[docs/foundry-concepts.md](docs/foundry-concepts.md).
-
----
-
 ## Teaching the Agent
 
 The agent learns about your platform from three kinds of Markdown:
@@ -662,90 +258,15 @@ environment description or the cluster notes instead of changing code.
 
 ---
 
-## Known Limitations
-
-Honest notes from the first real runs:
-
-- **Run-to-run variation.** The model can judge the same evidence differently in two
-  runs (`azure-cns` restarts were "healthy now" once and "warning" the next time). A
-  finding can then appear and disappear in Teams. Explicit rules in the environment
-  description reduce this.
-- **Name mix-ups.** It once reported a healthy workload whose name differed by one
-  character from the broken one. The prompt now asks for exact names; check the
-  evidence before acting.
-- **Detection comes from rules, explanation from the model.** On its own the model
-  missed firing alerts on a large cluster; `cluster_problems` (plain Python checks) is
-  what makes detection reliable. Problems outside those checks depend on the model
-  noticing them.
-- **No measure of answer quality yet.** Tests prove the mechanics, not that the agent
-  finds the right problems. An evaluation set (saved cluster states with expected
-  findings) is planned.
-- **The summary cannot see everything** (Flux, node usage, certificates), so skipped
-  checks rely on a full check at least every 6 hours.
-- **One cluster per process**, single replica; memory is SQLite on a 1 Gi volume.
-- **Clusters that are recreated regularly** lose their memory with the volume, and a
-  new OIDC issuer needs the federated credential re-pointed
-  ([docs/deployment.md](docs/deployment.md#when-a-cluster-is-recreated)).
-- **Model quality varies by provider and model.** All five providers are supported
-  ([docs/model-providers.md](docs/model-providers.md)), but small self-hosted models find
-  fewer problems than current hosted reasoning models. Bedrock and Vertex AI sign-in
-  are not supported yet.
-- **Notifications go to MS Teams only.** Slack and other channels are planned
-  ([#3](https://github.com/k8s-servant/k8s-servant/issues/3),
-  [#4](https://github.com/k8s-servant/k8s-servant/issues/4)).
-
----
-
-## FAQ
-
-**Can it break something?** No. Every tool only reads; the cluster's RBAC
-gives it read-only roles without Secrets; kubectl is limited to an allow-list; there
-is no shell. See [docs/security.md](docs/security.md).
-
-**What data leaves the cluster?** Object names, statuses, events, metrics and, when
-it investigates, log lines go to the model endpoint (with Azure AI Foundry: in the data
-zone you choose, not used for training; with other providers see their data policies,
-linked from [docs/model-providers.md](docs/model-providers.md#data-handling-and-errors)). Findings and summaries go to Teams. Never
-Secrets. Most data is reduced in Python first; log lines are not redacted.
-[docs/security.md](docs/security.md#what-data-leaves-the-cluster),
-[docs/data-processing.md](docs/data-processing.md).
-
-**Use with care.** k8s-servant gives advice; it does not act. Its answers come from a
-language model and can be wrong or incomplete, so check them before you change anything
-in a cluster. You decide which model provider your cluster data goes to
-([data processing](docs/data-processing.md)), what RBAC the agent gets, and who can
-read its reports. The software is provided "as is", without warranty, under the
-[Apache-2.0 license](LICENSE).
-
-**Why does a check sometimes take a minute and sometimes 6 seconds?** Six seconds
-means nothing changed since the last full check, so the model was skipped.
-
-**Why did it not post anything?** With `TEAMS_POST_MODE=changes` a check is posted only
-when something is new or resolved. The morning report is always posted.
-
-**It reports something that is normal here.** Add it to the environment description
-or cluster notes, or let it save a learned note. See
-[Teaching the agent](#teaching-the-agent).
-
-**Can I use another model?** Yes, any chat model with tool calling: change `LLM_MODEL`,
-or `LLM_PROVIDER` to use OpenAI, Anthropic, Ollama or any OpenAI-compatible server
-(`LLM_ENDPOINT` is then the full base URL including its path). For models without
-reasoning set `LLM_REASONING_EFFORT=` (empty). Recipes:
-[docs/model-providers.md](docs/model-providers.md).
-
-**Does it need AKS?** No. The agent and the chart work on any Kubernetes cluster. The
-Workload Identity and Key Vault parts are optional and AKS-specific.
-
-**Why not an agent framework or HolmesGPT?** A small own loop is easy to read, test
-and secure. HolmesGPT covers much of the same ground and is worth a fair comparison.
-See [docs/architecture.md](docs/architecture.md#why-our-own-loop-and-no-framework).
-
----
-
 ## Documentation
 
 | Document | What it covers |
 |---|---|
+| [docs/getting-started.md](docs/getting-started.md) | The full local quickstart on a throwaway kind cluster, then the MCP server, Prometheus and your platform's knowledge |
+| [docs/configuration.md](docs/configuration.md) | Every setting (environment variables), and which values are secrets locally and in the cluster |
+| [docs/teams-setup.md](docs/teams-setup.md) | Creating the Teams Workflows webhook, storing it and testing it |
+| [docs/how-it-works.md](docs/how-it-works.md) | The flow from a question to an answer, step by step, and the repository structure |
+| [docs/faq.md](docs/faq.md) | Frequent questions, known limitations, cost and rate limits |
 | [docs/architecture.md](docs/architecture.md) | How the agent is built and why: components, loop, summary tools, MCP/kubectl fallback, safety layers, scheduler, logging |
 | [docs/tools.md](docs/tools.md) | Every tool: what it reads, its safety rules, when the model uses it |
 | [docs/reports.md](docs/reports.md) | Health checks, fingerprints, skipping unchanged checks, the morning report, Teams cards and posting rules |

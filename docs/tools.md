@@ -129,7 +129,7 @@ unfiltered, and on a large test cluster that exceeded the MCP client's 1 MB mess
 
 Provided by [kubernetes-mcp-server](https://github.com/containers/kubernetes-mcp-server)
 v0.0.67 with the `core` toolset in read-only mode
-([`deploy/local/mcp-config.toml`](../deploy/local/mcp-config.toml)). Names,
+([`deploy/local/mcp-config.toml`](https://github.com/k8s-servant/k8s-servant/blob/main/deploy/local/mcp-config.toml)). Names,
 descriptions and arguments come from the server unchanged.
 
 | Tool | Use |
