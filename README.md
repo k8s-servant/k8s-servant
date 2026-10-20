@@ -685,6 +685,7 @@ See [docs/architecture.md](docs/architecture.md#why-our-own-loop-and-no-framewor
 | [docs/data-processing.md](docs/data-processing.md) | What happens to cluster data before and after the model: reduction, size caps, answer checks, facts computed in Python, and what is not done (no redaction) |
 | [docs/troubleshooting.md](docs/troubleshooting.md) | Symptoms, causes and fixes, from the first real runs |
 | [docs/ci-and-releases.md](docs/ci-and-releases.md) | CI workflows, required checks, PR title rules, release-please and published artifacts |
+| [docs/code-walkthrough.md](docs/code-walkthrough.md) | A guided tour of the code in six parts: one question end to end, the model layer, tools and safety, the scheduler and memory, the tests, packaging and release |
 | [docs/development.md](docs/development.md) | Working on the code: code map, rules, tests and fakes, recipes (add a setting, a check, a tool, a skill, a command) |
 | [docs/model-providers.md](docs/model-providers.md) | Why three APIs, and a full recipe per provider: Foundry, Claude on Foundry, OpenAI, Anthropic, Ollama, OpenAI-compatible; migrating from `FOUNDRY_*` |
 | [docs/foundry-concepts.md](docs/foundry-concepts.md) | What Azure AI Foundry is: resources, deployments, quota, cost, access, network |
