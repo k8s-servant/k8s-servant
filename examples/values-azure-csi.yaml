@@ -1,5 +1,5 @@
 # Example values for one AKS cluster, Azure without any Kubernetes Secret:
-#   - Azure AI Foundry as the model, reached with Workload Identity (no API key);
+#   - Microsoft Foundry as the model, reached with Workload Identity (no API key);
 #   - the Teams webhook URL mounted straight from Azure Key Vault as a file by the
 #     Secrets Store CSI driver (Azure provider), also authenticated with Workload
 #     Identity. Nothing is synced into a Kubernetes Secret, so nothing lands in etcd.

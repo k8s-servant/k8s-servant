@@ -46,7 +46,7 @@ Reasons: [architecture.md](architecture.md#why-our-own-loop-and-no-framework).
 
 ## The model
 
-The model is a setting, not part of the program: `LLM_PROVIDER` picks Azure AI Foundry,
+The model is a setting, not part of the program: `LLM_PROVIDER` picks Microsoft Foundry,
 OpenAI, Anthropic, Ollama or any OpenAI-compatible server, and `LLM_MODEL` the model.
 What the agent needs from it:
 
@@ -58,7 +58,7 @@ What the agent needs from it:
 
 Recipes, data handling and the reason for three APIs: [model-providers.md](model-providers.md).
 
-### Worked example: Azure AI Foundry
+### Worked example: Microsoft Foundry
 
 The setup that `scripts/setup-foundry.sh` creates, and the one the measurements in
 these docs come from:

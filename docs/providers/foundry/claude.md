@@ -1,4 +1,4 @@
-# Claude on Azure AI Foundry
+# Claude on Microsoft Foundry
 
 **Choose it when** you want Claude but inside Azure: same Entra ID sign-in and billing as
 the [Foundry recipe](gpt.md), with Claude's Messages API. Deploy a Claude model in your Foundry

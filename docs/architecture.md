@@ -15,7 +15,7 @@ and Teams cards in [reports.md](reports.md); what goes wrong and how to fix it i
 ```
                          ┌───────────────────────── k8s-servant (Python) ─────────────────────────┐
   question ─────────────▶│ cli.py ──▶ agent.py (loop) ──▶ llm/ ──────────────────────────────────┼──▶ chat model (LLM_PROVIDER:
-                         │               │                                                       │    Anthropic, Azure AI Foundry,
+                         │               │                                                       │    Anthropic, Microsoft Foundry,
                          │               │                                                       │    OpenAI, Ollama, ...)
                          │               ▼ tool calls                                            │
                          │          tools/registry.py                                            │

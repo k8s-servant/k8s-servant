@@ -8,7 +8,7 @@ issues.
 
 | Area | What exists |
 |---|---|
-| **Core agent** | The tool-calling loop on any of five model providers (Azure AI Foundry, OpenAI, Anthropic, Ollama, any OpenAI-compatible server; [model-providers.md](model-providers.md)); MCP tools with a guarded kubectl fallback; knowledge (environment description, cluster notes, skills); CLI `ask`, `tools`, `doctor`; Foundry guide and `scripts/setup-foundry.sh` |
+| **Core agent** | The tool-calling loop on any of five model providers (Microsoft Foundry, OpenAI, Anthropic, Ollama, any OpenAI-compatible server; [model-providers.md](model-providers.md)); MCP tools with a guarded kubectl fallback; knowledge (environment description, cluster notes, skills); CLI `ask`, `tools`, `doctor`; Foundry guide and `scripts/setup-foundry.sh` |
 | **Checks, memory, Teams** | Scheduled health checks with findings memory (new / still open / resolved), the morning report, Teams cards, Prometheus and Alertmanager tools; `cluster_problems` / `warning_events` summary tools, the policy-event filter, reasoning effort, skipping unchanged checks |
 | **In the cluster** | Signed container image, Helm chart as an OCI artifact (agent + MCP sidecar, read-only RBAC, PVC, credentials from your own Secrets, extension points), examples for Azure (GPT and Claude), Anthropic, OpenAI, Ollama, any OpenAI-compatible server and Flux, `scripts/setup-workload-identity.sh`, the [deployment guide](deployment.md) |
 | **Documentation** | This site, [k8s-servant.dev](https://k8s-servant.dev), built from `docs/`: getting started, one recipe per model provider, every setting, security model, a guided code walkthrough |

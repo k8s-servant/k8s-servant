@@ -4,7 +4,7 @@ How k8s-servant gets into a Kubernetes cluster and how to run it there: prerequi
 the model identity, values, installing with Helm or Flux, checks after the first
 deployment, and day-2 operations. The chart works on any cluster and with every model
 provider ([model-providers.md](model-providers.md)). The sections marked *AKS* show the
-fully worked Azure path (Azure AI Foundry, Workload Identity and Key Vault); with
+fully worked Azure path (Microsoft Foundry, Workload Identity and Key Vault); with
 another provider, skip them and give the pod an API key from a Secret
 ([Credentials](#credentials-bring-your-own-secrets)).
 
@@ -80,7 +80,7 @@ signatures, and how to keep your settings in a private repository without a fork
 
 | What | How to check |
 |---|---|
-| A chat model with tool calling | Pick a provider ([model-providers.md](model-providers.md)); for Azure AI Foundry, `scripts/setup-foundry.sh` ([Foundry setup guide](providers/foundry/setup.md)) |
+| A chat model with tool calling | Pick a provider ([model-providers.md](model-providers.md)); for Microsoft Foundry, `scripts/setup-foundry.sh` ([Foundry setup guide](providers/foundry/setup.md)) |
 | (AKS) OIDC issuer and Workload Identity on the cluster | `az aks show -g my-cluster-rg -n my-cluster --query "[oidcIssuerProfile.enabled, securityProfile.workloadIdentity.enabled]"` → `[true, true]` |
 | (Optional) The Teams webhook URL, as a Kubernetes Secret or in your secret store | [MS Teams setup](teams-setup.md); see [Credentials](#credentials-bring-your-own-secrets) |
 | (Optional, Azure example) External Secrets Operator, to sync it from Key Vault | `kubectl get crd externalsecrets.external-secrets.io secretstores.external-secrets.io` |
@@ -159,7 +159,7 @@ Start from the examples in this repository:
 |---|---|
 | `charts/k8s-servant/values.yaml` | chart defaults, every key commented |
 | `examples/knowledge-values.yaml` | an example platform description and cluster notes: copy and describe *your* platform |
-| `examples/values-azure.yaml` | **The complete Azure setup:** Azure AI Foundry with Workload Identity, and the Teams webhook synced from Key Vault by External Secrets (its objects installed through `extraObjects`) |
+| `examples/values-azure.yaml` | **The complete Azure setup:** Microsoft Foundry with Workload Identity, and the Teams webhook synced from Key Vault by External Secrets (its objects installed through `extraObjects`) |
 | `examples/values-azure-csi.yaml` | Azure **without any Kubernetes Secret**: Workload Identity, and the Teams webhook mounted straight from Key Vault by the Secrets Store CSI driver |
 | `examples/values-minimal.yaml` | Any cluster: `openai-compatible` with an API key and the Teams webhook from Secrets created with kubectl, nothing cloud-specific |
 | `examples/values-azure-claude.yaml` | AKS: Claude on Foundry with Workload Identity (`anthropic`, Foundry endpoint) |

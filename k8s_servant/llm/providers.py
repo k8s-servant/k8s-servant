@@ -60,7 +60,7 @@ _SELF_HOSTED = ("ollama", "openai-compatible")
 
 
 def is_foundry_endpoint(endpoint: str) -> bool:
-    """Whether the URL points at an Azure AI Foundry / Azure OpenAI resource."""
+    """Whether the URL points at an Microsoft Foundry / Azure OpenAI resource."""
     host = urlsplit(endpoint.strip()).hostname or ""
     return host.endswith(_FOUNDRY_SUFFIXES)
 

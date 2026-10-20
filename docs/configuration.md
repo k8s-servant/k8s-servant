@@ -12,9 +12,9 @@ from the Helm chart (`appConfig` in the values, rendered into a ConfigMap). A te
 | `LLM_PROVIDER` | *(required)* | Who serves the model: `foundry`, `openai`, `anthropic`, `ollama` or `openai-compatible`. It decides the wire API, the default endpoint and the default reasoning effort. |
 | `LLM_ENDPOINT` | provider default | Base URL. Required for `foundry` (the resource endpoint, e.g. `https://<name>.openai.azure.com/`; `/openai/v1/` is appended automatically) and `openai-compatible`. Defaults: `https://api.openai.com/v1`, `https://api.anthropic.com`, `http://localhost:11434/v1` (ollama). Plain `http` is accepted for localhost and, for `ollama` and `openai-compatible`, in-cluster hosts. |
 | `LLM_MODEL` | *(required)* | Model name. For `foundry` the **deployment** name. |
-| `LLM_API_KEY` | *(empty)* | API key, for providers that need one. Prefer `LLM_API_KEY_FILE`. Leave it empty for Azure AI Foundry with Entra ID and for servers without a key (Ollama). |
+| `LLM_API_KEY` | *(empty)* | API key, for providers that need one. Prefer `LLM_API_KEY_FILE`. Leave it empty for Microsoft Foundry with Entra ID and for servers without a key (Ollama). |
 | `LLM_API_KEY_FILE` | *(empty)* | File containing the API key (the mounted Secret in the cluster, set by the chart from `llmApiKey.existingSecret`); wins over `LLM_API_KEY`. An unreadable or empty file stops the agent with an error. |
-| `LLM_AUTH` | `auto` | `auto`: the API key when one is set; otherwise Entra ID for Azure AI Foundry endpoints, no sign-in for `ollama` and `openai-compatible`, and an error for the other providers. `entra` or `api-key` force one method. |
+| `LLM_AUTH` | `auto` | `auto`: the API key when one is set; otherwise Entra ID for Microsoft Foundry endpoints, no sign-in for `ollama` and `openai-compatible`, and an error for the other providers. `entra` or `api-key` force one method. |
 | `LLM_TOKEN_SCOPE` | `https://ai.azure.com/.default` | Scope requested for the Entra ID token. |
 | `LLM_TIMEOUT_SECONDS` | `120` | Timeout of one model request (the SDK retries up to 3 times; retries are logged). |
 | `LLM_MAX_OUTPUT_TOKENS` | `32000` | Output token limit of one model reply (reasoning tokens count against it). |
@@ -96,7 +96,7 @@ Almost nothing in `.env` is secret:
 |---|---|---|---|
 | Endpoints, names, URLs of Prometheus etc., timeouts | No | `.env` | ConfigMap rendered by the Helm chart |
 | **The model's API key** (OpenAI, Anthropic, most hosted providers) | **Yes** | a file only you can read, named in `LLM_API_KEY_FILE` ([Quickstart](getting-started.md)) | a Kubernetes Secret you create, named in `llmApiKey.existingSecret`, mounted as a file (`LLM_API_KEY_FILE`) |
-| **Model access without a key** | — | Ollama: nothing. Azure AI Foundry with Entra ID: your `az login` session | Ollama in the cluster: nothing. Foundry on AKS: **Workload Identity**, the pod's ServiceAccount federated with a managed identity that has *Cognitive Services OpenAI User* on the Foundry resource (*Cognitive Services User* for Claude and other non-OpenAI models) |
+| **Model access without a key** | — | Ollama: nothing. Microsoft Foundry with Entra ID: your `az login` session | Ollama in the cluster: nothing. Foundry on AKS: **Workload Identity**, the pod's ServiceAccount federated with a managed identity that has *Cognitive Services OpenAI User* on the Foundry resource (*Cognitive Services User* for Claude and other non-OpenAI models) |
 | **`TEAMS_WEBHOOK_URL`** | **Yes**: anyone with it can post to the channel | load it from your secret store into your shell (below) | A Kubernetes Secret you create any way you like (kubectl, External Secrets, Sealed Secrets, ...), named in `teamsWebhook.existingSecret`, mounted as a file and read through `TEAMS_WEBHOOK_URL_FILE`. `examples/values-azure.yaml` syncs it from Azure Key Vault with External Secrets |
 
 In the Azure example, one managed identity does both jobs: it calls the model and

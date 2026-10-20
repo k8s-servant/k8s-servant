@@ -1,7 +1,7 @@
 #!/bin/bash
 # =============================================================================
 # setup-foundry.sh
-# Creates the MS Foundry resource and the chat model deployment that the
+# Creates the Microsoft Foundry resource and the chat model deployment that the
 # k8s-servant calls, and grants the signed-in user (you) the data-plane role
 # needed to call the model for local testing.
 #
@@ -223,7 +223,7 @@ fi
 # ---------------------------------------------------------------------------
 echo ""
 echo "======================================================================"
-echo "MS Foundry setup complete"
+echo "Microsoft Foundry setup complete"
 echo "======================================================================"
 echo "Resource:    $FOUNDRY_NAME ($RESOURCE_GROUP, $LOCATION)"
 echo "Deployment:  $DEPLOYMENT_NAME -> $MODEL_NAME $MODEL_VERSION ($SKU_NAME, ${CAPACITY}k tokens/minute,"

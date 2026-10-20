@@ -59,7 +59,7 @@ def resolve_model_auth(config: dict) -> ModelAuth:
     if mode == "entra":
         if not eligible:
             raise ValueError(
-                f"LLM_AUTH=entra needs an Azure AI Foundry endpoint, but LLM_PROVIDER={provider} "
+                f"LLM_AUTH=entra needs an Microsoft Foundry endpoint, but LLM_PROVIDER={provider} "
                 f"with this LLM_ENDPOINT is not one; use an API key (LLM_API_KEY_FILE)"
             )
         if key:

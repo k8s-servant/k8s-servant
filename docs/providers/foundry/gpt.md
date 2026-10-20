@@ -1,4 +1,4 @@
-# GPT and other models on Azure AI Foundry
+# GPT and other models on Microsoft Foundry
 
 **Choose it when** your organisation runs on Azure and you want a model inside your own
 tenant, in an EU or US data zone, with no key to manage: on AKS the pod signs in with

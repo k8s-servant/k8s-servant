@@ -1,4 +1,4 @@
-# MS Foundry concepts
+# Microsoft Foundry concepts
 
 This page explains what Microsoft Foundry is, how its parts fit together, and which of
 them k8s-servant uses. Read it before [Foundry setup guide](setup.md), which is

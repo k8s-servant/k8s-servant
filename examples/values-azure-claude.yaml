@@ -1,4 +1,4 @@
-# Example values for one AKS cluster: Claude served by Azure AI Foundry, reached with
+# Example values for one AKS cluster: Claude served by Microsoft Foundry, reached with
 # Workload Identity (Entra ID tokens, no API key). Prerequisite: the identity, its
 # federated credential and the 'Cognitive Services User' role on the Foundry resource
 # (Claude is not covered by 'Cognitive Services OpenAI User'), from

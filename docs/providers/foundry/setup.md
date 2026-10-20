@@ -1,4 +1,4 @@
-# MS Foundry setup
+# Microsoft Foundry setup
 
 This runbook sets up the language model the agent uses: a chat model deployed in
 **Microsoft Foundry** (formerly Azure AI Foundry), which the agent calls over HTTPS.
