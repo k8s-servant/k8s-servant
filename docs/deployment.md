@@ -145,9 +145,9 @@ If the cluster's egress is restricted, the pod needs HTTPS (443) to:
 - the Teams webhook host;
 - your Prometheus and Alertmanager, if they are outside the cluster.
 
-If `k8s-servant doctor` in the pod shows a timeout for the model, open the egress (for
-Foundry, or use a private endpoint:
-[foundry-setup.md](foundry-setup.md#7-step-5--networking)).
+If `k8s-servant doctor` in the pod shows a timeout for the model, open the egress; on
+Foundry you can also use a private endpoint
+([foundry-setup.md](foundry-setup.md#7-step-5--networking)).
 
 ## 3. Values for the cluster
 
