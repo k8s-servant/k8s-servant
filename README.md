@@ -375,7 +375,8 @@ kind delete cluster --name k8s-servant-demo && rm -rf .data
   npx -y kubernetes-mcp-server@0.0.67 --config deploy/local/mcp-config.toml
   ```
 
-  Then leave `MCP_URL` unset (it defaults to `http://localhost:8080/mcp`).
+  Then `unset MCP_URL` in the shell you use for the agent (step 4 set it to empty, which
+  turns MCP off); unset, it defaults to `http://localhost:8080/mcp`.
 - **Prometheus and Alertmanager**, through port-forwards in their own terminals (adjust
   namespace and service names to your monitoring stack), then set
   `PROMETHEUS_URL=http://localhost:9090` and `ALERTMANAGER_URL=http://localhost:9093`.
@@ -773,9 +774,10 @@ See [docs/architecture.md](docs/architecture.md#why-our-own-loop-and-no-framewor
 ## Roadmap
 
 Available today: the agent and CLI (`ask`, `check`, `report`, `serve`, `doctor`, ...)
-on five model providers, MCP with kubectl fallback, knowledge and skills, scheduled health checks with memory,
-the morning report, MS Teams cards, Prometheus/Alertmanager tools, summary tools with
-skipping of unchanged checks, a signed container image and the Helm chart.
+on five model providers, MCP with kubectl fallback, knowledge and skills, scheduled
+health checks with memory, the morning report, MS Teams cards, Prometheus/Alertmanager
+tools, summary tools with skipping of unchanged checks, a signed container image and
+the Helm chart.
 
 Where it is going: k8s-servant should feel like **one more person on the team**. Next
 come a documentation site, an **initial scan** in which the agent drafts the
