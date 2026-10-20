@@ -106,7 +106,7 @@ webhook URL come only from Secrets mounted as files.
 {{- fail (printf "appConfig.%s is no longer supported: use llmApiKey.existingSecret or llmApiKey.file (the key is mounted from a Secret, never set in appConfig)" $key) }}
 {{- end }}
 {{- if hasPrefix "FOUNDRY_" $key }}
-{{- fail (printf "appConfig.%s is no longer supported: use appConfig.%s (the FOUNDRY_* settings became LLM_*; see docs/model-providers.md)" $key (get $renamed $key | default "LLM_*")) }}
+{{- fail (printf "appConfig.%s is no longer supported: use appConfig.%s (the FOUNDRY_* settings became LLM_*)" $key (get $renamed $key | default "LLM_*")) }}
 {{- end }}
 {{- if contains "API_KEY" $key }}
 {{- fail (printf "appConfig.%s is not allowed: the API key is a credential and comes only from a Secret or a mounted file (llmApiKey.existingSecret / llmApiKey.file)" $key) }}
