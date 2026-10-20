@@ -24,6 +24,7 @@ kubernetes-mcp-server --config deploy/local/mcp-config.toml     # local MCP serv
 helm lint charts/k8s-servant                                    # chart
 helm template k8s-servant charts/k8s-servant -f examples/values-azure.yaml   # render
 docker build -t k8s-servant:dev .                               # image
+pip install -e '.[docs]' && zensical build --strict             # docs site (k8s-servant.dev)
 ```
 
 ## Architecture in brief

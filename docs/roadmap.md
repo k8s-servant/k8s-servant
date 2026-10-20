@@ -11,6 +11,7 @@ issues.
 | **Core agent** | The tool-calling loop on any of five model providers (Azure AI Foundry, OpenAI, Anthropic, Ollama, any OpenAI-compatible server; [model-providers.md](model-providers.md)); MCP tools with a guarded kubectl fallback; knowledge (environment description, cluster notes, skills); CLI `ask`, `tools`, `doctor`; Foundry guide and `scripts/setup-foundry.sh` |
 | **Checks, memory, Teams** | Scheduled health checks with findings memory (new / still open / resolved), the morning report, Teams cards, Prometheus and Alertmanager tools; `cluster_problems` / `warning_events` summary tools, the policy-event filter, reasoning effort, skipping unchanged checks |
 | **In the cluster** | Signed container image, Helm chart as an OCI artifact (agent + MCP sidecar, read-only RBAC, PVC, credentials from your own Secrets, extension points), examples for Azure (GPT and Claude), Anthropic, OpenAI, Ollama, any OpenAI-compatible server and Flux, `scripts/setup-workload-identity.sh`, the [deployment guide](deployment.md) |
+| **Documentation** | This site, [k8s-servant.dev](https://k8s-servant.dev), built from `docs/`: getting started, one recipe per model provider, every setting, security model, a guided code walkthrough |
 
 ## Direction
 
@@ -25,8 +26,6 @@ default and the core.
 
 | Step | What | Issue |
 |---|---|---|
-| 0 | **Provider-neutral README rewrite**. Multi-provider support itself shipped in 0.3.0 ([#2](https://github.com/k8s-servant/k8s-servant/issues/2)) | [#11](https://github.com/k8s-servant/k8s-servant/issues/11) |
-| 0b | **Documentation site** (Zensical on GitHub Pages), once the docs are provider-neutral, before the Teams launch | [#5](https://github.com/k8s-servant/k8s-servant/issues/5) |
 | 0c | **Initial scan**: the agent onboards itself (platform, installed components, what's normal here) and drafts the environment description for a human to review | [#35](https://github.com/k8s-servant/k8s-servant/issues/35) |
 | 1 | **Two-way MS Teams bot for the whole fleet**: @mention questions, interactive cards, platform-team allow-list, per-day budget (opt-in component) | [#27](https://github.com/k8s-servant/k8s-servant/issues/27) |
 | 1b | **Command centre, phase 1 (look)**: a web view of findings across clusters, run history, conversations with their evidence, and cost; OIDC login; opt-in. Then low-risk changes (approving the onboarding draft, persona); approving cluster actions arrives with step 4 | [#38](https://github.com/k8s-servant/k8s-servant/issues/38) |

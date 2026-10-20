@@ -1,0 +1,55 @@
+name: Docs
+
+# Builds the documentation site from docs/ and publishes it to https://k8s-servant.dev.
+# Pull requests only build it (strict: a broken link or anchor fails the check).
+on:
+  pull_request:
+    paths: [docs/**, zensical.toml, pyproject.toml, .github/workflows/docs.yml]
+  push:
+    branches: [main]
+    paths: [docs/**, zensical.toml, pyproject.toml, .github/workflows/docs.yml]
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  # Never cancel a deployment half-way; superseded PR builds can go.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    name: docs
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          # No pip cache: this workflow publishes, and a cache written by a PR must not reach it.
+          python-version: "3.14"
+      - run: pip install -e '.[docs]'
+      - run: zensical build --strict --clean
+      - if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: site
+
+  deploy:
+    name: deploy
+    if: github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+      - id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

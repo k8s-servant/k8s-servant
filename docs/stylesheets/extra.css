@@ -1,0 +1,4 @@
+/* Keep setting names such as LLM_API_KEY_FILE on one line in the first table column. */
+.md-typeset table:not([class]) td:first-child code {
+  white-space: nowrap;
+}

@@ -15,6 +15,7 @@ you push.
 - [pr-title.yml: Conventional Commit titles](#pr-titleyml-conventional-commit-titles)
 - [Claude workflows](#claude-workflows)
 - [release-please.yml: versions and published artifacts](#release-pleaseyml-versions-and-published-artifacts)
+- [docs.yml: the documentation site](#docsyml-the-documentation-site)
 - [Housekeeping: Scorecard, labels, Dependabot](#housekeeping-scorecard-labels-dependabot)
 - [Conventions every workflow follows](#conventions-every-workflow-follows)
 - [Cheat sheet](#cheat-sheet)
@@ -35,6 +36,7 @@ weekly ──► security scans · CodeQL · Scorecard · Dependabot PRs
 | PR opened or updated | lint, tests (3 Python versions), helm, docker build + Trivy, gitleaks, zizmor, dependency-review, CodeQL, pr-title, Claude review | nothing |
 | Merge to `main` | the same CI and security checks, CodeQL, Scorecard, release-please | nothing (the release PR is updated) |
 | Release PR merged | release-please, then our publish jobs | tag, GitHub Release, image, chart |
+| A PR or merge that touches `docs/` or `zensical.toml` | docs (strict site build) | on merge: the site at https://k8s-servant.dev |
 | Weekly | security scans, CodeQL, Scorecard, Dependabot | Dependabot PRs |
 
 ## CLI, Action or GitHub service
@@ -377,6 +379,22 @@ Before 1.0, breaking changes bump the minor version (`bump-minor-pre-major` in
 Regular PRs and merges to `main` build the image but never push it. Only a release
 publishes.
 
+## docs.yml: the documentation site
+
+The site at [k8s-servant.dev](https://k8s-servant.dev) is built from `docs/` with
+[Zensical](https://zensical.org) (configuration: `zensical.toml`; design documents in
+`docs/superpowers/` are left out).
+
+- **On a PR** that touches `docs/`, `zensical.toml`, `pyproject.toml` or the workflow,
+  the `docs` job builds the site with `--strict`: a link to a missing page or heading
+  fails it. It is not a required check, because it does not run on every PR.
+- **On a merge to `main`** the same build is uploaded and the `deploy` job publishes it
+  to GitHub Pages. Only that job gets `pages: write` and `id-token: write`. The custom
+  domain is set in the repository's Pages settings, so there is no `CNAME` file.
+- **Locally:** `pip install -e '.[docs]'`, then `zensical serve` for a live preview, or
+  `zensical build --strict` for the CI check. Zensical is pinned exactly while it is in
+  alpha; Dependabot proposes updates.
+
 ## Housekeeping: Scorecard, labels, Dependabot
 
 - **scorecard.yml**: [OpenSSF Scorecard](https://scorecard.dev/) grades the repository
@@ -412,3 +430,4 @@ publishes.
 | `dependency-review` | GitHub service | no (reports) | n/a |
 | `CodeQL` | CLI + service | alerts show on the PR | possible with the CodeQL CLI; rarely needed |
 | `review` (Claude) | Action | no, but its threads must be resolved | Claude Code in your terminal |
+| `docs` | CLI | no (runs only when docs change) | `zensical build --strict` |

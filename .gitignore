@@ -16,6 +16,7 @@ __pycache__/
 coverage.xml
 htmlcov/
 build/
+site/
 dist/
 
 # Local settings, state and logs (may hold endpoints, findings, credentials)
