@@ -14,8 +14,9 @@ and Teams cards in [reports.md](reports.md); what goes wrong and how to fix it i
 
 ```
                          ┌───────────────────────── k8s-servant (Python) ─────────────────────────┐
-  question ─────────────▶│ cli.py ──▶ agent.py (loop) ──▶ llm/ ──────────────────────────────────┼──▶ Foundry   
-                         │               │                                                       │    chat model
+  question ─────────────▶│ cli.py ──▶ agent.py (loop) ──▶ llm/ ──────────────────────────────────┼──▶ chat model (LLM_PROVIDER:
+                         │               │                                                       │    Anthropic, Azure AI Foundry,
+                         │               │                                                       │    OpenAI, Ollama, ...)
                          │               ▼ tool calls                                            │
                          │          tools/registry.py                                            │
                          │      ┌────────┼──────────────────────┐                                │
@@ -56,7 +57,7 @@ runs next to it as a **sidecar** container on `localhost:8080`.
 ## How a question is answered
 
 ```
-you            cli.py          agent.py            Foundry model        tools
+you            cli.py          agent.py            chat model           tools
  │ ask "..."     │                │                     │                 │
  │──────────────▶│ open_runtime   │                     │                 │
  │               │──(MCP connect, kubectl, load_skill)──────────────────▶│

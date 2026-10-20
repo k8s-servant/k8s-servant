@@ -6,7 +6,7 @@ tested on 2026-10-12; `pyproject.toml` holds the allowed ranges.
 ## At a glance
 
 ```
- Python 3.14 program (k8s_servant)                        runs on a laptop and in AKS (one pod)
+ Python 3.14 program (k8s_servant)                        runs on a laptop and in a cluster (one pod)
  ├── openai SDK ──────── HTTPS, Responses API ──────────────▶ Foundry / OpenAI (Chat Completions: Ollama, vLLM, Gemini, ...)
  │     └── azure-identity (optional extra): Entra ID token (az login / Workload Identity)
  ├── anthropic SDK ───── HTTPS, Messages API ───────────────▶ Anthropic / Claude on Foundry
@@ -14,7 +14,7 @@ tested on 2026-10-12; `pyproject.toml` holds the allowed ranges.
  ├── kubectl (subprocess, allow-listed) ─────────────────────────────────────────────────────────▶ Kubernetes API
  ├── httpx2 ──────────── HTTP GET ──────────────────────────▶ Prometheus, Alertmanager
  │                       HTTP POST (Adaptive Card) ─────────▶ MS Teams Workflows webhook
- ├── sqlite3 (stdlib) ── memory.db (WAL) + notes.md ────────▶ DATA_DIR (a PersistentVolume in AKS)
+ ├── sqlite3 (stdlib) ── memory.db (WAL) + notes.md ────────▶ DATA_DIR (a PersistentVolume in the cluster)
  └── PyYAML ──────────── SKILL.md frontmatter, Helm values files
 ```
 
@@ -44,13 +44,28 @@ No agent framework (LangChain, Semantic Kernel, AutoGen, …): the tool-calling 
 about 100 lines, and owning it keeps behaviour, security checks and tests in our hands.
 Reasons: [architecture.md](architecture.md#why-our-own-loop-and-no-framework).
 
-## The model: Foundry as the worked example
+## The model
 
-The provider is a setting (`LLM_PROVIDER`; see [model-providers.md](model-providers.md)). The table describes the Azure AI Foundry setup that `scripts/setup-foundry.sh` creates.
+The model is a setting, not part of the program: `LLM_PROVIDER` picks Azure AI Foundry,
+OpenAI, Anthropic, Ollama or any OpenAI-compatible server, and `LLM_MODEL` the model.
+What the agent needs from it:
+
+- **Tool calling**, or the agent cannot read the cluster.
+- **A reasoning model** for good investigations. Small local models work, but follow
+  fewer leads (see the README's quickstart).
+- **Room for about 90k tokens in a minute** during a full health check (a provider's
+  rate limit below that gives `HTTP 429`).
+
+Recipes, data handling and the reason for three APIs: [model-providers.md](model-providers.md).
+
+### Worked example: Azure AI Foundry
+
+The setup that `scripts/setup-foundry.sh` creates, and the one the measurements in
+these docs come from:
 
 | | Choice | Why |
 |---|---|---|
-| Service | **Microsoft Foundry** (Azure AI Services resource) | Models hosted in your own Azure tenant, with Entra ID access and EU data zones. OpenAI, Anthropic, Ollama and any OpenAI-compatible server are supported too ([model-providers.md](model-providers.md)) |
+| Service | **Microsoft Foundry** (Azure AI Services resource) | Models hosted in your own Azure tenant, with Entra ID access and EU data zones |
 | Model | **gpt-5.4-mini**, version 2026-03-17 | A reasoning model with tool calling at a low price; gpt-4.1 is closed to new deployments |
 | Deployment type | **DataZoneStandard** | Processing stays in the EU data zone; pay per token |
 | Capacity | 200k tokens per minute | A full check's busiest minute is ~90k tokens |
@@ -101,7 +116,7 @@ it runs as a sidecar container on `localhost:8080`, from the upstream image `ghc
 | Tool | Used for |
 |---|---|
 | setuptools (`pyproject.toml`) | Packaging; the `k8s-servant` command |
-| pytest | Unit tests (330+), including documentation checks (`tests/test_docs.py`) |
+| pytest | Unit tests, including documentation checks (`tests/test_docs.py`) |
 | `scripts/setup-foundry.sh` (bash + `az` CLI) | Creates the Foundry resource and model deployment |
 
 ## Alternatives that were considered
