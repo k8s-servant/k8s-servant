@@ -285,51 +285,115 @@ which also explains in plain words why the agent speaks three different APIs.
 
 ## Quickstart (Local)
 
-Prerequisites:
-- Python 3.12+;
-- `kubectl` with a context for the cluster;
-- a chat model with tool calling from any provider in
-  [the table above](#choose-a-model-provider): for example an OpenAI or Anthropic API
-  key, a local Ollama, or a deployment in **Azure AI Foundry** (run
-  `scripts/setup-foundry.sh`, or follow [docs/foundry-setup.md](docs/foundry-setup.md))
-  plus the `az` CLI for Entra ID sign-in;
-- optional: Node.js (to run kubernetes-mcp-server with `npx`).
+Try it on a throwaway cluster with something broken in it, in about 10 minutes. You
+need Python 3.12 or newer (`python3 --version`), `kubectl`, Docker and
+[kind](https://kind.sigs.k8s.io/).
+
+**1. Install**
 
 ```bash
-# 1. Install
+git clone https://github.com/k8s-servant/k8s-servant.git && cd k8s-servant
 python3 -m venv .venv
-.venv/bin/pip install -e '.[dev]'   # add ,azure for Entra ID sign-in: '.[dev,azure]'
+.venv/bin/pip install -e .
 source .venv/bin/activate
-
-# 2. Configure (see the table below)
-cp .env.example .env            # set LLM_PROVIDER, LLM_ENDPOINT, LLM_MODEL, CLUSTER_NAME
-                                #   (no secrets in it: see "Secrets: local vs cluster")
-set -a; source .env; set +a
-az login                        # only for Foundry with Entra ID; other providers use an API key
-kubectl config current-context  # the agent reads the cluster of this context
-
-# 3. Optional but recommended, each in its own terminal:
-#    the MCP server (the binary from its GitHub releases, or through npm):
-npx -y kubernetes-mcp-server@0.0.67 --config deploy/local/mcp-config.toml
-#    Prometheus and Alertmanager (then set PROMETHEUS_URL=http://localhost:9090
-#    and ALERTMANAGER_URL=http://localhost:9093 in .env). Port-forwards drop now and
-#    then ("lost connection to pod"); restart them when doctor reports FAIL.
-#    Adjust namespace and service names to your monitoring stack.
-kubectl -n monitoring port-forward svc/prometheus-operated 9090
-kubectl -n monitoring port-forward svc/alertmanager-operated 9093
-
-# 4. Use the same knowledge files as the cluster (your platform + this cluster)
-alias kss='k8s-servant --values examples/knowledge-values.yaml --values my-values.yaml'
-
-# 5. Check, then use
-kss doctor
-kss ask "Are there any unhealthy pods or nodes?"
-kss check            # one health check; memory in ./.data
-kss findings         # what is open now
-kss report           # the morning report, now
-kss check --post     # ... and to Teams (see "MS Teams setup")
-kss serve            # the scheduler, as it will run in the cluster (Ctrl-C to stop)
 ```
+
+`pip install -e .` is all a user needs. Developers add the test tools with
+`'.[dev]'`; Azure AI Foundry with Entra ID sign-in also needs the `azure` extra, for
+example `'.[dev,azure]'`.
+
+**2. A cluster with something broken**
+
+```bash
+kind create cluster --name k8s-servant-demo    # kubectl now points at kind-k8s-servant-demo
+kubectl create deployment web --image=nginx:1.27
+kubectl create deployment api --image=busybox:1.36 -- \
+  sh -c 'echo "connecting to db:5432"; sleep 2; echo "error: connection refused"; exit 1'
+kubectl create deployment worker --image=nginx:9.99-does-not-exist
+```
+
+`web` is healthy, `api` crash-loops and `worker` cannot pull its image. To use one of
+your own clusters instead, skip this step: the agent reads whichever cluster
+`kubectl config current-context` names, and only reads.
+
+**3. Choose a model**
+
+*Option A: Ollama, free and local.* Install [Ollama](https://ollama.com/), then:
+
+```bash
+ollama pull qwen3                                 # about 5 GB
+export LLM_PROVIDER=ollama LLM_MODEL=qwen3
+```
+
+Good enough to see how it works, not to rely on. On this demo, qwen3 found both broken
+Deployments and wrote a correct health check, but it stopped after the first tool call
+and did not read the crash logs. With Claude on the same demo, the agent read the logs,
+the pod's events and the container command, and named the exact cause of both failures.
+
+*Option B: an API key from Anthropic or OpenAI.* Keep the key in a file only you can
+read, not on the command line (it would stay in your shell history):
+
+```bash
+mkdir -p ~/.config/k8s-servant && chmod 700 ~/.config/k8s-servant
+nano ~/.config/k8s-servant/llm-api-key          # paste the key, save
+chmod 600 ~/.config/k8s-servant/llm-api-key
+export LLM_API_KEY_FILE=~/.config/k8s-servant/llm-api-key
+export LLM_PROVIDER=anthropic LLM_MODEL=claude-sonnet-5-5   # or: LLM_PROVIDER=openai LLM_MODEL=gpt-5
+```
+
+Azure AI Foundry (Entra ID, no key), Claude on Foundry and any OpenAI-compatible server
+have their own recipes in [docs/model-providers.md](docs/model-providers.md).
+
+**4. Ask**
+
+```bash
+export CLUSTER_NAME=demo MCP_URL=     # empty MCP_URL: kubectl only (MCP server: see below)
+k8s-servant doctor                    # OK for config, kubectl and model; WARN lines are optional extras
+k8s-servant ask "Are there any unhealthy pods? Why?"
+k8s-servant check                     # one health check, remembered in ./.data
+k8s-servant findings                  # what is open now
+```
+
+On a laptop `doctor` warns that your identity can read Secrets: that is expected with
+an admin kubeconfig. In the cluster the agent's own RBAC must say no.
+
+**5. Clean up**
+
+```bash
+kind delete cluster --name k8s-servant-demo && rm -rf .data
+```
+
+### Going further
+
+- **Keep your settings.** `cp .env.example .env`, fill it in (no secrets in it: see
+  [Secrets: local vs cluster](#secrets-local-vs-cluster)), then load it into each new
+  shell with `set -a; source .env; set +a`.
+- **The MCP server** (recommended; the agent falls back to kubectl without it). In its
+  own terminal, with the binary from its GitHub releases or through npm:
+
+  ```bash
+  npx -y kubernetes-mcp-server@0.0.67 --config deploy/local/mcp-config.toml
+  ```
+
+  Then leave `MCP_URL` unset (it defaults to `http://localhost:8080/mcp`).
+- **Prometheus and Alertmanager**, through port-forwards in their own terminals (adjust
+  namespace and service names to your monitoring stack), then set
+  `PROMETHEUS_URL=http://localhost:9090` and `ALERTMANAGER_URL=http://localhost:9093`.
+  Port-forwards drop now and then; restart them when `doctor` reports FAIL.
+
+  ```bash
+  kubectl -n monitoring port-forward svc/prometheus-operated 9090
+  kubectl -n monitoring port-forward svc/alertmanager-operated 9093
+  ```
+
+- **Your platform's knowledge**, the same files the cluster uses:
+
+  ```bash
+  alias kss='k8s-servant --values examples/knowledge-values.yaml --values my-values.yaml'
+  kss report           # the morning report, now
+  kss check --post     # a health check, posted to Teams (see "MS Teams setup")
+  kss serve            # the scheduler, as it runs in the cluster (Ctrl-C to stop)
+  ```
 
 `k8s-servant doctor` checks configuration, knowledge, memory, MCP, kubectl, RBAC,
 Prometheus, Alertmanager, Teams and the model, one line each. Run it first when
@@ -397,9 +461,9 @@ from the Helm chart (`appConfig` in the values, rendered into a ConfigMap). A te
 | `LLM_PROVIDER` | *(required)* | Who serves the model: `foundry`, `openai`, `anthropic`, `ollama` or `openai-compatible`. It decides the wire API, the default endpoint and the default reasoning effort. |
 | `LLM_ENDPOINT` | provider default | Base URL. Required for `foundry` (the resource endpoint, e.g. `https://<name>.openai.azure.com/`; `/openai/v1/` is appended automatically) and `openai-compatible`. Defaults: `https://api.openai.com/v1`, `https://api.anthropic.com`, `http://localhost:11434/v1` (ollama). Plain `http` is accepted for localhost and, for `ollama` and `openai-compatible`, in-cluster hosts. |
 | `LLM_MODEL` | *(required)* | Model name. For `foundry` the **deployment** name. |
-| `LLM_API_KEY` | *(empty)* | API key. Empty = Entra ID (`az login` locally, Workload Identity in the cluster), the recommended way for Azure AI Foundry. |
+| `LLM_API_KEY` | *(empty)* | API key, for providers that need one. Prefer `LLM_API_KEY_FILE`. Leave it empty for Azure AI Foundry with Entra ID and for servers without a key (Ollama). |
 | `LLM_API_KEY_FILE` | *(empty)* | File containing the API key (the mounted Secret in the cluster, set by the chart from `llmApiKey.existingSecret`); wins over `LLM_API_KEY`. An unreadable or empty file stops the agent with an error. |
-| `LLM_AUTH` | `auto` | `auto` (API key when set, else Entra ID), `entra` or `api-key`. |
+| `LLM_AUTH` | `auto` | `auto`: the API key when one is set; otherwise Entra ID for Azure AI Foundry endpoints, no sign-in for `ollama` and `openai-compatible`, and an error for the other providers. `entra` or `api-key` force one method. |
 | `LLM_TOKEN_SCOPE` | `https://ai.azure.com/.default` | Scope requested for the Entra ID token. |
 | `LLM_TIMEOUT_SECONDS` | `120` | Timeout of one model request (the SDK retries up to 3 times; retries are logged). |
 | `LLM_MAX_OUTPUT_TOKENS` | `32000` | Output token limit of one model reply (reasoning tokens count against it). |
@@ -482,8 +546,8 @@ Almost nothing in `.env` is secret:
 | Value | Secret? | Local (laptop) | Cluster |
 |---|---|---|---|
 | Endpoints, names, URLs of Prometheus etc., timeouts | No | `.env` | ConfigMap rendered by the Helm chart |
-| **Access to the model (Foundry with Entra ID)** | — | your `az login` session; nothing is stored in `.env` | **Workload Identity**: the pod's ServiceAccount is federated with a managed identity that has *Cognitive Services OpenAI User* on the Foundry resource (*Cognitive Services User* for Claude and other non-OpenAI models). No key anywhere |
-| `LLM_API_KEY` | **Yes** | leave it empty for Foundry with Entra ID and for Ollama; required for OpenAI and Anthropic | not used with Entra ID or Ollama; otherwise a Kubernetes Secret you create, named in `llmApiKey.existingSecret`, mounted as a file (`LLM_API_KEY_FILE`) |
+| **The model's API key** (OpenAI, Anthropic, most hosted providers) | **Yes** | a file only you can read, named in `LLM_API_KEY_FILE` ([Quickstart](#quickstart-local)) | a Kubernetes Secret you create, named in `llmApiKey.existingSecret`, mounted as a file (`LLM_API_KEY_FILE`) |
+| **Model access without a key** | — | Ollama: nothing. Azure AI Foundry with Entra ID: your `az login` session | Ollama in the cluster: nothing. Foundry on AKS: **Workload Identity**, the pod's ServiceAccount federated with a managed identity that has *Cognitive Services OpenAI User* on the Foundry resource (*Cognitive Services User* for Claude and other non-OpenAI models) |
 | **`TEAMS_WEBHOOK_URL`** | **Yes**: anyone with it can post to the channel | load it from your secret store into your shell (below) | A Kubernetes Secret you create any way you like (kubectl, External Secrets, Sealed Secrets, ...), named in `teamsWebhook.existingSecret`, mounted as a file and read through `TEAMS_WEBHOOK_URL_FILE`. `examples/values-azure.yaml` syncs it from Azure Key Vault with External Secrets |
 
 In the Azure example, one managed identity does both jobs: it calls the model and
@@ -541,8 +605,10 @@ lists end with "… and N more".
 
 ## Cost and Limits
 
-You pay **per token** used. An idle deployment and the deployment's capacity cost
-nothing. Measured on a test cluster (~600 Deployments, ~1,250 pods) with gpt-5.4-mini:
+With a hosted model you pay **per token**; an idle agent costs nothing, and a local
+Ollama costs only your hardware. Measured on a test cluster (~600 Deployments, ~1,250
+pods) with gpt-5.4-mini on Azure AI Foundry; other models use a similar number of
+tokens, at their own price:
 
 | Run | Model calls | Tokens | Time |
 |---|---|---|---|
@@ -551,20 +617,22 @@ nothing. Measured on a test cluster (~600 Deployments, ~1,250 pods) with gpt-5.4
 | `ask` | 3–10 | depends on the question (not measured separately; less than a full check) | 10–60 s |
 | Morning report | a full check + 1 overview call | a full check plus a small overview call | ~1–2 min |
 
-- **Capacity (tokens per minute)** must cover a full check's busiest minute (about
-  90k): use **150–200k TPM**. With 50k, deep checks hit `HTTP 429`. Raising it costs
-  nothing.
+- **Rate limits.** A full check's busiest minute uses about 90k tokens, so your
+  provider's tokens-per-minute limit must cover that, or deep checks fail with
+  `HTTP 429`. On Azure AI Foundry, give the deployment 150–200k TPM (raising it costs
+  nothing).
 - **Monthly cost** depends on how often something changes, because unchanged hours
-  are free. A rough estimate from public price lists (verify the real price for your
-  region in Azure Cost Management): about $0.10–0.20 per full check, so from roughly
-  $10–30 a month per cluster when most hours are quiet to $70–160 if every hour ran in
-  full.
+  are free. For gpt-5.4-mini, a rough estimate from public price lists was about
+  $0.10–0.20 per full check, so from roughly $10–30 a month per cluster when most hours
+  are quiet to $70–160 if every hour ran in full. Prices change and differ by model and
+  region: check your provider's current price list.
 - **Levers:** `CHECK_SKIP_UNCHANGED`, `CHECK_FULL_INTERVAL_HOURS`,
   `CHECK_INTERVAL_MINUTES`, `TOOL_OUTPUT_MAX_CHARS`, `LLM_REASONING_EFFORT`.
 - Every model call is logged with its tokens: `model call: N prompt (M cached) + K
   completion tokens (R reasoning)`. Set a budget alert with your provider (on Foundry: the resource group).
 
-More: [docs/foundry-setup.md](docs/foundry-setup.md#9-cost-and-limits),
+More: [docs/model-providers.md](docs/model-providers.md); for Azure AI Foundry,
+[docs/foundry-setup.md](docs/foundry-setup.md#9-cost-and-limits) and
 [docs/foundry-concepts.md](docs/foundry-concepts.md).
 
 ---
@@ -641,6 +709,13 @@ Secrets. Most data is reduced in Python first; log lines are not redacted.
 [docs/security.md](docs/security.md#what-data-leaves-the-cluster),
 [docs/data-processing.md](docs/data-processing.md).
 
+**Use with care.** k8s-servant gives advice; it does not act. Its answers come from a
+language model and can be wrong or incomplete, so check them before you change anything
+in a cluster. You decide which model provider your cluster data goes to
+([data processing](docs/data-processing.md)), what RBAC the agent gets, and who can
+read its reports. The software is provided "as is", without warranty, under the
+[Apache-2.0 license](LICENSE).
+
 **Why does a check sometimes take a minute and sometimes 6 seconds?** Six seconds
 means nothing changed since the last full check, so the model was skipped.
 
@@ -697,15 +772,17 @@ See [docs/architecture.md](docs/architecture.md#why-our-own-loop-and-no-framewor
 
 ## Roadmap
 
-Available today: the agent and CLI (`ask`, `check`, `report`, `serve`, `doctor`, ...),
-MCP with kubectl fallback, knowledge and skills, scheduled health checks with memory,
+Available today: the agent and CLI (`ask`, `check`, `report`, `serve`, `doctor`, ...)
+on five model providers, MCP with kubectl fallback, knowledge and skills, scheduled health checks with memory,
 the morning report, MS Teams cards, Prometheus/Alertmanager tools, summary tools with
 skipping of unchanged checks, a signed container image and the Helm chart.
 
 Where it is going: k8s-servant should feel like **one more person on the team**. Next
-come multi-provider LLM support
-([#2](https://github.com/k8s-servant/k8s-servant/issues/2)), then a **two-way MS Teams
-bot** for the whole fleet ([#27](https://github.com/k8s-servant/k8s-servant/issues/27)),
+come a documentation site, an **initial scan** in which the agent drafts the
+description of your platform ([#35](https://github.com/k8s-servant/k8s-servant/issues/35)),
+then a **two-way MS Teams bot** for the whole fleet
+([#27](https://github.com/k8s-servant/k8s-servant/issues/27)), a **command centre** web
+view ([#38](https://github.com/k8s-servant/k8s-servant/issues/38)),
 a **scoreboard** that shows how often it is right
 ([#28](https://github.com/k8s-servant/k8s-servant/issues/28)), cost budgets, and later
 **approved runbooks** such as rolling node restarts after patching, unlocked step by step
