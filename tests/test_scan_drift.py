@@ -126,7 +126,7 @@ def test_a_failure_present_in_both_scans_is_not_listed_again():
 
 
 def test_noise_only_sources_are_never_listed():
-    failed = {k: "x" for k in ("prometheus", "alertmanager", "prometheus-url", "alertmanager-url", "memory")}
+    failed = {k: "x" for k in ("prometheus", "alertmanager")}
     changes, _ = compare(_r([]), _r([], failed=failed))
     assert changes.not_checked == {}
     changes, _ = compare(None, _r([], failed=failed))
@@ -158,3 +158,17 @@ def test_stored_scans_with_naive_time_or_non_string_values_are_ignored(tmp_path)
         assert load_scan(memory) is None
     memory.set_meta(LAST_SCAN_KEY, json.dumps(base))
     assert load_scan(memory) is not None
+
+
+def test_a_broken_configured_url_or_memory_is_listed_when_new():
+    failed = {"prometheus-url": "configured URL failed", "memory": "boom", "prometheus": "x"}
+    changes, _ = compare(_r([]), _r([], failed=failed))
+    assert set(changes.not_checked) == {"prometheus-url", "memory"}
+    changes, _ = compare(_r([], failed=failed), _r([], failed=failed))
+    assert changes.not_checked == {}
+
+
+def test_a_crashed_detector_is_listed_on_every_scan():
+    failed = {"detector:catalog": "KeyError"}
+    changes, _ = compare(_r([], failed=failed), _r([], failed=failed))
+    assert changes.not_checked == failed

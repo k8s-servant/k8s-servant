@@ -22,8 +22,8 @@ log = logging.getLogger(__name__)
 LAST_SCAN_KEY = "last_cluster_scan"
 _VERSION = 1
 _SCOPES = ("platform", "cluster")
-# Failures that only cost noise detail; they are normal on many clusters and never reported.
-_NOISE_ONLY = frozenset({"prometheus", "alertmanager", "prometheus-url", "alertmanager-url", "memory"})
+# Monitoring that is simply not there is normal on many clusters and never reported.
+_NOISE_ONLY = frozenset({"prometheus", "alertmanager"})
 
 
 def save_scan(memory: Memory, result: ScanResult) -> None:
@@ -136,10 +136,14 @@ def compare(old: ScanResult | None, new: ScanResult) -> tuple[ScanChanges, ScanR
 
     noise = [f for f in new.facts if f.topic == "noise"]
     new_facts = {f.key: f for f in new.facts if f.topic != "noise" and not untouched(f)}
-    # A failure is reported once: when it is new since the stored scan (all on a baseline).
+    # A failure is reported once, when new since the stored scan (all on a baseline); a crashed detector every time.
     previous = set(old.failed) if old else set()
     changes = ScanChanges(
-        not_checked={k: v for k, v in new.failed.items() if k not in _NOISE_ONLY and k not in previous}
+        not_checked={
+            k: v
+            for k, v in new.failed.items()
+            if k.startswith("detector:") or (k not in _NOISE_ONLY and k not in previous)
+        }
     )
     stored = dict(new_facts)
     if old is None:
