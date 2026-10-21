@@ -270,9 +270,9 @@ def test_control_characters_never_break_a_file(bad):
         for files in built:
             for name, text in files.items():
                 assert not [c for c in text if ord(c) < 32 and c not in "\n\t"], name
-            assert "\ud800" not in text
-            if name.endswith(".yaml"):
-                assert isinstance(yaml.safe_load(text), dict)
+                assert "\ud800" not in text
+                if name.endswith(".yaml"):
+                    assert isinstance(yaml.safe_load(text), dict)
 
 
 def test_a_no_break_space_stays_readable():
