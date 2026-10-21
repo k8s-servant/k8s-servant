@@ -1,0 +1,10 @@
+{
+  "clientVersion": {
+    "gitVersion": "v1.30.4-eks-0000000"
+  },
+  "serverVersion": {
+    "major": "1",
+    "minor": "30",
+    "gitVersion": "v1.30.4-eks-0000000"
+  }
+}

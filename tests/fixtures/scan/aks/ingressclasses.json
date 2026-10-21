@@ -1,0 +1,12 @@
+{
+  "items": [
+    {
+      "metadata": {
+        "name": "nginx",
+        "annotations": {
+          "ingressclass.kubernetes.io/is-default-class": "true"
+        }
+      }
+    }
+  ]
+}

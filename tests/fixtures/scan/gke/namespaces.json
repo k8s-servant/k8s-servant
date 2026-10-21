@@ -1,0 +1,46 @@
+{
+  "items": [
+    {
+      "metadata": {
+        "name": "default",
+        "labels": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "kube-system",
+        "labels": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "kube-public",
+        "labels": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "kube-node-lease",
+        "labels": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "istio-system",
+        "labels": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "infra",
+        "labels": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "shop",
+        "labels": {}
+      }
+    }
+  ]
+}

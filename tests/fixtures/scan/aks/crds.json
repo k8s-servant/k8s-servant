@@ -1,0 +1,100 @@
+{
+  "items": [
+    {
+      "metadata": {
+        "name": "clusterpolicies.kyverno.io"
+      },
+      "spec": {
+        "group": "kyverno.io"
+      }
+    },
+    {
+      "metadata": {
+        "name": "policies.kyverno.io"
+      },
+      "spec": {
+        "group": "kyverno.io"
+      }
+    },
+    {
+      "metadata": {
+        "name": "things.source.toolkit.fluxcd.io"
+      },
+      "spec": {
+        "group": "source.toolkit.fluxcd.io"
+      }
+    },
+    {
+      "metadata": {
+        "name": "things.kustomize.toolkit.fluxcd.io"
+      },
+      "spec": {
+        "group": "kustomize.toolkit.fluxcd.io"
+      }
+    },
+    {
+      "metadata": {
+        "name": "things.helm.toolkit.fluxcd.io"
+      },
+      "spec": {
+        "group": "helm.toolkit.fluxcd.io"
+      }
+    },
+    {
+      "metadata": {
+        "name": "things.notification.toolkit.fluxcd.io"
+      },
+      "spec": {
+        "group": "notification.toolkit.fluxcd.io"
+      }
+    },
+    {
+      "metadata": {
+        "name": "certificates.cert-manager.io"
+      },
+      "spec": {
+        "group": "cert-manager.io"
+      }
+    },
+    {
+      "metadata": {
+        "name": "prometheuses.monitoring.coreos.com"
+      },
+      "spec": {
+        "group": "monitoring.coreos.com"
+      }
+    },
+    {
+      "metadata": {
+        "name": "alertmanagers.monitoring.coreos.com"
+      },
+      "spec": {
+        "group": "monitoring.coreos.com"
+      }
+    },
+    {
+      "metadata": {
+        "name": "externalsecrets.external-secrets.io"
+      },
+      "spec": {
+        "group": "external-secrets.io"
+      }
+    },
+    {
+      "metadata": {
+        "name": "secretproviderclasses.secrets-store.csi.x-k8s.io"
+      },
+      "spec": {
+        "group": "secrets-store.csi.x-k8s.io"
+      }
+    },
+    {
+      "metadata": {
+        "name": "servicedefaults.consul.hashicorp.com"
+      },
+      "spec": {
+        "group": "consul.hashicorp.com"
+      }
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "items": [
+    {
+      "metadata": {
+        "name": "prometheus-kps-prometheus",
+        "namespace": "monitoring"
+      },
+      "status": {
+        "readyReplicas": 1
+      }
+    },
+    {
+      "metadata": {
+        "name": "alertmanager-kps-alertmanager",
+        "namespace": "monitoring"
+      },
+      "status": {
+        "readyReplicas": 1
+      }
+    },
+    {
+      "metadata": {
+        "name": "consul-server",
+        "namespace": "consul"
+      },
+      "status": {
+        "readyReplicas": 3
+      }
+    }
+  ]
+}

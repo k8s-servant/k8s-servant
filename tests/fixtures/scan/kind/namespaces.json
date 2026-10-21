@@ -1,0 +1,34 @@
+{
+  "items": [
+    {
+      "metadata": {
+        "name": "default",
+        "labels": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "kube-system",
+        "labels": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "kube-public",
+        "labels": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "kube-node-lease",
+        "labels": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "local-path-storage",
+        "labels": {}
+      }
+    }
+  ]
+}

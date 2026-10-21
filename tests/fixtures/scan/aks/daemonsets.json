@@ -1,0 +1,40 @@
+{
+  "items": [
+    {
+      "metadata": {
+        "name": "azure-cns",
+        "namespace": "kube-system"
+      },
+      "status": {
+        "numberReady": 5
+      }
+    },
+    {
+      "metadata": {
+        "name": "kube-proxy",
+        "namespace": "kube-system"
+      },
+      "status": {
+        "numberReady": 5
+      }
+    },
+    {
+      "metadata": {
+        "name": "aks-secrets-store-csi-driver",
+        "namespace": "kube-system"
+      },
+      "status": {
+        "numberReady": 5
+      }
+    },
+    {
+      "metadata": {
+        "name": "aks-secrets-store-provider-azure",
+        "namespace": "kube-system"
+      },
+      "status": {
+        "numberReady": 5
+      }
+    }
+  ]
+}

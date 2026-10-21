@@ -1,0 +1,97 @@
+{
+  "items": [
+    {
+      "metadata": {
+        "name": "default",
+        "labels": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "kube-system",
+        "labels": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "kube-public",
+        "labels": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "kube-node-lease",
+        "labels": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "kyverno",
+        "labels": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "flux-system",
+        "labels": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "cert-manager",
+        "labels": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "ingress-nginx",
+        "labels": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "monitoring",
+        "labels": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "external-secrets",
+        "labels": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "consul",
+        "labels": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "shop",
+        "labels": {
+          "team": "team-a",
+          "cost-center": "cc-1"
+        }
+      }
+    },
+    {
+      "metadata": {
+        "name": "payments",
+        "labels": {
+          "team": "team-a",
+          "cost-center": "cc-1"
+        }
+      }
+    },
+    {
+      "metadata": {
+        "name": "orders",
+        "labels": {
+          "team": "team-a",
+          "cost-center": "cc-1"
+        }
+      }
+    }
+  ]
+}

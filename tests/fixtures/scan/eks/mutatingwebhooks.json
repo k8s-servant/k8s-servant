@@ -1,0 +1,9 @@
+{
+  "items": [
+    {
+      "metadata": {
+        "name": "linkerd-proxy-injector-webhook-config"
+      }
+    }
+  ]
+}

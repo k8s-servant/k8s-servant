@@ -1,0 +1,31 @@
+{
+  "items": [
+    {
+      "metadata": {
+        "name": "anetd",
+        "namespace": "kube-system"
+      },
+      "status": {
+        "numberReady": 3
+      }
+    },
+    {
+      "metadata": {
+        "name": "secrets-store-csi-driver",
+        "namespace": "kube-system"
+      },
+      "status": {
+        "numberReady": 3
+      }
+    },
+    {
+      "metadata": {
+        "name": "csi-secrets-store-provider-gcp",
+        "namespace": "kube-system"
+      },
+      "status": {
+        "numberReady": 3
+      }
+    }
+  ]
+}

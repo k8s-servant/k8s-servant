@@ -1,0 +1,94 @@
+{
+  "items": [
+    {
+      "metadata": {
+        "name": "coredns",
+        "namespace": "kube-system"
+      },
+      "status": {
+        "readyReplicas": 2
+      }
+    },
+    {
+      "metadata": {
+        "name": "karpenter",
+        "namespace": "karpenter"
+      },
+      "status": {
+        "readyReplicas": 2
+      }
+    },
+    {
+      "metadata": {
+        "name": "argocd-server",
+        "namespace": "argocd"
+      },
+      "status": {
+        "readyReplicas": 1
+      }
+    },
+    {
+      "metadata": {
+        "name": "argocd-repo-server",
+        "namespace": "argocd"
+      },
+      "status": {
+        "readyReplicas": 1
+      }
+    },
+    {
+      "metadata": {
+        "name": "gatekeeper-controller-manager",
+        "namespace": "gatekeeper-system"
+      },
+      "status": {
+        "readyReplicas": 3
+      }
+    },
+    {
+      "metadata": {
+        "name": "gatekeeper-audit",
+        "namespace": "gatekeeper-system"
+      },
+      "status": {
+        "readyReplicas": 1
+      }
+    },
+    {
+      "metadata": {
+        "name": "sealed-secrets-controller",
+        "namespace": "kube-system"
+      },
+      "status": {
+        "readyReplicas": 1
+      }
+    },
+    {
+      "metadata": {
+        "name": "linkerd-destination",
+        "namespace": "linkerd"
+      },
+      "status": {
+        "readyReplicas": 1
+      }
+    },
+    {
+      "metadata": {
+        "name": "linkerd-identity",
+        "namespace": "linkerd"
+      },
+      "status": {
+        "readyReplicas": 1
+      }
+    },
+    {
+      "metadata": {
+        "name": "linkerd-proxy-injector",
+        "namespace": "linkerd"
+      },
+      "status": {
+        "readyReplicas": 1
+      }
+    }
+  ]
+}

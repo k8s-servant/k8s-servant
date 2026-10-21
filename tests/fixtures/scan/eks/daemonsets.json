@@ -1,0 +1,22 @@
+{
+  "items": [
+    {
+      "metadata": {
+        "name": "aws-node",
+        "namespace": "kube-system"
+      },
+      "status": {
+        "numberReady": 3
+      }
+    },
+    {
+      "metadata": {
+        "name": "kube-proxy",
+        "namespace": "kube-system"
+      },
+      "status": {
+        "numberReady": 3
+      }
+    }
+  ]
+}

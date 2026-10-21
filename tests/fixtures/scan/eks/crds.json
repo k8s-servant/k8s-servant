@@ -1,0 +1,52 @@
+{
+  "items": [
+    {
+      "metadata": {
+        "name": "nodepools.karpenter.sh"
+      },
+      "spec": {
+        "group": "karpenter.sh"
+      }
+    },
+    {
+      "metadata": {
+        "name": "applications.argoproj.io"
+      },
+      "spec": {
+        "group": "argoproj.io"
+      }
+    },
+    {
+      "metadata": {
+        "name": "constrainttemplates.templates.gatekeeper.sh"
+      },
+      "spec": {
+        "group": "templates.gatekeeper.sh"
+      }
+    },
+    {
+      "metadata": {
+        "name": "sealedsecrets.bitnami.com"
+      },
+      "spec": {
+        "group": "bitnami.com"
+      }
+    },
+    {
+      "metadata": {
+        "name": "serviceprofiles.linkerd.io"
+      },
+      "spec": {
+        "group": "linkerd.io"
+      }
+    },
+    {
+      "metadata": {
+        "name": "servers.policy.linkerd.io"
+      },
+      "spec": {
+        "group": "policy.linkerd.io"
+      }
+    }
+  ]
+}

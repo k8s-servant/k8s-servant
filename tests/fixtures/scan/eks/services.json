@@ -1,0 +1,42 @@
+{
+  "items": [
+    {
+      "metadata": {
+        "name": "storefront",
+        "namespace": "shop",
+        "annotations": {
+          "service.beta.kubernetes.io/aws-load-balancer-type": "external"
+        }
+      },
+      "spec": {
+        "type": "LoadBalancer",
+        "clusterIP": "10.0.0.10",
+        "ports": [
+          {
+            "name": "http",
+            "port": 443
+          }
+        ]
+      }
+    },
+    {
+      "metadata": {
+        "name": "backoffice",
+        "namespace": "shop",
+        "annotations": {
+          "service.beta.kubernetes.io/aws-load-balancer-scheme": "internal"
+        }
+      },
+      "spec": {
+        "type": "LoadBalancer",
+        "clusterIP": "10.0.0.10",
+        "ports": [
+          {
+            "name": "http",
+            "port": 443
+          }
+        ]
+      }
+    }
+  ]
+}

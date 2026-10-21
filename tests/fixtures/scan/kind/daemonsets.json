@@ -1,0 +1,22 @@
+{
+  "items": [
+    {
+      "metadata": {
+        "name": "kindnet",
+        "namespace": "kube-system"
+      },
+      "status": {
+        "numberReady": 1
+      }
+    },
+    {
+      "metadata": {
+        "name": "kube-proxy",
+        "namespace": "kube-system"
+      },
+      "status": {
+        "numberReady": 1
+      }
+    }
+  ]
+}

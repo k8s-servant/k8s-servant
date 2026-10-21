@@ -65,6 +65,13 @@ k8s-servant/
 │   ├── report.py                   # The morning report
 │   ├── teams.py                    # Adaptive Cards, posting to the Teams Workflows webhook
 │   ├── scheduler.py                # `serve`: hourly checks + the morning report, heartbeat, SIGTERM
+│   ├── scan/
+│   │   ├── catalog.py              # Well-known components and how to recognise them
+│   │   ├── discover.py             # Platform, network, monitoring and noise facts: version, cloud, pools, URLs, noisy alerts
+│   │   ├── draft.py                # Facts as Markdown: sections, evidence, TODO(onboard) questions
+│   │   ├── facts.py                # Scan facts: evidence, certainty, scope; scan results
+│   │   ├── inputs.py               # Scan inputs read once each; Prometheus and Alertmanager access
+│   │   └── run.py                  # scan(): inputs, every detector, monitoring access; failures listed, never raised
 │   └── tools/
 │       ├── registry.py             # Common Tool shape, registry, output size cap
 │       ├── cluster_tools.py        # cluster_problems + warning_events: summaries for large clusters

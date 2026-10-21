@@ -1,0 +1,52 @@
+{
+  "items": [
+    {
+      "metadata": {
+        "name": "virtualservices.networking.istio.io"
+      },
+      "spec": {
+        "group": "networking.istio.io"
+      }
+    },
+    {
+      "metadata": {
+        "name": "peerauthentications.security.istio.io"
+      },
+      "spec": {
+        "group": "security.istio.io"
+      }
+    },
+    {
+      "metadata": {
+        "name": "gateways.gateway.networking.k8s.io"
+      },
+      "spec": {
+        "group": "gateway.networking.k8s.io"
+      }
+    },
+    {
+      "metadata": {
+        "name": "gatewayclasses.gateway.networking.k8s.io"
+      },
+      "spec": {
+        "group": "gateway.networking.k8s.io"
+      }
+    },
+    {
+      "metadata": {
+        "name": "secretproviderclasses.secrets-store.csi.x-k8s.io"
+      },
+      "spec": {
+        "group": "secrets-store.csi.x-k8s.io"
+      }
+    },
+    {
+      "metadata": {
+        "name": "ciliumclusterwidenetworkpolicies.cilium.io"
+      },
+      "spec": {
+        "group": "cilium.io"
+      }
+    }
+  ]
+}

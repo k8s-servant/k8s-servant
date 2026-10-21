@@ -1,0 +1,13 @@
+{
+  "items": [
+    {
+      "metadata": {
+        "name": "external",
+        "namespace": "infra"
+      },
+      "spec": {
+        "gatewayClassName": "gke-l7-global-external-managed"
+      }
+    }
+  ]
+}

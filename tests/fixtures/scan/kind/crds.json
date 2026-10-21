@@ -1,0 +1,20 @@
+{
+  "items": [
+    {
+      "metadata": {
+        "name": "clusterpolicies.kyverno.io"
+      },
+      "spec": {
+        "group": "kyverno.io"
+      }
+    },
+    {
+      "metadata": {
+        "name": "policies.kyverno.io"
+      },
+      "spec": {
+        "group": "kyverno.io"
+      }
+    }
+  ]
+}
