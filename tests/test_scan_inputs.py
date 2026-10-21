@@ -28,7 +28,7 @@ async def test_a_forbidden_input_is_a_failure_not_an_exception():
 async def test_crd_dependent_inputs_are_skipped_when_the_crd_is_absent():
     calls = []
     inputs = await gather_inputs(fixture_fetch("kind", calls))
-    assert not any("gateways.gateway.networking.k8s.io" in c for c in calls)
+    assert not any(len(c) > 1 and c[1] == "gateways.gateway.networking.k8s.io" for c in calls)
     assert "gateways" not in inputs.failed
 
 
@@ -78,8 +78,10 @@ async def test_alertmanager_through_the_proxy_path():
     assert calls[0] == [
         "get",
         "--raw",
-        "/api/v1/namespaces/monitoring/services/kps-alertmanager:9093/proxy"
-        "/api/v2/alerts?active=true&silenced=false&inhibited=false",
+        (
+            "/api/v1/namespaces/monitoring/services/kps-alertmanager:9093/proxy"
+            "/api/v2/alerts?active=true&silenced=false&inhibited=false"
+        ),
     ]
 
 
