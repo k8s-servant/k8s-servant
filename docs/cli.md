@@ -25,7 +25,7 @@ k8s-servant [--values FILE ...] [--knowledge-dir DIR] [--log-level LEVEL] COMMAN
   notes              the agent's learned notes
   tools              the tools available right now (MCP or kubectl fallback)
   doctor             check configuration and connectivity, step by step
-  onboard            scan the cluster once and draft its knowledge files for review
+  onboard [--show]   scan the cluster once and draft its knowledge files for review
 ```
 
 `python -m k8s_servant ...` is the same as `k8s-servant ...`.
@@ -281,8 +281,9 @@ see (firewalls, maintenance windows). The scan is read-only: it runs only fixed
 `kubectl get` and `kubectl version` calls (plus GET requests to Prometheus and
 Alertmanager, directly or through the API server's service proxy) and never reads
 Secrets. It never overwrites
-existing files unless you pass `--force`. It prints the paths it wrote on stdout.
+existing files (`settings.env` included) unless you pass `--force`. It prints the paths it wrote on stdout.
 With a model configured, it adds a short overview written from the proven facts only.
+The full guide, with an example draft: [onboarding.md](onboarding.md).
 
 | Flag | Meaning |
 |---|---|
@@ -292,14 +293,21 @@ With a model configured, it adds a short overview written from the proven facts 
 | `--no-input` | Ask nothing; every doubt stays a `TODO(onboard):` line |
 | `--no-model` | Do not ask the model for the overview |
 | `--cluster-name NAME` | Cluster name for the draft and the file name. Default: `CLUSTER_NAME`, else `my-cluster` |
+| `--show` | Print the cluster values file from the last stored scan (the one the morning report keeps current); no scan, no questions, no model. Takes no other option. For use in the pod, whose filesystem is read-only |
+
+```bash
+k8s-servant onboard                                   # interactive: asks, then writes k8s-servant-onboard/
+k8s-servant onboard --no-input --no-model --out /tmp/draft
+kubectl -n k8s-servant exec deploy/k8s-servant -c agent -- k8s-servant onboard --show
+```
 
 ## Exit codes
 
 | Code | Meaning |
 |---|---|
 | 0 | Success |
-| 1 | Something failed at runtime: a model call, a check without valid findings, a FAIL in `doctor`, an unknown run id |
-| 2 | Configuration error: missing setting, bad value, unreadable or malformed `--values` file, invalid endpoint, unwritable `DATA_DIR` |
+| 1 | Something failed at runtime: a model call, a check without valid findings, a FAIL in `doctor`, an unknown run id; for `onboard`, a draft file that already exists, a cluster that cannot be read, or no stored scan for `--show` |
+| 2 | Configuration error: missing setting, bad value, unreadable or malformed `--values` file, invalid endpoint, unwritable `DATA_DIR`, `onboard --show` with another option |
 | 130 | Interrupted with Ctrl-C |
 
 ## Running inside the pod
@@ -308,6 +316,7 @@ With a model configured, it adds a short overview written from the proven facts 
 kubectl -n k8s-servant exec -it deploy/k8s-servant -c agent -- k8s-servant ask "What changed in the last hour?"
 kubectl -n k8s-servant exec -it deploy/k8s-servant -c agent -- k8s-servant findings
 kubectl -n k8s-servant exec -it deploy/k8s-servant -c agent -- k8s-servant doctor
+kubectl -n k8s-servant exec deploy/k8s-servant -c agent -- k8s-servant onboard --show
 ```
 
 Inside the pod every setting is already provided by the chart, and the commands share

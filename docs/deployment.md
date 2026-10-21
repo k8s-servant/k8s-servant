@@ -13,6 +13,7 @@ another provider, skip them and give the pod an API key from a Secret
 - [What gets deployed](#what-gets-deployed)
 - [Published artifacts](#published-artifacts)
 - [Prerequisites](#prerequisites)
+- [First run](#first-run)
 - [1. Workload Identity (AKS)](#1-workload-identity-aks)
 - [2. Network](#2-network)
 - [3. Values for the cluster](#3-values-for-the-cluster)
@@ -87,6 +88,26 @@ signatures, and how to keep your settings in a private repository without a fork
 | Approval to send this cluster's data to the model | your organisation's data-processing rules ([data-processing.md](data-processing.md)) |
 | (AKS) Rights | Contributor on the identity's resource group; Owner or User Access Administrator on the Key Vault and the Foundry resource |
 
+## First run
+
+Draft the cluster's knowledge files before you install, from a laptop whose `kubectl`
+points at the cluster:
+
+```bash
+k8s-servant onboard                 # writes k8s-servant-onboard/: up to two values files plus settings.env
+```
+
+The scan is read-only and never reads Secrets. Review the draft (every
+`TODO(onboard):` line), then use the files as the values in
+[step 3](#3-values-for-the-cluster): `knowledge-values.yaml` (written only when you
+say the cluster is representative) is the platform description shared by every
+cluster, `<cluster>.yaml` holds this cluster's notes and suggested `appConfig`
+settings. `settings.env` repeats those settings for the CLI on your laptop. The full guide: [onboarding.md](onboarding.md).
+
+Once installed, the agent re-scans before each morning report and lists what changed
+since the last scan. To take a fresh draft from the running pod:
+`kubectl -n k8s-servant exec deploy/k8s-servant -c agent -- k8s-servant onboard --show`.
+
 ## 1. Workload Identity (AKS)
 
 A user-assigned managed identity, used for two things: the agent calls the model with
@@ -158,7 +179,7 @@ Start from the examples in this repository:
 | File | Holds |
 |---|---|
 | `charts/k8s-servant/values.yaml` | chart defaults, every key commented |
-| `examples/knowledge-values.yaml` | an example platform description and cluster notes: copy and describe *your* platform |
+| `examples/knowledge-values.yaml` | an example platform description and cluster notes: copy and describe *your* platform, or start from the [first-run draft](#first-run) |
 | `examples/values-azure.yaml` | **The complete Azure setup:** Microsoft Foundry with Workload Identity, and the Teams webhook synced from Key Vault by External Secrets (its objects installed through `extraObjects`) |
 | `examples/values-azure-csi.yaml` | Azure **without any Kubernetes Secret**: Workload Identity, and the Teams webhook mounted straight from Key Vault by the Secrets Store CSI driver |
 | `examples/values-minimal.yaml` | Any cluster: `openai-compatible` with an API key and the Teams webhook from Secrets created with kubectl, nothing cloud-specific |

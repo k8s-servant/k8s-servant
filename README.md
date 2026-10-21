@@ -37,6 +37,7 @@ the terminal and to an **MS Teams** channel.
 - [How It Works](#how-it-works)
 - [Choose a Model Provider](#choose-a-model-provider)
 - [Quickstart](#quickstart)
+- [First Run](#first-run)
 - [Deploying to a Cluster](#deploying-to-a-cluster)
 - [Teaching the Agent](#teaching-the-agent)
 - [Documentation](#documentation)
@@ -190,6 +191,28 @@ a safe way to keep the API key, the MCP server and Prometheus:
 
 ---
 
+## First Run
+
+Before you write the environment description by hand, let the agent draft it. With
+`kubectl` pointing at a cluster:
+
+```bash
+k8s-servant onboard
+```
+
+It scans the cluster once (read-only, never Secrets), asks whether this cluster is
+representative of your platform, asks about what it is unsure of and what it cannot
+see (firewalls, maintenance windows), and writes up to two Helm values files plus a
+`settings.env` to `k8s-servant-onboard/`: `knowledge-values.yaml` (the platform, only
+when the cluster is representative), `<cluster>.yaml` (this cluster and the suggested
+settings) and `settings.env` (the same settings, for your shell). Every line carries its evidence or says it
+came from you; open points are `TODO(onboard):` lines. It never overwrites a file
+without `--force`. Review the files, then pass them to Helm. In the cluster the agent
+re-scans before each morning report and lists what changed since.
+Guide: [docs/onboarding.md](docs/onboarding.md).
+
+---
+
 ## Deploying to a Cluster
 
 In a cluster the agent is one pod with two containers, the agent (`k8s-servant serve`)
@@ -267,6 +290,7 @@ search and navigation. The same pages, in the repository:
 | Document | What it covers |
 |---|---|
 | [docs/getting-started.md](docs/getting-started.md) | The full local quickstart on a throwaway kind cluster, then the MCP server, Prometheus and your platform's knowledge |
+| [docs/onboarding.md](docs/onboarding.md) | The first run: `k8s-servant onboard` drafts the knowledge files from a read-only scan, and the re-scan before each morning report shows what changed |
 | [docs/configuration.md](docs/configuration.md) | Every setting (environment variables), and which values are secrets locally and in the cluster |
 | [docs/teams-setup.md](docs/teams-setup.md) | Creating the Teams Workflows webhook, storing it and testing it |
 | [docs/how-it-works.md](docs/how-it-works.md) | The flow from a question to an answer, step by step, and the repository structure |
@@ -301,13 +325,12 @@ search and navigation. The same pages, in the repository:
 Available today: the agent and CLI (`ask`, `check`, `report`, `serve`, `doctor`, ...)
 on five model providers, MCP with kubectl fallback, knowledge and skills, scheduled
 health checks with memory, the morning report, MS Teams cards, Prometheus/Alertmanager
-tools, summary tools with skipping of unchanged checks, a signed container image and
-the Helm chart.
+tools, summary tools with skipping of unchanged checks, the first-run scan that drafts
+the description of your platform (`onboard`), a signed container image and the Helm
+chart.
 
 Where it is going: k8s-servant should feel like **one more person on the team**. Next
-comes an **initial scan** in which the agent drafts the
-description of your platform ([#35](https://github.com/k8s-servant/k8s-servant/issues/35)),
-then a **two-way MS Teams bot** for the whole fleet
+comes a **two-way MS Teams bot** for the whole fleet
 ([#27](https://github.com/k8s-servant/k8s-servant/issues/27)), a **command centre** web
 view ([#38](https://github.com/k8s-servant/k8s-servant/issues/38)),
 a **scoreboard** that shows how often it is right
