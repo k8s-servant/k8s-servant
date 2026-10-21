@@ -661,6 +661,23 @@ def test_onboard_show_prints_the_stored_scan(monkeypatch, capsys):
     assert "Managed service: AKS" in notes  # a platform-default fact is still shown
 
 
+@pytest.mark.parametrize(
+    "extra",
+    [["--format", "markdown"], ["--out", "x"], ["--cluster-name", "c"], ["--force"], ["--no-input"], ["--no-model"]],
+)
+def test_onboard_show_takes_no_other_options(extra, capsys):
+    assert cli.main(["onboard", "--show", *extra]) == 2
+    assert "--show prints the stored scan; it takes no other options." in capsys.readouterr().err
+
+
+def test_onboard_show_uses_the_placeholder_for_an_unset_cluster_name(capsys):
+    memory = Memory(configure_app()["data_dir"])
+    save_scan(memory, asyncio.run(scan(fixture_fetch("aks"), configure_app(), "unknown-cluster", memory)))
+    assert cli.main(["onboard", "--show"]) == 0
+    out = capsys.readouterr().out
+    assert "TODO(onboard): Set the real cluster name." in out and "unknown-cluster" not in out
+
+
 def test_onboard_show_without_a_stored_scan(capsys):
     assert cli.main(["onboard", "--show"]) == 1
     assert "No stored scan yet" in capsys.readouterr().err

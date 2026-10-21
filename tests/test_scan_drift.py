@@ -34,7 +34,7 @@ def test_added_removed_changed():
     changes, _ = compare(old, new)
     assert [f.key for f in changes.added] == ["component/flux"]
     assert [f.key for f in changes.removed] == ["component/kyverno"]
-    assert changes.lines()[-1] == "Changed: 3 nodes → 6 nodes"
+    assert changes.lines()[-1] == "Changed: 3 nodes → 6 nodes — replace it in knowledge.environment"
     assert changes.headline() == "1 added, 1 removed, 1 changed"
 
 
@@ -47,8 +47,8 @@ def test_lines_name_the_knowledge_target_and_the_setting():
     )
     changes, _ = compare(_r([_f("component/old", "Old runs")]), new)
     assert changes.lines() == [
-        "Added: Flux runs — add to knowledge.environment: `- Flux runs` and appConfig.FLUX_ON: true",
-        "Added: 3 nodes — add to knowledge.clusterNotes: `- 3 nodes`",
+        'Added: Flux runs — add the line "- Flux runs" to knowledge.environment and appConfig.FLUX_ON: true',
+        'Added: 3 nodes — add the line "- 3 nodes" to knowledge.clusterNotes',
         "Gone: Old runs — remove it from knowledge.environment",
     ]
 
@@ -176,3 +176,56 @@ def test_a_crashed_detector_is_listed_on_every_scan():
 
 def test_a_long_error_is_cut_in_the_headline():
     assert len(ScanChanges(error="x" * 1000).headline()) <= 400
+
+
+def _unsure(key, statement, question):
+    return Fact(key, "network", statement, ("e",), "unsure", "cluster", (), question=question)
+
+
+def test_an_unsure_fact_is_a_question_not_a_paste_line():
+    new = _r([_unsure("network/ingress-exposure", "Exposure unclear", "Is the ingress public?")])
+    changes, _ = compare(_r([]), new)
+    assert changes.lines() == ["Added (unsure): Is the ingress public?"]
+
+
+def test_a_fact_that_became_unsure_shows_the_question():
+    old = _r([_f("network/ingress-exposure", "Ingress is internal", topic="network")])
+    new = _r([_unsure("network/ingress-exposure", "Exposure unclear", "Is the ingress public?")])
+    changes, _ = compare(old, new)
+    assert changes.lines() == ["Changed (unsure): Ingress is internal → Is the ingress public?"]
+
+
+def test_a_changed_setting_is_named():
+    old = _r([_f("c/x", "a", setting=("X", "1"))])
+    new = _r([_f("c/x", "b", setting=("X", "2"))])
+    changes, _ = compare(old, new)
+    assert changes.lines() == ["Changed: a → b — replace it in knowledge.environment and appConfig.X: 2"]
+
+
+def test_not_checked_comes_first():
+    changes, _ = compare(_r([_f("a")]), _r([_f("b")], failed={"deployments": "Forbidden"}))
+    assert changes.lines()[0] == "Not checked this time: deployments"
+
+
+async def test_a_forbidden_workload_read_changes_nothing_in_organisation_facts(tmp_path):
+    memory = Memory(tmp_path)
+    config = configure_app({"CLUSTER_NAME": "my-cluster"})
+    await rescan(fixture_fetch("aks"), config, memory, clock=lambda: NOW)
+    forbidden = await rescan(
+        fixture_fetch("aks", fail={"deployments": RuntimeError("Forbidden")}), config, memory, clock=lambda: NOW
+    )
+    assert forbidden.headline() == "no changes"
+    assert forbidden.lines() == ["Not checked this time: deployments"]
+    clean = await rescan(fixture_fetch("aks"), config, memory, clock=lambda: NOW)
+    assert clean.headline() == "no changes"
+
+
+async def test_a_crashed_component_detector_leaves_dependent_facts_alone(tmp_path):
+    memory = Memory(tmp_path)
+    config = configure_app({"CLUSTER_NAME": "my-cluster"})
+    await rescan(fixture_fetch("aks"), config, memory, clock=lambda: NOW)
+    old = load_scan(memory)
+    org = next(f for f in old.facts if f.key == "organisation/namespaces")
+    new = _r([], failed={"detector:components": "KeyError"})
+    changes, stored = compare(old, new)
+    assert org in stored.facts and not changes.removed

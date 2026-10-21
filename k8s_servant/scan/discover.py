@@ -18,7 +18,7 @@ from collections import Counter
 from datetime import UTC, datetime, timedelta
 
 from k8s_servant.findings import StoredFinding
-from k8s_servant.scan.catalog import running_namespaces
+from k8s_servant.scan.catalog import CATALOG_INPUTS, running_namespaces
 from k8s_servant.scan.facts import Fact, fact
 from k8s_servant.scan.inputs import Inputs
 from k8s_servant.tools.cluster_tools import _owner, _parse_time
@@ -179,6 +179,11 @@ def platform_namespaces(inputs: Inputs, component_namespaces: set[str]) -> set[s
     return {name for name in names if name.startswith("kube-") or name == "default" or name in component_namespaces}
 
 
+def _with_catalog(*own: str) -> tuple[str, ...]:
+    """Inputs of a fact that depends on what the catalog found running (its namespaces, a mesh)."""
+    return tuple(dict.fromkeys((*own, *CATALOG_INPUTS)))
+
+
 def organisation_facts(inputs: Inputs, component_namespaces: set[str]) -> list[Fact]:
     """Facts about how the namespaces are split between platform and applications."""
     if not inputs.ok("namespaces"):
@@ -193,7 +198,7 @@ def organisation_facts(inputs: Inputs, component_namespaces: set[str]) -> list[F
             "organisation",
             f"{len(names)} namespaces: {len(platform)} for the platform, {len(apps)} for applications",
             ("kubectl get namespaces",),
-            ("namespaces",),
+            _with_catalog("namespaces"),
             scope="cluster",
         )
     ]
@@ -210,7 +215,7 @@ def organisation_facts(inputs: Inputs, component_namespaces: set[str]) -> list[F
                     "organisation",
                     f"Application namespaces carry the labels {listed}",
                     ("kubectl get namespaces",),
-                    ("namespaces",),
+                    _with_catalog("namespaces"),
                 )
             )
     return facts
@@ -361,7 +366,7 @@ def _policy_facts(inputs: Inputs, component_namespaces: set[str], mesh_seen: boo
                 "network",
                 "No NetworkPolicies: Kubernetes network policy does not restrict pod traffic",
                 ("kubectl get networkpolicies -A",),
-                ("networkpolicies", "crds", "calico-policies", "cilium-policies"),
+                _with_catalog("networkpolicies", "crds", "calico-policies", "cilium-policies"),
                 unsure_question=question,
             )
         )
@@ -397,7 +402,7 @@ def _policy_facts(inputs: Inputs, component_namespaces: set[str], mesh_seen: boo
                     "network",
                     f"Inbound pod traffic is denied by default in {_share(len(covered), len(apps))}",
                     _evidence("NetworkPolicy", [p for group in covered.values() for p in group]),
-                    ("networkpolicies", "namespaces"),
+                    _with_catalog("networkpolicies", "namespaces"),
                 )
             )
     egress = {

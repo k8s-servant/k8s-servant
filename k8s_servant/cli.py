@@ -32,6 +32,7 @@ import signal
 import sqlite3
 import sys
 import time
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -557,6 +558,8 @@ async def _overview(config: dict, facts) -> str:
 def _show_stored_scan(config: dict, memory: Memory) -> int:
     """Print the cluster values file for the stored scan (the one the morning report keeps current)."""
     stored = load_scan(memory)
+    if stored is not None and stored.cluster == "unknown-cluster":
+        stored = replace(stored, cluster="my-cluster")  # the unset default: same placeholder as cmd_onboard
     if stored is None:
         print(
             "No stored scan yet: the agent stores one before each morning report (SCAN_BEFORE_REPORT).", file=sys.stderr
@@ -572,6 +575,11 @@ def _show_stored_scan(config: dict, memory: Memory) -> int:
 async def cmd_onboard(args, config: dict, knowledge, memory: Memory) -> int:
     """Scan the cluster once, ask about what is unsure, and write the draft files."""
     if args.show:
+        if (args.format, args.out, args.cluster_name) != ("values", "k8s-servant-onboard", None) or (
+            args.force or args.no_input or args.no_model
+        ):
+            print("--show prints the stored scan; it takes no other options.", file=sys.stderr)
+            return 2
         return _show_stored_scan(config, memory)
     configured = config["cluster_name"]
     cluster = args.cluster_name or (configured if configured and configured != "unknown-cluster" else "my-cluster")

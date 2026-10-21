@@ -8,6 +8,7 @@ from k8s_servant.findings import FindingsDiff, StoredFinding
 from k8s_servant.healthcheck import CheckResult
 from k8s_servant.report import MorningReport
 from k8s_servant.scan.drift import ScanChanges
+from k8s_servant.scan.facts import Fact
 from k8s_servant.teams import (
     MAX_CARD_BYTES,
     check_card,
@@ -218,8 +219,14 @@ def test_morning_card_shows_the_scan_changes():
 
 
 def test_scan_changes_do_not_break_the_size_limit():
-    from k8s_servant.scan.facts import Fact
-
     added = [Fact(f"component/c{i}", "components", f"c{i} " + "x" * 400, (), "seen", "cluster", ()) for i in range(200)]
     card = morning_card("my-cluster", _report(scan_changes=ScanChanges(added=added)))
     assert _size(card) <= MAX_CARD_BYTES
+
+
+def test_a_long_change_list_ends_with_a_count_and_keeps_not_checked():
+    added = [Fact(f"component/c{i}", "components", f"c{i} runs", (), "seen", "cluster", ()) for i in range(40)]
+    changes = ScanChanges(added=added, not_checked={"deployments": "Forbidden"})
+    texts = _texts(morning_card("my-cluster", _report(scan_changes=changes)))
+    assert "Not checked this time: deployments" in texts
+    assert "… and 26 more (see the report)" in texts

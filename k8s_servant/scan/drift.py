@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 
 from k8s_servant.memory import Memory
+from k8s_servant.scan.catalog import CATALOG_INPUTS
 from k8s_servant.scan.facts import CERTAINTIES, TOPICS, Fact, ScanResult
 from k8s_servant.scan.run import scan
 from k8s_servant.tools.cluster_tools import Fetch
@@ -102,17 +103,31 @@ class ScanChanges:
         return f"{len(self.added)} added, {len(self.removed)} removed, {len(self.changed)} changed"
 
     def lines(self) -> list[str]:
-        """One line per change, saying where in the knowledge to apply it."""
+        """One line per change, saying where in the knowledge to apply it.
+
+        "Not checked" comes first so that a card that cuts the list never drops it.
+        An unsure fact is a question for a human, not a line to paste.
+        """
         out = []
+        if self.not_checked:
+            out.append("Not checked this time: " + ", ".join(sorted(self.not_checked)))
         for fact in self.added:
-            line = f"Added: {fact.statement} — add to knowledge.{_target(fact)}: `- {fact.statement}`"
+            if fact.certainty == "unsure":
+                out.append(f"Added (unsure): {fact.question}")
+                continue
+            line = f'Added: {fact.statement} — add the line "- {fact.statement}" to knowledge.{_target(fact)}'
             if fact.setting:
                 line += f" and appConfig.{fact.setting[0]}: {fact.setting[1]}"
             out.append(line)
         out += [f"Gone: {f.statement} — remove it from knowledge.{_target(f)}" for f in self.removed]
-        out += [f"Changed: {old.statement} → {new.statement}" for old, new in self.changed]
-        if self.not_checked:
-            out.append("Not checked this time: " + ", ".join(sorted(self.not_checked)))
+        for old, new in self.changed:
+            if new.certainty == "unsure":
+                out.append(f"Changed (unsure): {old.statement} → {new.question}")
+                continue
+            line = f"Changed: {old.statement} → {new.statement} — replace it in knowledge.{_target(new)}"
+            if new.setting and new.setting != old.setting:
+                line += f" and appConfig.{new.setting[0]}: {new.setting[1]}"
+            out.append(line)
         return out
 
 
@@ -132,7 +147,9 @@ def compare(old: ScanResult | None, new: ScanResult) -> tuple[ScanChanges, ScanR
     detector_crashed = any(key.startswith("detector:") for key in failed)
 
     def untouched(fact: Fact) -> bool:
-        return bool(failed.intersection(fact.inputs))
+        # A fact built from the catalog's components depends on the component detector too.
+        needs_components = set(CATALOG_INPUTS) <= set(fact.inputs)
+        return bool(failed.intersection(fact.inputs)) or (needs_components and "detector:components" in failed)
 
     noise = [f for f in new.facts if f.topic == "noise"]
     new_facts = {f.key: f for f in new.facts if f.topic != "noise" and not untouched(f)}
