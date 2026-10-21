@@ -118,7 +118,7 @@ async def test_values_files_load_back_as_knowledge(tmp_path):
     facts = apply_scope(result.facts, representative=True)
     files = values_files(result, facts, suggested_settings(facts, configure_app({}), "my-cluster"), True)
     paths = write_files(tmp_path, files, force=False)
-    knowledge = load_knowledge(tmp_path / "empty", [str(p) for p in paths])
+    knowledge = load_knowledge(tmp_path / "empty", [str(p) for p in paths if p.suffix == ".yaml"])
     assert knowledge.environment.strip() == render_markdown(facts, "platform").strip()
     assert (
         yaml.safe_load(files["my-cluster.yaml"])["appConfig"]["PROMETHEUS_URL"]
@@ -163,13 +163,21 @@ def test_hostile_failure_reasons_stay_in_their_comment():
     assert header(result)[-1].startswith("Not checked: crds (boom") and "\n" not in header(result)[-1]
 
 
-def test_not_representative_writes_only_the_cluster_file():
-    assert set(values_files(_result([]), [], [], False)) == {"my-cluster.yaml"}
+def test_not_representative_writes_the_cluster_file_and_settings_env():
+    assert list(values_files(_result([]), [], [], False)) == ["my-cluster.yaml", "settings.env"]
+
+
+def test_values_files_also_write_the_same_settings_env_as_markdown():
+    s = [Setting("PROMETHEUS_URL", "http://p.monitoring.svc:9090", "found")]
+    result = _result([])
+    files = values_files(result, [], s, True)
+    assert list(files) == ["knowledge-values.yaml", "my-cluster.yaml", "settings.env"]
+    assert files["settings.env"] == markdown_files(result, [], s, True)["settings.env"]
 
 
 def test_a_cluster_called_knowledge_values_does_not_overwrite_the_platform_file():
     files = values_files(_result([], cluster="knowledge-values"), [], [], True)
-    assert len(files) == 2
+    assert len(files) == 3
 
 
 def test_unsure_noise_alone_writes_no_setting_line():
