@@ -68,7 +68,7 @@ k8s-servant/
 │   ├── scan/
 │   │   ├── catalog.py              # Well-known components and how to recognise them
 │   │   ├── discover.py             # Platform, network, monitoring and noise facts: version, cloud, pools, URLs, noisy alerts
-│   │   ├── draft.py                # Facts as Markdown: sections, evidence, TODO(onboard) questions
+│   │   ├── draft.py                # The draft: Markdown sections, suggested settings, Helm values or Markdown files
 │   │   ├── facts.py                # Scan facts: evidence, certainty, scope; scan results
 │   │   ├── inputs.py               # Scan inputs read once each; Prometheus and Alertmanager access
 │   │   ├── questions.py            # Onboarding questions: confirm unsure facts, fill blind spots
