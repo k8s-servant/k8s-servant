@@ -323,3 +323,11 @@ def test_target_names_match_the_written_files(representative, cluster):
     s = [Setting("CLUSTER_NAME", cluster, "r")]
     assert target_names("values", cluster, representative) == list(values_files(result, [], s, representative))
     assert target_names("markdown", cluster, representative) == list(markdown_files(result, [], s, representative))
+
+
+def test_markdown_overview_is_cleaned_like_values():
+    overview = "Line one\x00\x1b[31m\u2028line two"
+    files = markdown_files(_result([]), [], [], True, overview)
+    for text in (files["environment.md"],):
+        assert "\x00" not in text and "\x1b" not in text and "\u2028" not in text
+        assert "Line one[31m\nline two" in text

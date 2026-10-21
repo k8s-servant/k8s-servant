@@ -50,6 +50,11 @@ def _line(f: Fact) -> str | None:
     return f"- {statement}" if f.certainty == "confirmed" else None
 
 
+def count_statements(facts: list[Fact]) -> int:
+    """How many facts render as a stated line (not a TODO, not left out for missing evidence)."""
+    return sum(1 for f in facts if f.certainty != "unsure" and _line(f))
+
+
 def render_markdown(facts: list[Fact], scope: str, overview: str = "") -> str:
     """The facts of one scope as Markdown, one `##` section per topic.
 
@@ -235,6 +240,8 @@ def target_names(fmt: str, cluster: str, representative: bool = True) -> list[st
 
 
 def _texts(result: ScanResult, facts: list[Fact], representative: bool, overview: str) -> tuple[str, str]:
+    # Model text: cleaned here so the Markdown files get the same treatment as YAML.
+    overview = _clean(overview, block=True)
     environment = render_markdown(facts, "platform", overview) if representative else ""
     notes = render_markdown(facts, "cluster", "" if representative else overview)
     return environment, notes
@@ -291,22 +298,27 @@ def markdown_files(
     return files
 
 
+class DraftExists(FileExistsError):
+    """Draft files already exist; raised by us, unlike the OS's own FileExistsError."""
+
+
 def refuse_existing(out_dir: Path, names: list[str]) -> None:
     """Raise when any of `names` already exists in `out_dir` (a dangling symlink counts).
 
     Raises:
-        FileExistsError: Naming every target that already exists.
+        DraftExists: Naming every target that already exists.
     """
     existing = [name for name in names if (Path(out_dir) / name).exists() or (Path(out_dir) / name).is_symlink()]
     if existing:
-        raise FileExistsError("Already exist (use --force to overwrite): " + ", ".join(existing))
+        raise DraftExists("Already exist (use --force to overwrite): " + ", ".join(existing))
 
 
 def write_files(out_dir: Path, files: dict[str, str], force: bool) -> list[Path]:
     """Write the files into `out_dir`; without `force` nothing is written if any exists.
 
     Raises:
-        FileExistsError: Naming every target that already exists.
+        DraftExists: Naming every target that already exists.
+        OSError: The folder or a file could not be written.
     """
     out_dir = Path(out_dir)
     targets = [out_dir / name for name in files]

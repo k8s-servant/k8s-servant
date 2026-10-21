@@ -1,3 +1,4 @@
+import os
 import sys
 
 import pytest
@@ -554,3 +555,78 @@ def test_onboard_confirmed_doubts_leave_fewer_todos(monkeypatch, tmp_path):
     asked = (tmp_path / "asked" / "my-cluster.yaml").read_text()
     assert asked.count("TODO(onboard)") < plain.count("TODO(onboard)")
     assert "How does outbound traffic" in asked
+
+
+def test_onboard_out_is_a_file_is_a_message(monkeypatch, tmp_path, capsys):
+    _fixture_scan(monkeypatch, "kind")
+    out = tmp_path / "taken"
+    out.write_text("a file, not a folder")
+    assert cli.main(["onboard", "--no-input", "--no-model", "--out", str(out)]) == 1
+    err = capsys.readouterr().err
+    assert f"Could not write the draft to {out}:" in err and "Traceback" not in err
+    assert len([line for line in err.splitlines() if "Could not write" in line]) == 1
+
+
+@pytest.mark.skipif(sys.platform == "win32" or os.geteuid() == 0, reason="root ignores folder permissions")
+def test_onboard_read_only_folder_is_a_message(monkeypatch, tmp_path, capsys):
+    _fixture_scan(monkeypatch, "kind")
+    out = tmp_path / "ro"
+    out.mkdir()
+    out.chmod(0o500)
+    try:
+        assert cli.main(["onboard", "--no-input", "--no-model", "--out", str(out)]) == 1
+    finally:
+        out.chmod(0o700)
+    err = capsys.readouterr().err
+    assert f"Could not write the draft to {out}: Permission denied" in err and "Traceback" not in err
+
+
+def test_onboard_counts_the_statements_written(monkeypatch, tmp_path, capsys):
+    import re
+
+    _fixture_scan(monkeypatch, "aks")
+    out = tmp_path / "out"
+    assert cli.main(["onboard", "--no-input", "--no-model", "--out", str(out)]) == 0
+    text = (out / "my-cluster.yaml").read_text()
+    bullets = [line.strip() for line in text.splitlines() if line.strip().startswith("- ")]
+    stated = [line for line in bullets if not line.startswith("- TODO(onboard)")]
+    n = int(re.search(r"(\d+) facts,", capsys.readouterr().err).group(1))
+    assert n == len(stated) and n > 0
+
+
+def test_onboard_model_error_never_shows_the_api_key(monkeypatch, tmp_path, capsys):
+    import httpx2
+    import openai
+
+    _fixture_scan(monkeypatch, "kind")
+    monkeypatch.setenv("LLM_PROVIDER", "openai")
+    monkeypatch.setenv("LLM_MODEL", "gpt-5")
+    monkeypatch.setenv("LLM_API_KEY", "sk-test-secret")
+    response = httpx2.Response(401, request=httpx2.Request("POST", "https://api.openai.com/v1/responses"))
+    body = {"error": {"message": "Incorrect API key provided: sk-test-secret."}}
+    error = openai.AuthenticationError("Incorrect API key provided: sk-test-secret.", response=response, body=body)
+    monkeypatch.setattr(cli, "build_chat", lambda config: ScriptedChat(error))
+    out = tmp_path / "out"
+    assert cli.main(["onboard", "--no-input", "--out", str(out)]) == 0
+    captured = capsys.readouterr()
+    assert "sk-test-secret" not in captured.err + captured.out
+    assert "without an overview" in captured.err
+    assert "sk-test-secret" not in (out / "my-cluster.yaml").read_text()
+
+
+def test_onboard_does_not_count_a_fact_left_out_of_the_file(monkeypatch, tmp_path, capsys):
+    from datetime import UTC, datetime
+
+    from k8s_servant.scan.facts import ScanResult, fact
+
+    facts = [
+        fact("platform/a", "platform", "Kubernetes v1.33.2", ("kubectl version",), ("version",)),
+        fact("platform/b", "platform", "No proof for this", (), ()),  # dropped: a scanned fact needs evidence
+    ]
+
+    async def fake_scan(fetch, config, cluster, memory=None, **kwargs):
+        return ScanResult(datetime(2026, 10, 21, tzinfo=UTC), cluster, facts, {}, True)
+
+    monkeypatch.setattr(cli, "scan", fake_scan)
+    assert cli.main(["onboard", "--no-input", "--no-model", "--out", str(tmp_path / "out")]) == 0
+    assert "1 facts," in capsys.readouterr().err

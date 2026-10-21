@@ -48,6 +48,8 @@ from k8s_servant.report import MorningReport, build_morning_report, format_age
 from k8s_servant.runtime import open_agent, open_runtime
 from k8s_servant.scan import scan
 from k8s_servant.scan.draft import (
+    DraftExists,
+    count_statements,
     markdown_files,
     refuse_existing,
     suggested_settings,
@@ -540,7 +542,7 @@ async def cmd_onboard(args, config: dict, knowledge, memory: Memory) -> int:
         # "not representative" answer never hides a clash until the end.
         try:
             refuse_existing(out, target_names(args.format, cluster))
-        except FileExistsError as exc:
+        except DraftExists as exc:
             print(exc, file=sys.stderr)
             return 1
 
@@ -565,13 +567,17 @@ async def cmd_onboard(args, config: dict, knowledge, memory: Memory) -> int:
     files = build(result, facts, settings, representative, overview)
     try:
         paths = write_files(out, files, args.force)
-    except FileExistsError as exc:
+    except DraftExists as exc:
         print(exc, file=sys.stderr)
+        return 1
+    except OSError as exc:
+        # A read-only volume or an --out that is a file: a message, not a traceback.
+        print(f"Could not write the draft to {out}: {exc.strerror or exc}", file=sys.stderr)
         return 1
 
     for path in paths:
         print(path)
-    stated = sum(1 for f in facts if f.certainty != "unsure")
+    stated = count_statements(facts)
     todo = sum(text.count("TODO(onboard):") for text in files.values())
     print(f"{stated} facts, {todo} questions left open (TODO(onboard)). Review the files before use.", file=sys.stderr)
     return 0
