@@ -8,6 +8,7 @@ from k8s_servant import cli
 
 ENV_VARS = (
     "LLM_PROVIDER",
+    "SCAN_BEFORE_REPORT",
     "LLM_ENDPOINT",
     "LLM_MODEL",
     "LLM_API_KEY",
@@ -644,3 +645,25 @@ def test_onboard_end_of_input_stops_the_questions(monkeypatch, tmp_path):
     monkeypatch.setattr(sys.stdin, "isatty", lambda: True)
     assert cli.main(["onboard", "--no-model", "--out", str(tmp_path / "out")]) == 0
     assert len(prompts) == 1 and "representative" in prompts[0]
+
+
+def test_onboard_show_prints_the_stored_scan(monkeypatch, capsys):
+    import asyncio
+
+    import yaml
+    from fakes import fixture_fetch
+
+    from k8s_servant.config import configure_app
+    from k8s_servant.memory import Memory
+    from k8s_servant.scan import scan
+    from k8s_servant.scan.drift import save_scan
+
+    memory = Memory(configure_app()["data_dir"])
+    save_scan(memory, asyncio.run(scan(fixture_fetch("aks"), configure_app(), "my-cluster", memory)))
+    assert cli.main(["onboard", "--show"]) == 0
+    assert yaml.safe_load(capsys.readouterr().out)["knowledge"]["clusterNotes"]
+
+
+def test_onboard_show_without_a_stored_scan(capsys):
+    assert cli.main(["onboard", "--show"]) == 1
+    assert "No stored scan yet" in capsys.readouterr().err

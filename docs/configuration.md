@@ -75,6 +75,7 @@ from the Helm chart (`appConfig` in the values, rendered into a ConfigMap). A te
 | `MORNING_REPORT_TIME` | `08:00` | Local time of the morning report. |
 | `MORNING_REPORT_TIMEZONE` | `UTC` | IANA time zone of `MORNING_REPORT_TIME`, e.g. `Europe/Berlin` (summer time handled). |
 | `MORNING_REPORT_WEEKDAYS_ONLY` | `true` | Skip Saturdays and Sundays (Monday's report then covers the weekend). |
+| `SCAN_BEFORE_REPORT` | `true` | Before each morning report, scan the cluster again (no model, no tokens) and add "Since the last scan" with what changed. See [reports](reports.md). |
 | `HEARTBEAT_FILE` | *(empty)* | File touched every scheduler loop for a liveness probe (`/tmp/heartbeat` in the cluster). |
 
 ## Logging

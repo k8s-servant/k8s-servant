@@ -271,6 +271,9 @@ def configure_app(env: Mapping[str, str] | None = None) -> dict:
         "morning_report_time": _time_of_day(env, "MORNING_REPORT_TIME", "08:00"),
         # Time zone of MORNING_REPORT_TIME; handles summer time correctly.
         "morning_report_timezone": _timezone(env, "MORNING_REPORT_TIMEZONE", "UTC"),
+        # Re-scan the cluster before each morning report and report what changed
+        # since the last scan. Reads the cluster only; no model calls, no tokens.
+        "scan_before_report": _bool(env, "SCAN_BEFORE_REPORT", True),
         # Skip Saturdays and Sundays.
         "morning_report_weekdays_only": _bool(env, "MORNING_REPORT_WEEKDAYS_ONLY", True),
         # File touched on every scheduler loop for the liveness probe. Empty = off;

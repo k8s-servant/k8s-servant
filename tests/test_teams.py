@@ -7,6 +7,7 @@ import pytest
 from k8s_servant.findings import FindingsDiff, StoredFinding
 from k8s_servant.healthcheck import CheckResult
 from k8s_servant.report import MorningReport
+from k8s_servant.scan.drift import ScanChanges
 from k8s_servant.teams import (
     MAX_CARD_BYTES,
     check_card,
@@ -177,3 +178,48 @@ def test_morning_card_shows_new_notes():
     )
     texts = _texts(morning_card("my-cluster", report))
     assert "Notes saved overnight" in texts and "payments-prod are expected" in texts
+
+
+def _report(**overrides):
+    fields = {
+        "generated_at": T0,
+        "local_day": "Mon 12 Oct 2026",
+        "overview": "All calm.",
+        "check_ok": True,
+        "check_error": "",
+        "since": T0 - timedelta(hours=24),
+        "open_findings": [],
+        "new_open": [],
+        "resolved": [],
+        "came_and_went": [],
+        "checks_full": 1,
+        "checks_skipped": 0,
+        "checks_failed": 0,
+        "alerts": None,
+    }
+    return MorningReport(**{**fields, **overrides})
+
+
+def test_morning_card_shows_the_scan_changes():
+    card = morning_card(
+        "my-cluster",
+        _report(
+            scan_changes=ScanChanges(
+                baseline=True,
+                summary="First scan recorded: 3 components, 2 node pools",
+                added=[],
+                removed=[],
+                changed=[],
+                not_checked={},
+            )
+        ),
+    )
+    assert "First scan recorded: 3 components, 2 node pools" in json.dumps(card)
+
+
+def test_scan_changes_do_not_break_the_size_limit():
+    from k8s_servant.scan.facts import Fact
+
+    added = [Fact(f"component/c{i}", "components", f"c{i} " + "x" * 400, (), "seen", "cluster", ()) for i in range(200)]
+    card = morning_card("my-cluster", _report(scan_changes=ScanChanges(added=added)))
+    assert _size(card) <= MAX_CARD_BYTES

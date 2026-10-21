@@ -233,3 +233,8 @@ def test_llm_defaults():
     assert config["llm_provider"] == ""
     with pytest.raises(ValueError, match="LLM_AUTH"):
         configure_app({"LLM_AUTH": "magic"})
+
+
+def test_scan_before_report_defaults_on():
+    assert configure_app({})["scan_before_report"] is True
+    assert configure_app({"SCAN_BEFORE_REPORT": "false"})["scan_before_report"] is False

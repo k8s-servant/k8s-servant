@@ -5,6 +5,8 @@ administrators also get the story of the night, posted even when nothing changed
 It covers the time since the previous morning report, so Monday's report covers
 the weekend (at most 72 hours; 24 hours when there was no earlier report):
 
+  - when a scanner is given, a re-scan of the cluster (no model) whose changes
+    since the last scan become the "Since the last scan" section;
   - a fresh health check first, so the report reflects the cluster right now;
   - from memory: open findings and how long each has been open; what appeared and
     is still open, what was resolved, and what came and went during the night;
@@ -27,7 +29,7 @@ back the same day.
 import logging
 import time
 from collections import Counter
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -37,6 +39,7 @@ from k8s_servant.healthcheck import SKIPPED_SUMMARY_PREFIX, record_failed_run, r
 from k8s_servant.llm import model_error_text
 from k8s_servant.llm.types import Turn
 from k8s_servant.memory import Memory
+from k8s_servant.scan.drift import ScanChanges
 from k8s_servant.tools.prometheus_tool import fetch_alerts_fired_since, fetch_firing_alerts, format_alerts
 
 logger = logging.getLogger(__name__)
@@ -142,6 +145,7 @@ class MorningReport:
     # what every future run treats as normal.
     new_notes: list[str] = field(default_factory=list)
     timezone: str = "UTC"
+    scan_changes: ScanChanges | None = None  # None: the re-scan is off
 
     def window_text(self) -> str:
         """e.g. 'since Sun 11 Oct 08:00 (24 h)' in the report's time zone."""
@@ -153,6 +157,7 @@ class MorningReport:
         """The 'at a glance' lines (Markdown report and Teams FactSet)."""
         by_severity = Counter(f.severity for f in self.open_findings)
         checks = self.checks_full + self.checks_skipped + self.checks_failed
+        scan = [("Since the last scan", self.scan_changes.headline())] if self.scan_changes else []
         return [
             ("Covers", self.window_text()),
             (
@@ -175,6 +180,7 @@ class MorningReport:
                 "Alerts that stopped overnight",
                 "not available" if self.alerts_stopped is None else str(len(self.alerts_stopped)),
             ),
+            *scan,
         ]
 
     def alert_lines(self) -> list[str]:
@@ -214,6 +220,8 @@ def render_facts_md(report: MorningReport) -> str:
             for f in report.came_and_went
         ],
     )
+    if report.scan_changes:
+        listing("Since the last scan", report.scan_changes.lines())
     listing("Alerts firing now", report.alert_lines())
     listing("Alerts that fired overnight and stopped", report.stopped_alert_lines())
     if report.new_notes:
@@ -232,6 +240,7 @@ async def build_morning_report(
     clock: Callable[[], datetime] = lambda: datetime.now(UTC),
     alerts_fetcher=fetch_firing_alerts,
     fired_fetcher=fetch_alerts_fired_since,
+    scanner: Callable[[], Awaitable[ScanChanges]] | None = None,
 ) -> MorningReport:
     """Run a fresh check, gather the night from memory and Prometheus, and write the report.
 
@@ -242,6 +251,7 @@ async def build_morning_report(
         clock: Current time (injectable for tests).
         alerts_fetcher: Function (url, timeout) -> list of alerts firing now (injectable).
         fired_fetcher: Function (url, seconds, timeout) -> alerts fired in the window (injectable).
+        scanner: Re-scans the cluster and returns what changed; None leaves the section out.
 
     Returns:
         The report, already stored as a run of kind "morning".
@@ -250,6 +260,15 @@ async def build_morning_report(
     since = report_window_start(memory, started)
     t0 = time.monotonic()
     cluster = config["cluster_name"]
+
+    # 0. The re-scan (no model); a failure shows in the report, it never stops it.
+    scan_changes = None
+    if scanner is not None:
+        try:
+            scan_changes = await scanner()
+        except Exception as exc:
+            logger.warning("The re-scan for the morning report failed: %s", type(exc).__name__)
+            scan_changes = ScanChanges(error=type(exc).__name__)
 
     # 1. A fresh check, so the summary reflects the cluster right now.
     check_ok, check_error = False, ""
@@ -316,6 +335,7 @@ async def build_morning_report(
         alerts_stopped=stopped,
         timezone=config["morning_report_timezone"],
         new_notes=memory.notes_since(since),
+        scan_changes=scan_changes,
     )
     facts_md = render_facts_md(report)
 
