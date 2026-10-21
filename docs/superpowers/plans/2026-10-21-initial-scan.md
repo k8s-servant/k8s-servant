@@ -97,19 +97,31 @@ def test_fact_defaults_to_seen_and_the_topic_scope():
     f = fact("component/kyverno", "components", "Kyverno runs.", ("CRD group kyverno.io",), ("crds",))
     assert (f.certainty, f.scope) == ("seen", "platform")
 
+
 def test_a_question_makes_a_fact_unsure():
     f = fact("nodepool/user", "platform", "Node pool user: 3 nodes", (), ("nodes",), unsure_question="Correct?")
     assert (f.certainty, f.scope, f.question) == ("unsure", "cluster", "Correct?")
 
+
 def test_fact_round_trips_through_a_dict():
-    f = fact("monitoring/prometheus-url", "monitoring", "s", ("e",), ("services",), scope="cluster",
-             setting=("PROMETHEUS_URL", "http://p.monitoring.svc:9090"), setting_reason="r")
+    f = fact(
+        "monitoring/prometheus-url",
+        "monitoring",
+        "s",
+        ("e",),
+        ("services",),
+        scope="cluster",
+        setting=("PROMETHEUS_URL", "http://p.monitoring.svc:9090"),
+        setting_reason="r",
+    )
     assert Fact.from_dict(json.loads(json.dumps(f.to_dict()))) == f
+
 
 def test_not_representative_puts_everything_in_the_cluster_scope():
     f = fact("component/kyverno", "components", "s", (), ("crds",))
     assert apply_scope([f], representative=False)[0].scope == "cluster"
     assert apply_scope([f], representative=True)[0].scope == "platform"
+
 
 def test_section_titles_follow_the_topic_order():
     assert list(SECTION_TITLES) == list(TOPICS)
@@ -152,10 +164,12 @@ async def test_gather_reads_every_input_once():
     assert inputs.ok("nodes") and inputs.get("version")[0]["serverVersion"]["gitVersion"]
     assert len(calls) == len({tuple(c) for c in calls})
 
+
 async def test_a_forbidden_input_is_a_failure_not_an_exception():
     inputs = await gather_inputs(fixture_fetch("kind", fail={"networkpolicies": RuntimeError("Forbidden")}))
     assert inputs.failed["networkpolicies"] == "RuntimeError: Forbidden"
     assert inputs.ok("nodes")
+
 
 async def test_crd_dependent_inputs_are_skipped_when_the_crd_is_absent():
     calls = []
@@ -163,12 +177,15 @@ async def test_crd_dependent_inputs_are_skipped_when_the_crd_is_absent():
     assert not any("gateways.gateway.networking.k8s.io" in c for c in calls)
     assert "gateways" not in inputs.failed
 
+
 async def test_crd_dependent_inputs_fail_when_the_crd_list_failed():
     inputs = await gather_inputs(fixture_fetch("kind", fail={"crds": RuntimeError("Forbidden")}))
     assert inputs.failed["gateways"] == "CRD list not readable"
 
+
 async def test_no_input_reads_secrets():
     assert not any("secret" in " ".join(args).lower() for _, args, _ in INPUTS)
+
 
 async def test_alert_shares_through_the_proxy_path():
     calls = []
@@ -177,15 +194,20 @@ async def test_alert_shares_through_the_proxy_path():
     assert await alert_shares(query) == {"KubeCPUOvercommit": 0.96}
     assert calls[0][:2] == ["get", "--raw"] and "/services/kps-prometheus:9090/proxy/api/v1/query?query=" in calls[0][2]
 
+
 async def test_alert_shares_rejects_an_error_body():
     async def query(_):
         return {"status": "error", "error": "bad"}
+
     with pytest.raises(ValueError):
         await alert_shares(query)
 
+
 async def test_direct_prometheus_uses_the_configured_url():
     seen = []
-    transport = httpx2.MockTransport(lambda r: (seen.append(str(r.url)), httpx2.Response(200, json={"status": "success", "data": {"result": []}}))[1])
+    transport = httpx2.MockTransport(
+        lambda r: (seen.append(str(r.url)), httpx2.Response(200, json={"status": "success", "data": {"result": []}}))[1]
+    )
     assert await alert_shares(direct_prometheus("http://p:9090", 5, transport)) == {}
     assert seen[0].startswith("http://p:9090/api/v1/query?query=")
 ```
@@ -227,23 +249,32 @@ def test_every_catalog_row_is_valid():
         for pattern in c.workloads + c.webhooks:
             re.compile(pattern)
 
+
 def test_crds_and_a_running_controller_are_seen():
-    facts, namespaces = component_facts(_inputs(crds=[_crd("kyverno.io")], deployments=[_deploy("kyverno", "kyverno-admission-controller", ready=3)]))
+    facts, namespaces = component_facts(
+        _inputs(crds=[_crd("kyverno.io")], deployments=[_deploy("kyverno", "kyverno-admission-controller", ready=3)])
+    )
     f = _by_key(facts, "component/kyverno")
     assert f.certainty == "seen" and "kyverno" in namespaces
     assert "Deployment kyverno/kyverno-admission-controller (3 ready)" in f.evidence
+
 
 def test_crds_without_a_controller_are_asked_about():
     facts, _ = component_facts(_inputs(crds=[_crd("kyverno.io")]))
     assert _by_key(facts, "component/kyverno").question.endswith("Left over from an uninstall?")
 
+
 def test_a_controller_with_zero_ready_replicas_is_not_running():
-    facts, _ = component_facts(_inputs(crds=[_crd("kyverno.io")], deployments=[_deploy("kyverno", "kyverno-admission-controller", ready=0)]))
+    facts, _ = component_facts(
+        _inputs(crds=[_crd("kyverno.io")], deployments=[_deploy("kyverno", "kyverno-admission-controller", ready=0)])
+    )
     assert _by_key(facts, "component/kyverno").certainty == "unsure"
+
 
 def test_a_component_without_crds_is_seen_from_its_workload():
     facts, _ = component_facts(_inputs(daemonsets=[_daemonset("kube-system", "kindnet", ready=1)]))
     assert _by_key(facts, "component/kindnet").topic == "network"
+
 
 def test_nothing_matched_gives_no_facts():
     assert component_facts(_inputs()) == ([], set())
@@ -275,26 +306,60 @@ def test_nothing_matched_gives_no_facts():
 
 ```python
 def test_aks_node_pools_and_cloud():
-    nodes = [_node("aks-system-1", {"kubernetes.azure.com/cluster": "x", "kubernetes.azure.com/agentpool": "system", "kubernetes.azure.com/mode": "system", "node.kubernetes.io/instance-type": "Standard_D4s_v5"}),
-             *[_node(f"aks-user-{i}", {"kubernetes.azure.com/cluster": "x", "kubernetes.azure.com/agentpool": "user", "node.kubernetes.io/instance-type": "Standard_D8s_v5"}) for i in range(3)]]
-    facts = {f.key: f for f in platform_facts(_inputs(nodes=nodes, version=[{"serverVersion": {"gitVersion": "v1.33.2"}}]))}
+    nodes = [
+        _node(
+            "aks-system-1",
+            {
+                "kubernetes.azure.com/cluster": "x",
+                "kubernetes.azure.com/agentpool": "system",
+                "kubernetes.azure.com/mode": "system",
+                "node.kubernetes.io/instance-type": "Standard_D4s_v5",
+            },
+        ),
+        *[
+            _node(
+                f"aks-user-{i}",
+                {
+                    "kubernetes.azure.com/cluster": "x",
+                    "kubernetes.azure.com/agentpool": "user",
+                    "node.kubernetes.io/instance-type": "Standard_D8s_v5",
+                },
+            )
+            for i in range(3)
+        ],
+    ]
+    facts = {
+        f.key: f for f in platform_facts(_inputs(nodes=nodes, version=[{"serverVersion": {"gitVersion": "v1.33.2"}}]))
+    }
     assert facts["platform/kubernetes-version"].statement == "Kubernetes v1.33.2"
     assert facts["platform/cloud"].statement == "Managed service: AKS (Azure)"
     assert facts["nodepool/user"].statement == "Node pool `user`: 3 nodes, 3× Standard_D8s_v5"
     assert facts["nodepool/system"].statement.endswith("(system pool)")
 
+
 def test_a_bare_provider_id_is_asked_about():
     facts = {f.key: f for f in platform_facts(_inputs(nodes=[_node("n1", {}, provider_id="aws:///eu-west-1a/i-0")]))}
     assert facts["platform/cloud"].certainty == "unsure"
 
+
 def test_kind_nodes_fall_back_to_roles():
-    nodes = [_node("lab-control-plane", {"node-role.kubernetes.io/control-plane": ""}, provider_id="kind://docker/lab/lab-control-plane")]
+    nodes = [
+        _node(
+            "lab-control-plane",
+            {"node-role.kubernetes.io/control-plane": ""},
+            provider_id="kind://docker/lab/lab-control-plane",
+        )
+    ]
     facts = {f.key: f for f in platform_facts(_inputs(nodes=nodes))}
     assert "nodepool/control-plane" in facts and facts["platform/cloud"].statement == "Local kind cluster"
 
+
 def test_namespace_labels_need_three_application_namespaces():
     ns = [_ns("kube-system"), _ns("shop", {"team": "a"}), _ns("pay", {"team": "b"})]
-    assert not [f for f in organisation_facts(_inputs(namespaces=ns), set()) if f.key == "organisation/namespace-labels"]
+    assert not [
+        f for f in organisation_facts(_inputs(namespaces=ns), set()) if f.key == "organisation/namespace-labels"
+    ]
+
 
 def test_component_namespaces_count_as_platform():
     ns = [_ns("kube-system"), _ns("kyverno"), _ns("shop")]
@@ -329,24 +394,43 @@ def test_component_namespaces_count_as_platform():
 
 ```python
 def test_default_deny_egress_with_exceptions_is_asked():
-    pol = _netpol("shop", pod_selector={}, types=["Egress"], egress=[{"ports": [{"port": 53, "protocol": "UDP"}]}, {"to": [{"ipBlock": {"cidr": "10.0.0.0/8"}}]}])
+    pol = _netpol(
+        "shop",
+        pod_selector={},
+        types=["Egress"],
+        egress=[{"ports": [{"port": 53, "protocol": "UDP"}]}, {"to": [{"ipBlock": {"cidr": "10.0.0.0/8"}}]}],
+    )
     f = _by_key(network_facts(_inputs(networkpolicies=[pol], namespaces=[_ns("shop")])), "network/default-deny-egress")
     assert f.certainty == "unsure"
     assert f.question == "I read this as: outbound traffic is denied by default except DNS, 10.0.0.0/8. Correct?"
 
+
 def test_deny_all_egress_is_seen():
     pol = _netpol("shop", pod_selector={}, types=["Egress"], egress=[])
-    assert _by_key(network_facts(_inputs(networkpolicies=[pol], namespaces=[_ns("shop")])), "network/default-deny-egress").certainty == "seen"
+    assert (
+        _by_key(
+            network_facts(_inputs(networkpolicies=[pol], namespaces=[_ns("shop")])), "network/default-deny-egress"
+        ).certainty
+        == "seen"
+    )
+
 
 def test_no_policies_is_unsure_when_calico_could_not_be_read():
     inputs = _inputs(networkpolicies=[], failed={"calico-policies": "RuntimeError: Forbidden"})
     assert _by_key(network_facts(inputs), "network/no-network-policies").certainty == "unsure"
 
+
 def test_internal_load_balancers_ask_about_ingress():
-    svc = _service("ingress-nginx", "ingress-nginx-controller", "LoadBalancer", {"service.beta.kubernetes.io/azure-load-balancer-internal": "true"})
+    svc = _service(
+        "ingress-nginx",
+        "ingress-nginx-controller",
+        "LoadBalancer",
+        {"service.beta.kubernetes.io/azure-load-balancer-internal": "true"},
+    )
     facts = {f.key: f for f in network_facts(_inputs(services=[svc]))}
     assert facts["network/lb/ingress-nginx/ingress-nginx-controller"].statement.endswith("is internal-only")
     assert facts["network/ingress-exposure"].certainty == "unsure"
+
 
 def test_a_public_load_balancer_needs_no_question():
     facts = {f.key for f in network_facts(_inputs(services=[_service("a", "b", "LoadBalancer", {})]))}
@@ -387,24 +471,44 @@ def test_prometheus_url_is_built_from_the_service():
     assert f.setting == ("PROMETHEUS_URL", "http://kps-prometheus.monitoring.svc:9090")
     assert f.setting_reason.endswith("checked: it answered through the API server proxy")
 
+
 def test_an_alert_firing_most_of_the_week_is_asked():
     config = configure_app({})
     facts = noise_facts(_inputs(), config, {"KubeCPUOvercommit": 0.96, "Watchdog": 1.0, "Rare": 0.1}, None, [], NOW)
     assert [f.key for f in facts] == ["noise/alert/KubeCPUOvercommit"]
-    assert facts[0].question == "`KubeCPUOvercommit` fired 96% of the last 7 days. Is it expected here, so I stop reporting it?"
+    assert (
+        facts[0].question
+        == "`KubeCPUOvercommit` fired 96% of the last 7 days. Is it expected here, so I stop reporting it?"
+    )
+
 
 def test_without_history_long_firing_alerts_are_used():
-    alerts = [{"labels": {"alertname": "Old"}, "startsAt": "2026-10-18T00:00:00Z"}, {"labels": {"alertname": "New"}, "startsAt": "2026-10-21T08:00:00Z"}]
+    alerts = [
+        {"labels": {"alertname": "Old"}, "startsAt": "2026-10-18T00:00:00Z"},
+        {"labels": {"alertname": "New"}, "startsAt": "2026-10-21T08:00:00Z"},
+    ]
     assert [f.key for f in noise_facts(_inputs(), configure_app({}), None, alerts, [], NOW)] == ["noise/alert/Old"]
 
+
 def test_a_dominant_event_reason_is_asked_unless_already_hidden():
-    events = [_event("shop", "BackOff", count=60), _event("shop", "PolicyViolation", count=900), _event("x", "Other", count=40)]
-    assert [f.key for f in noise_facts(_inputs(events=events), configure_app({}), None, None, [], NOW)] == []  # BackOff 6%, PolicyViolation hidden by default
+    events = [
+        _event("shop", "BackOff", count=60),
+        _event("shop", "PolicyViolation", count=900),
+        _event("x", "Other", count=40),
+    ]
+    assert [
+        f.key for f in noise_facts(_inputs(events=events), configure_app({}), None, None, [], NOW)
+    ] == []  # BackOff 6%, PolicyViolation hidden by default
     events = [_event("shop", "BackOff", count=60), _event("x", "Other", count=40)]
-    assert [f.key for f in noise_facts(_inputs(events=events), configure_app({}), None, None, [], NOW)] == ["noise/event/BackOff"]
+    assert [f.key for f in noise_facts(_inputs(events=events), configure_app({}), None, None, [], NOW)] == [
+        "noise/event/BackOff"
+    ]
+
 
 def test_noise_is_cluster_scope_and_never_seen():
-    findings = [StoredFinding("oom/x/Deployment/a", "warning", "a is OOM", "", NOW - timedelta(days=5), NOW, "open", None)]
+    findings = [
+        StoredFinding("oom/x/Deployment/a", "warning", "a is OOM", "", NOW - timedelta(days=5), NOW, "open", None)
+    ]
     facts = noise_facts(_inputs(), configure_app({}), {}, None, findings, NOW)
     assert all(f.scope == "cluster" and f.certainty == "unsure" for f in facts) and facts
 ```
@@ -436,30 +540,75 @@ def test_noise_is_cluster_scope_and_never_seen():
 - [ ] **Step 1: Write the failing tests**
 
 ```python
-@pytest.mark.parametrize(("flavor", "expected"), [
-    ("aks", {"platform/cloud", "nodepool/system", "nodepool/user", "component/azure-cni", "component/kyverno", "component/flux",
-             "component/cert-manager", "component/ingress-nginx", "component/consul", "component/external-secrets",
-             "component/secrets-store-csi", "component/csi-provider-azure", "component/prometheus", "component/alertmanager",
-             "network/default-deny-egress", "network/ingress-exposure", "monitoring/prometheus-url", "noise/alert/KubeCPUOvercommit"}),
-    ("eks", {"platform/cloud", "component/aws-vpc-cni", "component/karpenter", "component/argo-cd", "component/gatekeeper",
-             "component/sealed-secrets", "component/linkerd", "network/no-network-policies"}),
-    ("gke", {"platform/cloud", "component/cilium", "component/istio", "component/csi-provider-gcp", "network/gateways"}),
-    ("kind", {"platform/cloud", "nodepool/control-plane", "component/kindnet", "component/kyverno"}),
-])
+@pytest.mark.parametrize(
+    ("flavor", "expected"),
+    [
+        (
+            "aks",
+            {
+                "platform/cloud",
+                "nodepool/system",
+                "nodepool/user",
+                "component/azure-cni",
+                "component/kyverno",
+                "component/flux",
+                "component/cert-manager",
+                "component/ingress-nginx",
+                "component/consul",
+                "component/external-secrets",
+                "component/secrets-store-csi",
+                "component/csi-provider-azure",
+                "component/prometheus",
+                "component/alertmanager",
+                "network/default-deny-egress",
+                "network/ingress-exposure",
+                "monitoring/prometheus-url",
+                "noise/alert/KubeCPUOvercommit",
+            },
+        ),
+        (
+            "eks",
+            {
+                "platform/cloud",
+                "component/aws-vpc-cni",
+                "component/karpenter",
+                "component/argo-cd",
+                "component/gatekeeper",
+                "component/sealed-secrets",
+                "component/linkerd",
+                "network/no-network-policies",
+            },
+        ),
+        (
+            "gke",
+            {"platform/cloud", "component/cilium", "component/istio", "component/csi-provider-gcp", "network/gateways"},
+        ),
+        ("kind", {"platform/cloud", "nodepool/control-plane", "component/kindnet", "component/kyverno"}),
+    ],
+)
 async def test_scan_finds_the_expected_facts(flavor, expected):
     result = await scan(fixture_fetch(flavor), configure_app({}), "my-cluster", clock=lambda: NOW)
     assert result.ok and expected <= {f.key for f in result.facts}
+
 
 async def test_scan_on_kind_marks_leftover_crds_unsure_and_alerts_not_reachable():
     result = await scan(fixture_fetch("kind"), configure_app({}), "my-cluster", clock=lambda: NOW)
     assert _by_key(result.facts, "component/kyverno").certainty == "unsure"
     assert result.failed["prometheus"].startswith("not reachable")
 
+
 async def test_scan_prefers_the_configured_prometheus_url():
     calls = []
     transport = httpx2.MockTransport(lambda r: httpx2.Response(200, json={"status": "success", "data": {"result": []}}))
-    await scan(fixture_fetch("aks", calls), configure_app({"PROMETHEUS_URL": "http://p:9090"}), "my-cluster", clock=lambda: NOW, transport=transport)
+    await scan(
+        fixture_fetch("aks", calls),
+        configure_app({"PROMETHEUS_URL": "http://p:9090"}),
+        "my-cluster",
+        clock=lambda: NOW,
+        transport=transport,
+    )
     assert not any(c[:2] == ["get", "--raw"] and "api/v1/query" in c[2] for c in calls)
+
 
 async def test_a_scan_with_every_kubectl_input_failing_is_not_ok():
     fail = {name: RuntimeError("Unable to connect") for name, _, _ in INPUTS}
@@ -470,19 +619,37 @@ async def test_a_scan_with_every_kubectl_input_failing_is_not_ok():
 ```python
 # tests/test_scan_draft.py
 def test_unsure_facts_render_only_as_todo():
-    facts = [fact("network/x", "network", "Outbound is denied", ("NetworkPolicy shop/deny",), ("networkpolicies",), unsure_question="Correct?"),
-             fact("component/kyverno", "components", "Kyverno (policy engine) runs in namespace `kyverno`", ("CRD group kyverno.io",), ("crds",))]
+    facts = [
+        fact(
+            "network/x",
+            "network",
+            "Outbound is denied",
+            ("NetworkPolicy shop/deny",),
+            ("networkpolicies",),
+            unsure_question="Correct?",
+        ),
+        fact(
+            "component/kyverno",
+            "components",
+            "Kyverno (policy engine) runs in namespace `kyverno`",
+            ("CRD group kyverno.io",),
+            ("crds",),
+        ),
+    ]
     text = render_markdown(facts, "platform")
     assert "- TODO(onboard): Correct?" in text and "Outbound is denied" not in text
     assert "## Components\n\n- Kyverno (policy engine) runs in namespace `kyverno` [CRD group kyverno.io]" in text
     assert text.index("## Components") < text.index("## Network")
+
 
 async def test_no_fixture_draft_states_anything_without_evidence_or_a_human():
     for flavor in ("aks", "eks", "gke", "kind"):
         result = await scan(fixture_fetch(flavor), configure_app({}), "my-cluster", clock=lambda: NOW)
         for line in render_markdown(result.facts, "cluster").splitlines():
             if line.startswith("- "):
-                assert line.startswith("- TODO(onboard): ") or line.endswith("]") or line.endswith("(from the team)"), line
+                assert line.startswith("- TODO(onboard): ") or line.endswith("]") or line.endswith("(from the team)"), (
+                    line
+                )
 ```
 
 - [ ] **Step 2:** Run `.venv/bin/pytest tests/test_scan_discover.py tests/test_scan_draft.py -v`. Expected: FAIL.
@@ -517,11 +684,14 @@ async def test_no_fixture_draft_states_anything_without_evidence_or_a_human():
 ```python
 def _asker(*answers):
     replies, prompts = list(answers), []
+
     def ask(prompt):
         prompts.append(prompt)
         return replies.pop(0) if replies else ""
+
     ask.prompts = prompts
     return ask
+
 
 def test_answers_confirm_drop_note_and_skip():
     unsure = [fact(f"k/{i}", "network", f"s{i}", ("e",), ("x",), unsure_question="q") for i in range(4)]
@@ -530,20 +700,24 @@ def test_answers_confirm_drop_note_and_skip():
     assert (out["k/2"].statement, out["k/2"].certainty) == ("Only DNS is allowed.", "told")
     assert out["k/3"].certainty == "unsure"
 
+
 def test_a_blind_spot_answer_becomes_a_told_fact():
     out = confirm([BLIND_SPOTS[0]], _asker("All egress goes through a\nfirewall."))
     assert (out[0].statement, out[0].certainty) == ("All egress goes through a firewall.", "told")
+
 
 def test_eof_skips_everything():
     facts = [fact("k/0", "network", "s", ("e",), ("x",), unsure_question="q"), *BLIND_SPOTS]
     assert confirm(facts, _asker()) == facts
     assert ask_representative(_asker()) is False
 
+
 def test_terminal_ask_prompts_on_stderr(monkeypatch, capsys):
     monkeypatch.setattr("sys.stdin", io.StringIO(""))
     assert terminal_ask("Q? ") == ""
     out, err = capsys.readouterr()
     assert (out, err) == ("", "Q? ")
+
 
 def test_seen_facts_are_never_asked_about():
     ask = _asker()
@@ -584,24 +758,50 @@ async def test_values_files_load_back_as_knowledge(tmp_path):
     paths = write_files(tmp_path, files, force=False)
     knowledge = load_knowledge(tmp_path / "empty", [str(p) for p in paths])
     assert knowledge.environment.strip() == render_markdown(facts, "platform").strip()
-    assert yaml.safe_load(files["my-cluster.yaml"])["appConfig"]["PROMETHEUS_URL"] == "http://kps-prometheus.monitoring.svc:9090"
+    assert (
+        yaml.safe_load(files["my-cluster.yaml"])["appConfig"]["PROMETHEUS_URL"]
+        == "http://kps-prometheus.monitoring.svc:9090"
+    )
+
 
 def test_hostile_text_survives_yaml(tmp_path):
-    note = fact("blindspot/egress", "network", "Proxy: http://proxy.example.com:3128 # all \"egress\" - äöü", (), (), scope="cluster")
+    note = fact(
+        "blindspot/egress",
+        "network",
+        'Proxy: http://proxy.example.com:3128 # all "egress" - äöü',
+        (),
+        (),
+        scope="cluster",
+    )
     note = replace(note, certainty="told")
     files = values_files(_result([note]), [note], [], False)
-    assert "Proxy: http://proxy.example.com:3128 # all \"egress\" - äöü (from the team)" in yaml.safe_load(files["my-cluster.yaml"])["knowledge"]["clusterNotes"]
+    assert (
+        'Proxy: http://proxy.example.com:3128 # all "egress" - äöü (from the team)'
+        in yaml.safe_load(files["my-cluster.yaml"])["knowledge"]["clusterNotes"]
+    )
+
 
 def test_not_representative_writes_only_the_cluster_file():
     assert set(values_files(_result([]), [], [], False)) == {"my-cluster.yaml"}
 
+
 def test_unsure_noise_is_a_commented_todo_not_a_setting():
-    noisy = fact("noise/alert/KubeCPUOvercommit", "noise", "s", ("e",), ("prometheus",), unsure_question="q", setting=("ALERTS_IGNORE_NAMES", "KubeCPUOvercommit"))
+    noisy = fact(
+        "noise/alert/KubeCPUOvercommit",
+        "noise",
+        "s",
+        ("e",),
+        ("prometheus",),
+        unsure_question="q",
+        setting=("ALERTS_IGNORE_NAMES", "KubeCPUOvercommit"),
+    )
     s = {x.name: x for x in suggested_settings([noisy], configure_app({}), "my-cluster")}["ALERTS_IGNORE_NAMES"]
     assert s.value == "Watchdog,InfoInhibitor" and "KubeCPUOvercommit" in s.todo
 
+
 def test_file_slug():
     assert file_slug("Prod/AKS 1") == "prod-aks-1" and file_slug("///") == "my-cluster"
+
 
 def test_existing_files_are_not_overwritten_without_force(tmp_path):
     (tmp_path / "my-cluster.yaml").write_text("mine")
@@ -610,6 +810,7 @@ def test_existing_files_are_not_overwritten_without_force(tmp_path):
     assert not (tmp_path / "knowledge-values.yaml").exists()
     write_files(tmp_path, {"my-cluster.yaml": "b"}, force=True)
     assert (tmp_path / "my-cluster.yaml").read_text() == "b"
+
 
 def test_markdown_format_and_settings_env(tmp_path):
     s = [Setting("PROMETHEUS_URL", "http://p.monitoring.svc:9090", "found", "")]
@@ -650,8 +851,10 @@ def test_markdown_format_and_settings_env(tmp_path):
 # tests/test_scan_draft.py
 async def test_overview_gets_only_confirmed_facts():
     chat = ScriptedChat(answer("A small AKS platform."))
-    facts = [fact("a", "platform", "Kubernetes v1.33.2", ("kubectl version",), ("version",)),
-             fact("b", "network", "Hidden guess", ("e",), ("x",), unsure_question="q")]
+    facts = [
+        fact("a", "platform", "Kubernetes v1.33.2", ("kubectl version",), ("version",)),
+        fact("b", "network", "Hidden guess", ("e",), ("x",), unsure_question="q"),
+    ]
     assert await write_overview(chat, facts) == "A small AKS platform."
     sent = chat.calls[0][0][-1].content  # check the real ScriptedChat call shape in tests/fakes.py
     assert "Kubernetes v1.33.2" in sent and "Hidden guess" not in sent
@@ -667,21 +870,25 @@ def test_onboard_no_input_writes_the_cluster_file_only(monkeypatch, tmp_path, ca
     assert out.strip() == str(tmp_path / "my-cluster.yaml")
     assert "TODO(onboard)" in (tmp_path / "my-cluster.yaml").read_text() and "questions left open" in err
 
+
 def test_onboard_refuses_to_overwrite(monkeypatch, tmp_path, capsys):
     _fixture_scan(monkeypatch, "aks")
     (tmp_path / "my-cluster.yaml").write_text("mine")
     assert cli.main(["onboard", "--no-input", "--no-model", "--out", str(tmp_path)]) == 1
     assert "--force" in capsys.readouterr().err and (tmp_path / "my-cluster.yaml").read_text() == "mine"
 
+
 def test_onboard_markdown_format(monkeypatch, tmp_path):
     _fixture_scan(monkeypatch, "kind")
     assert cli.main(["onboard", "--no-input", "--no-model", "--format", "markdown", "--out", str(tmp_path)]) == 0
     assert {p.name for p in tmp_path.iterdir()} == {"cluster.md", "settings.env"}
 
+
 def test_onboard_without_a_model_still_writes(monkeypatch, tmp_path, capsys):
     _fixture_scan(monkeypatch, "kind")
     assert cli.main(["onboard", "--no-input", "--out", str(tmp_path)]) == 0
     assert "without an overview" in capsys.readouterr().err
+
 
 def test_onboard_unreachable_cluster_exits_1(monkeypatch, tmp_path, capsys):
     _fixture_scan(monkeypatch, "kind", fail_all=True)
@@ -727,9 +934,11 @@ def test_onboard_unreachable_cluster_exits_1(monkeypatch, tmp_path, capsys):
 def _r(facts, failed=None):
     return ScanResult(NOW, "my-cluster", facts, failed or {}, True)
 
+
 def test_first_scan_is_a_baseline():
     changes, stored = compare(None, _r([_f("component/kyverno"), _f("nodepool/user")]))
     assert changes.baseline and changes.headline() == "First scan recorded: 1 components, 1 node pools"
+
 
 def test_added_removed_changed():
     old = _r([_f("component/kyverno"), _f("nodepool/user", "3 nodes")])
@@ -739,15 +948,18 @@ def test_added_removed_changed():
     assert [f.key for f in changes.removed] == ["component/kyverno"]
     assert changes.lines()[-1] == "Changed: 3 nodes → 6 nodes"
 
+
 def test_facts_of_a_failed_input_are_kept_and_never_removed():
     old = _r([_f("network/calico-policies", inputs=("calico-policies",))])
     changes, stored = compare(old, _r([], failed={"calico-policies": "RuntimeError: Forbidden"}))
     assert not changes.removed and [f.key for f in stored.facts] == ["network/calico-policies"]
     assert changes.lines() == ["Not checked this time: calico-policies"]
 
+
 def test_noise_is_not_compared():
     changes, _ = compare(_r([_f("noise/alert/A", topic="noise")]), _r([_f("noise/alert/B", topic="noise")]))
     assert changes.headline() == "no changes"
+
 
 def test_corrupt_or_old_stored_scans_are_ignored(tmp_path):
     memory = Memory(tmp_path)
@@ -755,12 +967,14 @@ def test_corrupt_or_old_stored_scans_are_ignored(tmp_path):
         memory.set_meta(LAST_SCAN_KEY, value)
         assert load_scan(memory) is None
 
+
 async def test_a_failed_rescan_leaves_memory_unchanged(tmp_path):
     memory = Memory(tmp_path)
     memory.set_meta(LAST_SCAN_KEY, "keep me")
     fail = {name: RuntimeError("Unable to connect") for name, _, _ in INPUTS}
     changes = await rescan(fixture_fetch("kind", fail=fail), configure_app({}), memory, clock=lambda: NOW)
     assert changes.error and memory.get_meta(LAST_SCAN_KEY) == "keep me"
+
 
 async def test_rescan_twice_reports_no_changes(tmp_path):
     memory = Memory(tmp_path)
@@ -797,29 +1011,56 @@ def test_scan_before_report_defaults_on():
     assert configure_app({})["scan_before_report"] is True
     assert configure_app({"SCAN_BEFORE_REPORT": "false"})["scan_before_report"] is False
 
+
 # tests/test_report.py
 async def test_morning_report_includes_the_scan_changes(tmp_path):
-    changes = ScanChanges(added=[_seen("component/flux", "Flux (GitOps) runs in namespace `flux-system`")], removed=[], changed=[], not_checked={})
-    report = await build_morning_report(_session(ScriptedChat(answer(findings_answer("ok", [])), answer("Quiet."))), Memory(tmp_path),
-                                        configure_app({"CLUSTER_NAME": "my-cluster"}), clock=lambda: MONDAY_0800_VILNIUS,
-                                        scanner=_returns(changes))
+    changes = ScanChanges(
+        added=[_seen("component/flux", "Flux (GitOps) runs in namespace `flux-system`")],
+        removed=[],
+        changed=[],
+        not_checked={},
+    )
+    report = await build_morning_report(
+        _session(ScriptedChat(answer(findings_answer("ok", [])), answer("Quiet."))),
+        Memory(tmp_path),
+        configure_app({"CLUSTER_NAME": "my-cluster"}),
+        clock=lambda: MONDAY_0800_VILNIUS,
+        scanner=_returns(changes),
+    )
     assert ("Since the last scan", "1 added, 0 removed, 0 changed") in report.facts()
     assert "## Since the last scan\n\n- Added: Flux (GitOps) runs in namespace `flux-system`" in report.report_md
+
 
 async def test_a_failing_scanner_does_not_stop_the_report(tmp_path):
     async def boom():
         raise RuntimeError("x")
+
     report = await build_morning_report(..., scanner=boom)  # same setup as above
     assert ("Since the last scan", "failed: RuntimeError") in report.facts()
+
 
 async def test_no_scanner_no_section(tmp_path):
     report = await build_morning_report(...)  # same setup, no scanner
     assert "Since the last scan" not in report.report_md
 
+
 # tests/test_teams.py
 def test_morning_card_shows_the_scan_changes():
-    card = morning_card("my-cluster", _report(scan_changes=ScanChanges(baseline=True, summary="First scan recorded: 3 components, 2 node pools", added=[], removed=[], changed=[], not_checked={})))
+    card = morning_card(
+        "my-cluster",
+        _report(
+            scan_changes=ScanChanges(
+                baseline=True,
+                summary="First scan recorded: 3 components, 2 node pools",
+                added=[],
+                removed=[],
+                changed=[],
+                not_checked={},
+            )
+        ),
+    )
     assert "First scan recorded: 3 components, 2 node pools" in json.dumps(card)
+
 
 # tests/test_cli.py
 def test_onboard_show_prints_the_stored_scan(monkeypatch, tmp_path, capsys):
@@ -827,6 +1068,7 @@ def test_onboard_show_prints_the_stored_scan(monkeypatch, tmp_path, capsys):
     save_scan(memory, _aks_result())
     assert cli.main(["onboard", "--show"]) == 0
     assert yaml.safe_load(capsys.readouterr().out)["knowledge"]["clusterNotes"]
+
 
 def test_onboard_show_without_a_stored_scan(capsys):
     assert cli.main(["onboard", "--show"]) == 1
