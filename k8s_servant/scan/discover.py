@@ -207,31 +207,71 @@ def _evidence(kind: str, items: list[dict]) -> tuple[str, ...]:
     return shown
 
 
-def _is_default_deny(policy: dict, direction: str) -> bool:
-    """An empty-podSelector policy covering `direction` whose rules (if any) do not allow everything."""
-    spec = policy.get("spec", {})
-    if spec.get("podSelector"):
-        return False
-    # An absent policyTypes means Ingress (and Egress only when egress rules exist).
-    types = spec.get("policyTypes") or ["Ingress"]
-    if direction not in types:
-        return False
-    # A rule without peers and ports allows everything, so the policy denies nothing.
-    return not any(not rule for rule in spec.get(direction.lower()) or [])
+# CRDs of other policy engines: where any exists, "no NetworkPolicies" proves nothing.
+_POLICY_CRDS = {
+    "networkpolicies.crd.projectcalico.org",
+    "globalnetworkpolicies.crd.projectcalico.org",
+    "ciliumnetworkpolicies.cilium.io",
+    "ciliumclusterwidenetworkpolicies.cilium.io",
+    "adminnetworkpolicies.policy.networking.k8s.io",
+    "baselineadminnetworkpolicies.policy.networking.k8s.io",
+}
 
 
-def _egress_allowed(policies: list[dict]) -> list[str]:
-    """What the egress rules let through: DNS, CIDR blocks and labelled namespaces."""
-    rules = [r for p in policies for r in p["spec"].get("egress") or []]
-    dns = any(str(port.get("port")) == "53" for r in rules for port in r.get("ports") or [])
-    peers = [peer for r in rules for peer in r.get("to") or []]
-    cidrs = [peer["ipBlock"]["cidr"] for peer in peers if peer.get("ipBlock", {}).get("cidr")]
-    labelled = [
-        f"namespaces labelled {k}={v}"
-        for peer in peers
-        for k, v in (peer.get("namespaceSelector", {}).get("matchLabels") or {}).items()
-    ]
-    return list(dict.fromkeys([*(["DNS"] if dns else []), *cidrs, *labelled]))
+def _covering(policies: list[dict], direction: str) -> dict[str, list[dict]]:
+    """Per namespace, the empty-podSelector policies that cover `direction`.
+
+    Kubernetes adds policies up, so a namespace is only denied by default when none
+    of them allows everything; the caller judges that from these groups.
+    """
+    groups: dict[str, list[dict]] = {}
+    for p in policies:
+        spec = p.get("spec", {})
+        # An absent policyTypes means Ingress.
+        if not spec.get("podSelector") and direction in (spec.get("policyTypes") or ["Ingress"]):
+            groups.setdefault(p["metadata"].get("namespace", ""), []).append(p)
+    return groups
+
+
+def _opens_everything(policy: dict, direction: str) -> bool:
+    """A rule without peers and ports allows all traffic."""
+    return any(not rule for rule in policy["spec"].get(direction.lower()) or [])
+
+
+def _only_dns(rule: dict) -> bool:
+    ports = rule.get("ports") or []
+    return bool(ports) and all(str(port.get("port")) == "53" for port in ports)
+
+
+def _egress_allowed(policies: list[dict]) -> tuple[list[str], bool]:
+    """What the egress rules let through, and whether some destination cannot be named.
+
+    A rule's peers and ports both apply, so a rule for port 53 only is DNS whoever
+    the peer is; other peers are named when they are a CIDR block or labelled
+    namespaces, and counted as "other destinations" otherwise.
+    """
+    items: list[str] = []
+    other = False
+    for rule in (r for p in policies for r in p["spec"].get("egress") or []):
+        if _only_dns(rule):
+            items.append("DNS")
+            continue
+        peers = rule.get("to") or []
+        other = other or not peers
+        for peer in peers:
+            block = peer.get("ipBlock") or {}
+            selector = peer.get("namespaceSelector") or {}
+            labels = selector.get("matchLabels")
+            if block.get("cidr"):
+                items.append(block["cidr"])
+                other = other or bool(block.get("except"))
+            elif labels and not peer.get("podSelector") and not selector.get("matchExpressions"):
+                items.append("namespaces labelled " + ",".join(f"{k}={v}" for k, v in labels.items()))
+            else:
+                other = True
+    # DNS first, then CIDR blocks, then namespaces, each once.
+    order = sorted(dict.fromkeys(items), key=lambda i: 0 if i == "DNS" else 2 if i.startswith("namespaces") else 1)
+    return order, other
 
 
 def _listed(items: list[str]) -> str:
@@ -247,14 +287,18 @@ def _policy_facts(inputs: Inputs) -> list[Fact]:
     facts: list[Fact] = []
     if not policies:
         # Calico or Cilium may restrict traffic where no NetworkPolicy exists.
-        others = [name for name in ("calico-policies", "cilium-policies") if inputs.get(name) or name in inputs.failed]
+        others = (
+            bool(inputs.crd_names() & _POLICY_CRDS)
+            or any(inputs.get(name) for name in ("calico-policies", "cilium-policies"))
+            or any(name in inputs.failed for name in ("calico-policies", "cilium-policies", "crds"))
+        )
         facts.append(
             fact(
                 "network/no-network-policies",
                 "network",
                 "No NetworkPolicies: pod traffic inside the cluster is not restricted",
                 ("kubectl get networkpolicies -A",),
-                ("networkpolicies", "calico-policies", "cilium-policies"),
+                ("networkpolicies", "crds", "calico-policies", "cilium-policies"),
                 unsure_question=(
                     "No NetworkPolicies, but Calico or Cilium policies may restrict traffic. Which rules apply?"
                     if others
@@ -278,46 +322,59 @@ def _policy_facts(inputs: Inputs) -> list[Fact]:
                     (name,),
                 )
             )
-    ingress = [p for p in policies if _is_default_deny(p, "Ingress")]
-    if inputs.ok("namespaces") and ingress:
+    ingress = _covering(policies, "Ingress")
+    if inputs.ok("namespaces"):
         apps = {
             _ref(n)
             for n in inputs.get("namespaces")
             if not _ref(n).startswith("kube-") and _ref(n) not in ("default", "")
         }
-        covered = [p for p in ingress if p["metadata"].get("namespace") in apps and not p["spec"].get("ingress")]
-        denied = {p["metadata"]["namespace"] for p in covered}
-        if denied:
+        # Strict: another covering policy with rules, or allowing everything, opens the namespace.
+        covered = {
+            space: group
+            for space, group in ingress.items()
+            if space in apps and not any(p["spec"].get("ingress") for p in group)
+        }
+        if covered:
             facts.append(
                 fact(
                     "network/default-deny-ingress",
                     "network",
-                    f"Inbound pod traffic is denied by default in {len(denied)} of "
+                    f"Inbound pod traffic is denied by default in {len(covered)} of "
                     f"{_count(len(apps), 'application namespace')}",
-                    _evidence("NetworkPolicy", covered),
+                    _evidence("NetworkPolicy", [p for group in covered.values() for p in group]),
                     ("networkpolicies", "namespaces"),
                 )
             )
-    egress = [p for p in policies if _is_default_deny(p, "Egress")]
+    egress = {
+        space: group
+        for space, group in _covering(policies, "Egress").items()
+        if not any(_opens_everything(p, "Egress") for p in group)
+    }
     if egress:
-        spaces = {p["metadata"].get("namespace", "") for p in egress}
-        base = f"Outbound pod traffic is denied by default in {_count(len(spaces), 'namespace')}"
-        with_rules = [p for p in egress if p["spec"].get("egress")]
-        allowed = _listed(_egress_allowed(with_rules))
+        base = f"Outbound pod traffic is denied by default in {_count(len(egress), 'namespace')}"
+        per_space = {space: _egress_allowed(group) for space, group in egress.items()}
+        distinct = {(tuple(items), other) for items, other in per_space.values()}
         question = ""
-        if with_rules:
-            if allowed:
-                base += f", except {allowed}"
-                question = f"I read this as: outbound traffic is denied by default except {allowed}. Correct?"
-            else:
-                base += ", with allow rules"
-                question = "Outbound traffic is denied by default with allow rules. Which destinations are allowed?"
+        if len(distinct) > 1:
+            base += ", each with its own exceptions"
+            question = (
+                f"Outbound traffic is denied by default in {_count(len(egress), 'namespace')}, "
+                "each with its own exceptions. Which destinations are allowed?"
+            )
+        elif distinct != {((), False)}:
+            items, other = next(iter(distinct))
+            allowed = _listed(list(items))
+            if other and len(items) <= _MAX_LISTED:
+                allowed = f"{allowed} and other destinations" if allowed else "other destinations"
+            base += f", except {allowed}"
+            question = f"I read this as: outbound traffic is denied by default except {allowed}. Correct?"
         facts.append(
             fact(
                 "network/default-deny-egress",
                 "network",
                 base,
-                _evidence("NetworkPolicy", egress),
+                _evidence("NetworkPolicy", [p for group in egress.values() for p in group]),
                 ("networkpolicies",),
                 unsure_question=question,
             )
@@ -349,7 +406,7 @@ def _exposure_facts(inputs: Inputs) -> list[Fact]:
             fact(
                 f"network/lb/{ref}",
                 "network",
-                f"LoadBalancer service `{ref}` is {'internal-only' if internal else 'public'}",
+                f"LoadBalancer service `{ref}` {'is internal-only' if internal else 'has no internal-only annotation'}",
                 (annotation,) if internal else (f"Service {ref} has type LoadBalancer without an internal annotation",),
                 ("services",),
                 scope="cluster",

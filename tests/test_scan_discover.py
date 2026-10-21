@@ -1,6 +1,6 @@
 """Tests for the platform and organisation facts of the scan."""
 
-from fakes import by_key, gateway, ingressclass, make_inputs, netpol, node, ns, service
+from fakes import by_key, crd, gateway, ingressclass, make_inputs, netpol, node, ns, service
 
 from k8s_servant.scan.discover import network_facts, organisation_facts, platform_facts
 
@@ -243,7 +243,7 @@ def test_a_public_load_balancer_needs_no_question():
     assert "network/ingress-exposure" not in keys
     assert "network/lb/a/c" not in keys
     lb = by_key(facts, "network/lb/a/b")
-    assert lb.statement == "LoadBalancer service `a/b` is public"
+    assert lb.statement == "LoadBalancer service `a/b` has no internal-only annotation"
     assert lb.evidence
 
 
@@ -271,3 +271,47 @@ def test_gateways_list_their_classes():
     assert f.evidence == ("Gateway a/g1", "Gateway a/g2", "Gateway b/g3")
     one = by_key(network_facts(make_inputs(gateways=gws[:1])), "network/gateways")
     assert one.statement == "Gateway API: 1 gateway (istio)"
+
+
+def test_an_allow_all_policy_in_the_same_namespace_cancels_the_deny():
+    deny = netpol("shop", {}, ["Ingress", "Egress"])
+    allow = netpol("shop", {}, ["Ingress", "Egress"], ingress=[{}], egress=[{}], name="allow-all")
+    facts = network_facts(make_inputs(networkpolicies=[deny, allow], namespaces=[ns("shop")]))
+    keys = {f.key for f in facts}
+    assert "network/default-deny-ingress" not in keys
+    assert "network/default-deny-egress" not in keys
+
+
+def test_dns_rule_folds_in_its_peers():
+    dns = {
+        "to": [{"namespaceSelector": {"matchLabels": {"kubernetes.io/metadata.name": "kube-system"}}}],
+        "ports": [{"port": 53, "protocol": "UDP"}, {"port": 53, "protocol": "TCP"}],
+    }
+    pol = netpol("shop", {}, ["Egress"], egress=[dns])
+    f = by_key(network_facts(make_inputs(networkpolicies=[pol])), "network/default-deny-egress")
+    assert f.statement == "Outbound pod traffic is denied by default in 1 namespace, except DNS"
+
+
+def test_unrenderable_peers_become_other_destinations():
+    pol = netpol("shop", {}, ["Egress"], egress=[{"to": [{"podSelector": {"matchLabels": {"app": "db"}}}]}])
+    f = by_key(network_facts(make_inputs(networkpolicies=[pol])), "network/default-deny-egress")
+    assert f.statement.endswith("except other destinations")
+    assert f.certainty == "unsure"
+
+
+def test_namespaces_with_different_exceptions_are_asked():
+    a = netpol("a", {}, ["Egress"], egress=[{"to": [{"ipBlock": {"cidr": "10.0.0.0/8"}}]}])
+    b = netpol("b", {}, ["Egress"], egress=[])
+    f = by_key(network_facts(make_inputs(networkpolicies=[a, b])), "network/default-deny-egress")
+    assert f.statement == "Outbound pod traffic is denied by default in 2 namespaces, each with its own exceptions"
+    assert f.question == (
+        "Outbound traffic is denied by default in 2 namespaces, each with its own exceptions. "
+        "Which destinations are allowed?"
+    )
+
+
+def test_no_policies_is_unsure_when_a_policy_crd_exists():
+    inputs = make_inputs(
+        networkpolicies=[], crds=[crd("cilium.io", "ciliumnetworkpolicies.cilium.io")], **{"cilium-policies": []}
+    )
+    assert by_key(network_facts(inputs), "network/no-network-policies").certainty == "unsure"
