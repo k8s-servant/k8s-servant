@@ -65,6 +65,8 @@ k8s-servant/
 │   ├── report.py                   # The morning report
 │   ├── teams.py                    # Adaptive Cards, posting to the Teams Workflows webhook
 │   ├── scheduler.py                # `serve`: hourly checks + the morning report, heartbeat, SIGTERM
+│   ├── scan/
+│   │   └── facts.py                # Scan facts: evidence, certainty, scope; scan results
 │   └── tools/
 │       ├── registry.py             # Common Tool shape, registry, output size cap
 │       ├── cluster_tools.py        # cluster_problems + warning_events: summaries for large clusters
