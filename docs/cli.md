@@ -25,6 +25,7 @@ k8s-servant [--values FILE ...] [--knowledge-dir DIR] [--log-level LEVEL] COMMAN
   notes              the agent's learned notes
   tools              the tools available right now (MCP or kubectl fallback)
   doctor             check configuration and connectivity, step by step
+  onboard            scan the cluster once and draft its knowledge files for review
 ```
 
 `python -m k8s_servant ...` is the same as `k8s-servant ...`.
@@ -268,6 +269,29 @@ $ k8s-servant --values examples/knowledge-values.yaml --values my-values.yaml do
 
 The exit code is `1` if any check reports FAIL, otherwise `0`. What to do about a
 WARN or FAIL: [troubleshooting.md](troubleshooting.md).
+
+## `onboard`
+
+Scans the cluster once and writes a draft of its knowledge files for you to review:
+what runs there, the network and monitoring setup, and what is normal noise. Every
+statement in the draft carries its evidence, and anything the scan is unsure of
+becomes a `TODO(onboard):` line. In a terminal it first asks whether this cluster is
+representative of your platform, then asks about each doubt and about what it cannot
+see (firewalls, maintenance windows). The scan is read-only: it runs only fixed
+`kubectl get` and `kubectl version` calls (plus GET requests to Prometheus and
+Alertmanager, directly or through the API server's service proxy) and never reads
+Secrets. It never overwrites
+existing files unless you pass `--force`. It prints the paths it wrote on stdout.
+With a model configured, it adds a short overview written from the proven facts only.
+
+| Flag | Meaning |
+|---|---|
+| `--out DIR` | Folder for the draft. Default: `k8s-servant-onboard` |
+| `--format {values,markdown}` | `values` (default): Helm values files (`knowledge-values.yaml` for the platform when representative, `<cluster>.yaml` for this cluster). `markdown`: `environment.md`, `cluster.md` and `settings.env` |
+| `--force` | Overwrite files that already exist |
+| `--no-input` | Ask nothing; every doubt stays a `TODO(onboard):` line |
+| `--no-model` | Do not ask the model for the overview |
+| `--cluster-name NAME` | Cluster name for the draft and the file name. Default: `CLUSTER_NAME`, else `my-cluster` |
 
 ## Exit codes
 
