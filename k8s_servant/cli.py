@@ -624,7 +624,15 @@ async def cmd_onboard(args, config: dict, knowledge, memory: Memory) -> int:
     for path in paths:
         print(path)
     stated = count_statements(facts)
-    todo = sum(text.count("TODO(onboard):") for text in files.values())
+    # A settings question sits in the cluster file and in settings.env: count it once.
+    todo = len(
+        {
+            line.strip().lstrip("#- ").strip()
+            for text in files.values()
+            for line in text.splitlines()
+            if "TODO(onboard):" in line
+        }
+    )
     print(f"{stated} facts, {todo} questions left open (TODO(onboard)). Review the files before use.", file=sys.stderr)
     return 0
 

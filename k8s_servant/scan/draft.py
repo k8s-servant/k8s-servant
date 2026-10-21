@@ -7,7 +7,7 @@ an unsure fact is never stated, only asked as a `TODO(onboard):` line. The optio
 overview at the top is written by the model from proven facts only.
 
 The draft goes to disk either as Helm values files (`knowledge:` and `appConfig:`)
-or as plain Markdown plus a `settings.env`. Cluster text is untrusted: values are
+or as plain Markdown; both formats also write a `settings.env`. Cluster text is untrusted: values are
 written as JSON strings (valid YAML) or shell-quoted, Markdown goes into a literal
 block, and anything placed in a `#` comment is collapsed to one short line so it
 cannot end the comment early.
@@ -253,7 +253,7 @@ def target_names(fmt: str, cluster: str, representative: bool = True) -> list[st
     True it names every file a run could write.
     """
     if fmt == "values":
-        return (["knowledge-values.yaml"] if representative else []) + [_cluster_file(cluster)]
+        return (["knowledge-values.yaml"] if representative else []) + [_cluster_file(cluster), "settings.env"]
     return (["environment.md"] if representative else []) + ["cluster.md", "settings.env"]
 
 
@@ -264,13 +264,30 @@ def _texts(facts: list[Fact], representative: bool, overview: str) -> tuple[str,
     return _clean(environment, block=True), _clean(notes, block=True)
 
 
+def _settings_env(result: ScanResult, settings: list[Setting]) -> str:
+    """The suggested settings as a shell-sourceable `settings.env`, shared by both formats."""
+    env = "".join(f"# {line}\n" for line in header(result))
+    for s in settings:
+        env += f"\n# {_comment(s.reason)}\n"
+        env += "".join(f"# TODO(onboard): {_comment(t)}\n" for t in s.todo)
+        if s.value:
+            env += f"{s.name}={shlex.quote(_clean(s.value))}\n"
+        elif s.placeholder:
+            env += f"# {s.name}=\n"
+    return env
+
+
 def values_files(
     result: ScanResult, facts: list[Fact], settings: list[Setting], representative: bool, overview: str = ""
 ) -> dict[str, str]:
-    """Helm values files: the platform description (when representative) and this cluster."""
+    """Helm values files (platform when representative, this cluster) plus `settings.env`.
+
+    `--values` loads only the knowledge part on a laptop, so the settings are also
+    written for `set -a; source settings.env; set +a`.
+    """
     environment, notes = _texts(facts, representative, overview)
     top = "".join(f"# {line}\n" for line in header(result))
-    platform_name, cluster_name = target_names("values", result.cluster, True)
+    platform_name, cluster_name, _ = target_names("values", result.cluster, True)
     files = {}
     if representative:
         files[platform_name] = top + "knowledge:\n" + _yaml_text("environment", environment)
@@ -285,6 +302,7 @@ def values_files(
     # With only commented-out settings, a bare `appConfig:` would be null, not a mapping.
     app_config = ("appConfig:\n" if any(s.value for s in settings) else "appConfig: {}\n") + config
     files[cluster_name] = top + "knowledge:\n" + _yaml_text("clusterNotes", notes) + app_config
+    files["settings.env"] = _settings_env(result, settings)
     return files
 
 
@@ -307,15 +325,7 @@ def markdown_files(
     if representative:
         files["environment.md"] = top + environment
     files["cluster.md"] = top + notes
-    env = "".join(f"# {line}\n" for line in header(result))
-    for s in settings:
-        env += f"\n# {_comment(s.reason)}\n"
-        env += "".join(f"# TODO(onboard): {_comment(t)}\n" for t in s.todo)
-        if s.value:
-            env += f"{s.name}={shlex.quote(_clean(s.value))}\n"
-        elif s.placeholder:
-            env += f"# {s.name}=\n"
-    files["settings.env"] = env
+    files["settings.env"] = _settings_env(result, settings)
     return files
 
 

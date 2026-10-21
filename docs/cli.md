@@ -287,7 +287,7 @@ With a model configured, it adds a short overview written from the proven facts 
 | Flag | Meaning |
 |---|---|
 | `--out DIR` | Folder for the draft. Default: `k8s-servant-onboard` |
-| `--format {values,markdown}` | `values` (default): Helm values files (`knowledge-values.yaml` for the platform when representative, `<cluster>.yaml` for this cluster). `markdown`: `environment.md`, `cluster.md` and `settings.env` |
+| `--format {values,markdown}` | `values` (default): Helm values files (`knowledge-values.yaml` for the platform when representative, `<cluster>.yaml` for this cluster, plus `settings.env`). `markdown`: `environment.md`, `cluster.md` and `settings.env` |
 | `--force` | Overwrite files that already exist |
 | `--no-input` | Ask nothing; every doubt stays a `TODO(onboard):` line |
 | `--no-model` | Do not ask the model for the overview |

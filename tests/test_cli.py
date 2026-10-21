@@ -449,7 +449,7 @@ def test_onboard_no_input_writes_the_cluster_file_only(monkeypatch, tmp_path, ca
     _fixture_scan(monkeypatch, "aks")
     assert cli.main(["onboard", "--no-input", "--no-model", "--out", str(tmp_path)]) == 0
     out, err = capsys.readouterr()
-    assert out.strip() == str(tmp_path / "my-cluster.yaml")
+    assert out.split() == [str(tmp_path / "my-cluster.yaml"), str(tmp_path / "settings.env")]
     assert "TODO(onboard)" in (tmp_path / "my-cluster.yaml").read_text() and "questions left open" in err
 
 
@@ -487,10 +487,24 @@ def test_onboard_markdown_format(monkeypatch, tmp_path):
     assert {p.name for p in out.iterdir()} == {"cluster.md", "settings.env"}
 
 
+def test_onboard_counts_each_open_question_once(monkeypatch, tmp_path, capsys):
+    _fixture_scan(monkeypatch, "aks")
+    out = tmp_path / "out"
+    assert cli.main(["onboard", "--no-input", "--no-model", "--out", str(out)]) == 0
+    err = capsys.readouterr().err
+    distinct = {
+        line.strip().lstrip("#- ").strip()
+        for path in out.iterdir()
+        for line in path.read_text().splitlines()
+        if "TODO(onboard):" in line
+    }
+    assert distinct and f", {len(distinct)} questions left open" in err
+
+
 def test_onboard_cluster_name_names_the_file(monkeypatch, tmp_path, capsys):
     _fixture_scan(monkeypatch, "kind")
     assert cli.main(["onboard", "--no-input", "--no-model", "--cluster-name", "Prod EU", "--out", str(tmp_path)]) == 0
-    assert capsys.readouterr().out.strip() == str(tmp_path / "prod-eu.yaml")
+    assert capsys.readouterr().out.split() == [str(tmp_path / "prod-eu.yaml"), str(tmp_path / "settings.env")]
     assert 'CLUSTER_NAME: "Prod EU"' in (tmp_path / "prod-eu.yaml").read_text()
 
 
@@ -538,7 +552,11 @@ def test_onboard_asks_when_run_in_a_terminal(monkeypatch, tmp_path, capsys):
     monkeypatch.setattr(sys.stdin, "isatty", lambda: True)
     assert cli.main(["onboard", "--no-model", "--out", str(tmp_path)]) == 0
     out = capsys.readouterr().out
-    assert out.split() == [str(tmp_path / "knowledge-values.yaml"), str(tmp_path / "my-cluster.yaml")]
+    assert out.split() == [
+        str(tmp_path / "knowledge-values.yaml"),
+        str(tmp_path / "my-cluster.yaml"),
+        str(tmp_path / "settings.env"),
+    ]
     assert len(prompts) > 1 and any("outbound traffic" in p for p in prompts)
     assert "TODO(onboard): How does outbound traffic" in (tmp_path / "knowledge-values.yaml").read_text()
 
