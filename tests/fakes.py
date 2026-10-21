@@ -122,3 +122,48 @@ def by_key(facts: list, key: str):
 def node(name: str, labels: dict[str, str] | None = None, provider_id: str = "") -> dict:
     """A Node with labels and an optional `spec.providerID`."""
     return {"metadata": {"name": name, "labels": labels or {}}, "spec": {"providerID": provider_id}}
+
+
+def service(
+    namespace: str,
+    name: str,
+    type: str = "ClusterIP",
+    annotations: dict[str, str] | None = None,
+    ports: list[dict] | None = None,
+    cluster_ip: str | None = None,
+) -> dict:
+    """A Service of a type, with annotations, ports and an optional cluster IP."""
+    spec: dict = {"type": type, "ports": ports or []}
+    if cluster_ip:
+        spec["clusterIP"] = cluster_ip
+    return {"metadata": {"namespace": namespace, "name": name, "annotations": annotations or {}}, "spec": spec}
+
+
+def netpol(
+    namespace: str,
+    pod_selector: dict,
+    types: list[str],
+    ingress: list[dict] | None = None,
+    egress: list[dict] | None = None,
+    name: str = "default-deny",
+) -> dict:
+    """A NetworkPolicy; a rule list of `None` leaves the key out, `[]` sets it empty."""
+    spec: dict = {"podSelector": pod_selector}
+    if types:
+        spec["policyTypes"] = types
+    if ingress is not None:
+        spec["ingress"] = ingress
+    if egress is not None:
+        spec["egress"] = egress
+    return {"metadata": {"namespace": namespace, "name": name}, "spec": spec}
+
+
+def ingressclass(name: str, default: bool = False) -> dict:
+    """An IngressClass, optionally the default one."""
+    annotations = {"ingressclass.kubernetes.io/is-default-class": "true"} if default else {}
+    return {"metadata": {"name": name, "annotations": annotations}}
+
+
+def gateway(namespace: str, name: str, class_name: str) -> dict:
+    """A Gateway API Gateway of a class."""
+    return {"metadata": {"namespace": namespace, "name": name}, "spec": {"gatewayClassName": class_name}}

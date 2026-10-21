@@ -1,8 +1,10 @@
-"""Platform and organisation facts: what the cluster runs on and how it is split up.
+"""Platform, organisation and network facts: what the cluster runs on, how it is split
+up and how traffic is kept in check.
 
 Why: the Kubernetes version, the managed service, the node pools and the namespace
 layout are the first things an environment description states, and all of them can
-be read off the nodes and namespaces without asking anyone. A fact is only made
+be read off the nodes and namespaces without asking anyone. The same holds for
+network policies, load balancers and ingress classes. A fact is only made
 from an input that was actually read; a failed read never becomes a statement.
 """
 
@@ -173,3 +175,239 @@ def organisation_facts(inputs: Inputs, component_namespaces: set[str]) -> list[F
                 )
             )
     return facts
+
+
+_MAX_LISTED = 5
+
+# Annotation -> values that make a LoadBalancer Service internal-only.
+_INTERNAL_LB = (
+    ("service.beta.kubernetes.io/azure-load-balancer-internal", {"true"}),
+    ("service.beta.kubernetes.io/aws-load-balancer-internal", {"true", "1", "yes"}),
+    ("service.beta.kubernetes.io/aws-load-balancer-scheme", {"internal"}),
+    ("networking.gke.io/load-balancer-type", {"internal"}),
+    ("cloud.google.com/load-balancer-type", {"internal"}),
+)
+
+
+def _count(n: int, noun: str, plural: str = "") -> str:
+    """`1 gateway`, `3 gateways`; pass `plural` for irregular nouns."""
+    return f"{n} {noun if n == 1 else plural or noun + 's'}"
+
+
+def _ref(item: dict) -> str:
+    meta = item.get("metadata", {})
+    return f"{meta['namespace']}/{meta.get('name', '')}" if meta.get("namespace") else meta.get("name", "")
+
+
+def _evidence(kind: str, items: list[dict]) -> tuple[str, ...]:
+    """`NetworkPolicy shop/default-deny` per item; long lists end with a count."""
+    shown = tuple(f"{kind} {_ref(i)}" for i in items[:_MAX_LISTED])
+    if len(items) > _MAX_LISTED:
+        shown += (f"and {len(items) - _MAX_LISTED} more",)
+    return shown
+
+
+def _is_default_deny(policy: dict, direction: str) -> bool:
+    """An empty-podSelector policy covering `direction` whose rules (if any) do not allow everything."""
+    spec = policy.get("spec", {})
+    if spec.get("podSelector"):
+        return False
+    # An absent policyTypes means Ingress (and Egress only when egress rules exist).
+    types = spec.get("policyTypes") or ["Ingress"]
+    if direction not in types:
+        return False
+    # A rule without peers and ports allows everything, so the policy denies nothing.
+    return not any(not rule for rule in spec.get(direction.lower()) or [])
+
+
+def _egress_allowed(policies: list[dict]) -> list[str]:
+    """What the egress rules let through: DNS, CIDR blocks and labelled namespaces."""
+    rules = [r for p in policies for r in p["spec"].get("egress") or []]
+    dns = any(str(port.get("port")) == "53" for r in rules for port in r.get("ports") or [])
+    peers = [peer for r in rules for peer in r.get("to") or []]
+    cidrs = [peer["ipBlock"]["cidr"] for peer in peers if peer.get("ipBlock", {}).get("cidr")]
+    labelled = [
+        f"namespaces labelled {k}={v}"
+        for peer in peers
+        for k, v in (peer.get("namespaceSelector", {}).get("matchLabels") or {}).items()
+    ]
+    return list(dict.fromkeys([*(["DNS"] if dns else []), *cidrs, *labelled]))
+
+
+def _listed(items: list[str]) -> str:
+    text = ", ".join(items[:_MAX_LISTED])
+    return text + ", and more" if len(items) > _MAX_LISTED else text
+
+
+def _policy_facts(inputs: Inputs) -> list[Fact]:
+    """Default-deny and missing-policy facts from NetworkPolicies, Calico and Cilium."""
+    if not inputs.ok("networkpolicies"):
+        return []
+    policies = inputs.get("networkpolicies")
+    facts: list[Fact] = []
+    if not policies:
+        # Calico or Cilium may restrict traffic where no NetworkPolicy exists.
+        others = [name for name in ("calico-policies", "cilium-policies") if inputs.get(name) or name in inputs.failed]
+        facts.append(
+            fact(
+                "network/no-network-policies",
+                "network",
+                "No NetworkPolicies: pod traffic inside the cluster is not restricted",
+                ("kubectl get networkpolicies -A",),
+                ("networkpolicies", "calico-policies", "cilium-policies"),
+                unsure_question=(
+                    "No NetworkPolicies, but Calico or Cilium policies may restrict traffic. Which rules apply?"
+                    if others
+                    else ""
+                ),
+            )
+        )
+    for name, label, noun in (
+        ("calico-policies", "Calico", "global network"),
+        ("cilium-policies", "Cilium", "cluster-wide network"),
+    ):
+        items = inputs.get(name)
+        if items:
+            plural = f"{label} {noun} policies"
+            facts.append(
+                fact(
+                    f"network/{name}",
+                    "network",
+                    _count(len(items), f"{label} {noun} policy", plural),
+                    _evidence(f"{label} policy", items),
+                    (name,),
+                )
+            )
+    ingress = [p for p in policies if _is_default_deny(p, "Ingress")]
+    if inputs.ok("namespaces") and ingress:
+        apps = {
+            _ref(n)
+            for n in inputs.get("namespaces")
+            if not _ref(n).startswith("kube-") and _ref(n) not in ("default", "")
+        }
+        covered = [p for p in ingress if p["metadata"].get("namespace") in apps and not p["spec"].get("ingress")]
+        denied = {p["metadata"]["namespace"] for p in covered}
+        if denied:
+            facts.append(
+                fact(
+                    "network/default-deny-ingress",
+                    "network",
+                    f"Inbound pod traffic is denied by default in {len(denied)} of "
+                    f"{_count(len(apps), 'application namespace')}",
+                    _evidence("NetworkPolicy", covered),
+                    ("networkpolicies", "namespaces"),
+                )
+            )
+    egress = [p for p in policies if _is_default_deny(p, "Egress")]
+    if egress:
+        spaces = {p["metadata"].get("namespace", "") for p in egress}
+        base = f"Outbound pod traffic is denied by default in {_count(len(spaces), 'namespace')}"
+        with_rules = [p for p in egress if p["spec"].get("egress")]
+        allowed = _listed(_egress_allowed(with_rules))
+        question = ""
+        if with_rules:
+            if allowed:
+                base += f", except {allowed}"
+                question = f"I read this as: outbound traffic is denied by default except {allowed}. Correct?"
+            else:
+                base += ", with allow rules"
+                question = "Outbound traffic is denied by default with allow rules. Which destinations are allowed?"
+        facts.append(
+            fact(
+                "network/default-deny-egress",
+                "network",
+                base,
+                _evidence("NetworkPolicy", egress),
+                ("networkpolicies",),
+                unsure_question=question,
+            )
+        )
+    return facts
+
+
+def _is_internal(svc: dict) -> tuple[bool, str]:
+    """Whether a LoadBalancer Service is internal-only, with the annotation that says so."""
+    annotations = svc.get("metadata", {}).get("annotations") or {}
+    for key, values in _INTERNAL_LB:
+        if str(annotations.get(key, "")).lower() in values:
+            return True, f"{key}: {annotations[key]}"
+    return False, ""
+
+
+def _exposure_facts(inputs: Inputs) -> list[Fact]:
+    """Facts about LoadBalancer Services and what they imply for inbound traffic."""
+    if not inputs.ok("services"):
+        return []
+    facts: list[Fact] = []
+    balancers = [s for s in inputs.get("services") if s.get("spec", {}).get("type") == "LoadBalancer"]
+    internal_count = 0
+    for svc in balancers:
+        internal, annotation = _is_internal(svc)
+        internal_count += internal
+        ref = _ref(svc)
+        facts.append(
+            fact(
+                f"network/lb/{ref}",
+                "network",
+                f"LoadBalancer service `{ref}` is {'internal-only' if internal else 'public'}",
+                (annotation,) if internal else (f"Service {ref} has type LoadBalancer without an internal annotation",),
+                ("services",),
+                scope="cluster",
+            )
+        )
+    if balancers and internal_count == len(balancers):
+        facts.append(
+            fact(
+                "network/ingress-exposure",
+                "network",
+                "Inbound traffic reaches the cluster only through internal load balancers",
+                tuple(f"Service {_ref(s)}" for s in balancers[:_MAX_LISTED]),
+                ("services",),
+                unsure_question="All load balancers are internal. Is ingress internal only?",
+            )
+        )
+    return facts
+
+
+def _entry_point_facts(inputs: Inputs) -> list[Fact]:
+    """Facts about ingress classes and Gateway API gateways."""
+    facts: list[Fact] = []
+    classes = inputs.get("ingressclasses")
+    if classes:
+        names = [
+            c["metadata"]["name"]
+            + (
+                " (default)"
+                if (c["metadata"].get("annotations") or {}).get("ingressclass.kubernetes.io/is-default-class") == "true"
+                else ""
+            )
+            for c in classes
+        ]
+        facts.append(
+            fact(
+                "network/ingress-classes",
+                "network",
+                f"Ingress classes: {', '.join(names)}",
+                _evidence("IngressClass", classes),
+                ("ingressclasses",),
+            )
+        )
+    gateways = inputs.get("gateways")
+    if gateways:
+        used = sorted({g.get("spec", {}).get("gatewayClassName", "") for g in gateways} - {""})
+        suffix = f" ({', '.join(used)})" if used else ""
+        facts.append(
+            fact(
+                "network/gateways",
+                "network",
+                f"Gateway API: {_count(len(gateways), 'gateway')}{suffix}",
+                _evidence("Gateway", gateways),
+                ("gateways", "gatewayclasses"),
+            )
+        )
+    return facts
+
+
+def network_facts(inputs: Inputs) -> list[Fact]:
+    """Facts about network policies, load balancers, ingress classes and gateways."""
+    return [*_policy_facts(inputs), *_exposure_facts(inputs), *_entry_point_facts(inputs)]

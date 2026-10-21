@@ -1,8 +1,8 @@
 """Tests for the platform and organisation facts of the scan."""
 
-from fakes import by_key, make_inputs, node, ns
+from fakes import by_key, gateway, ingressclass, make_inputs, netpol, node, ns, service
 
-from k8s_servant.scan.discover import organisation_facts, platform_facts
+from k8s_servant.scan.discover import network_facts, organisation_facts, platform_facts
 
 
 def test_aks_node_pools_and_cloud():
@@ -126,3 +126,148 @@ def test_one_pool_name_is_one_fact_even_with_different_labels():
     assert len(pools) == 1
     assert pools[0].statement == "Node pool `x`: 2 nodes"
     assert len(pools[0].evidence) == 2
+
+
+def test_default_deny_ingress_counts_application_namespaces():
+    pols = [netpol("shop", {}, ["Ingress"]), netpol("kube-system", {}, ["Ingress"], name="x")]
+    namespaces = [ns("shop"), ns("blog"), ns("kube-system")]
+    f = by_key(network_facts(make_inputs(networkpolicies=pols, namespaces=namespaces)), "network/default-deny-ingress")
+    assert f.statement == "Inbound pod traffic is denied by default in 1 of 2 application namespaces"
+    assert f.certainty == "seen"
+    assert f.evidence == ("NetworkPolicy shop/default-deny",)
+
+
+def test_policy_types_missing_means_ingress_and_rules_disqualify():
+    deny = netpol("shop", {}, [])
+    open_ = netpol("blog", {}, ["Ingress"], ingress=[{"from": [{"podSelector": {}}]}])
+    facts = network_facts(make_inputs(networkpolicies=[deny, open_], namespaces=[ns("shop"), ns("blog")]))
+    assert by_key(facts, "network/default-deny-ingress").statement.endswith("in 1 of 2 application namespaces")
+
+
+def test_default_deny_egress_with_exceptions_is_asked():
+    pol = netpol(
+        "shop",
+        pod_selector={},
+        types=["Egress"],
+        egress=[{"ports": [{"port": 53, "protocol": "UDP"}]}, {"to": [{"ipBlock": {"cidr": "10.0.0.0/8"}}]}],
+    )
+    f = by_key(
+        network_facts(make_inputs(networkpolicies=[pol], namespaces=[ns("shop")])), "network/default-deny-egress"
+    )
+    assert f.certainty == "unsure"
+    assert f.statement == "Outbound pod traffic is denied by default in 1 namespace, except DNS, 10.0.0.0/8"
+    assert f.question == "I read this as: outbound traffic is denied by default except DNS, 10.0.0.0/8. Correct?"
+
+
+def test_egress_exceptions_include_namespace_labels_and_are_capped():
+    to = [{"ipBlock": {"cidr": f"10.0.{i}.0/24"}} for i in range(6)]
+    to.append({"namespaceSelector": {"matchLabels": {"team": "a"}}})
+    pol = netpol("shop", {}, ["Egress"], egress=[{"to": to}])
+    f = by_key(network_facts(make_inputs(networkpolicies=[pol])), "network/default-deny-egress")
+    assert f.statement.endswith("except 10.0.0.0/24, 10.0.1.0/24, 10.0.2.0/24, 10.0.3.0/24, 10.0.4.0/24, and more")
+    ns_rule = netpol("a", {}, ["Egress"], egress=[{"to": [{"namespaceSelector": {"matchLabels": {"team": "a"}}}]}])
+    g = by_key(network_facts(make_inputs(networkpolicies=[ns_rule])), "network/default-deny-egress")
+    assert g.statement.endswith("except namespaces labelled team=a")
+
+
+def test_deny_all_egress_is_seen():
+    pol = netpol("shop", pod_selector={}, types=["Egress"], egress=[])
+    f = by_key(
+        network_facts(make_inputs(networkpolicies=[pol], namespaces=[ns("shop")])), "network/default-deny-egress"
+    )
+    assert f.certainty == "seen"
+    assert f.statement == "Outbound pod traffic is denied by default in 1 namespace"
+
+
+def test_a_failed_policy_read_makes_no_policy_fact():
+    inputs = make_inputs(failed={"networkpolicies": "Forbidden"}, namespaces=[ns("shop")])
+    assert not [f for f in network_facts(inputs) if f.key.startswith("network/default-deny")]
+    assert "network/no-network-policies" not in {f.key for f in network_facts(inputs)}
+
+
+def test_no_policies_is_seen_when_nothing_else_could_restrict():
+    f = by_key(network_facts(make_inputs(networkpolicies=[])), "network/no-network-policies")
+    assert f.certainty == "seen"
+    assert f.statement == "No NetworkPolicies: pod traffic inside the cluster is not restricted"
+    assert f.evidence
+
+
+def test_no_policies_is_unsure_when_calico_could_not_be_read():
+    inputs = make_inputs(networkpolicies=[], failed={"calico-policies": "RuntimeError: Forbidden"})
+    f = by_key(network_facts(inputs), "network/no-network-policies")
+    assert f.certainty == "unsure"
+    assert f.question == "No NetworkPolicies, but Calico or Cilium policies may restrict traffic. Which rules apply?"
+
+
+def test_calico_and_cilium_policies_are_counted():
+    inputs = make_inputs(
+        networkpolicies=[],
+        **{"calico-policies": [{"metadata": {"name": "a"}}], "cilium-policies": [{"metadata": {"name": "b"}}] * 2},
+    )
+    facts = network_facts(inputs)
+    assert by_key(facts, "network/calico-policies").statement == "1 Calico global network policy"
+    assert by_key(facts, "network/cilium-policies").statement == "2 Cilium cluster-wide network policies"
+    assert by_key(facts, "network/no-network-policies").certainty == "unsure"
+
+
+def test_internal_load_balancers_ask_about_ingress():
+    svc = service(
+        "ingress-nginx",
+        "ingress-nginx-controller",
+        "LoadBalancer",
+        {"service.beta.kubernetes.io/azure-load-balancer-internal": "true"},
+    )
+    facts = {f.key: f for f in network_facts(make_inputs(services=[svc]))}
+    lb = facts["network/lb/ingress-nginx/ingress-nginx-controller"]
+    assert lb.statement == "LoadBalancer service `ingress-nginx/ingress-nginx-controller` is internal-only"
+    assert lb.scope == "cluster"
+    assert lb.evidence == ("service.beta.kubernetes.io/azure-load-balancer-internal: true",)
+    assert facts["network/ingress-exposure"].certainty == "unsure"
+    assert facts["network/ingress-exposure"].question == "All load balancers are internal. Is ingress internal only?"
+
+
+def test_other_clouds_internal_annotations():
+    for key, value in (
+        ("service.beta.kubernetes.io/aws-load-balancer-internal", "true"),
+        ("service.beta.kubernetes.io/aws-load-balancer-scheme", "internal"),
+        ("networking.gke.io/load-balancer-type", "Internal"),
+        ("cloud.google.com/load-balancer-type", "Internal"),
+    ):
+        facts = network_facts(make_inputs(services=[service("a", "b", "LoadBalancer", {key: value})]))
+        assert by_key(facts, "network/lb/a/b").statement.endswith("is internal-only"), key
+
+
+def test_a_public_load_balancer_needs_no_question():
+    facts = network_facts(make_inputs(services=[service("a", "b", "LoadBalancer", {}), service("a", "c")]))
+    keys = {f.key for f in facts}
+    assert "network/ingress-exposure" not in keys
+    assert "network/lb/a/c" not in keys
+    lb = by_key(facts, "network/lb/a/b")
+    assert lb.statement == "LoadBalancer service `a/b` is public"
+    assert lb.evidence
+
+
+def test_a_mix_of_load_balancers_needs_no_question():
+    internal = {"service.beta.kubernetes.io/azure-load-balancer-internal": "true"}
+    svcs = [service("a", "x", "LoadBalancer", internal), service("a", "y", "LoadBalancer", {})]
+    assert "network/ingress-exposure" not in {f.key for f in network_facts(make_inputs(services=svcs))}
+
+
+def test_failed_services_make_no_load_balancer_facts():
+    assert network_facts(make_inputs(failed={"services": "Forbidden"})) == []
+
+
+def test_ingress_classes_name_the_default():
+    classes = [ingressclass("nginx", default=True), ingressclass("internal")]
+    f = by_key(network_facts(make_inputs(ingressclasses=classes)), "network/ingress-classes")
+    assert f.statement == "Ingress classes: nginx (default), internal"
+    assert f.evidence == ("IngressClass nginx", "IngressClass internal")
+
+
+def test_gateways_list_their_classes():
+    gws = [gateway("a", "g1", "istio"), gateway("a", "g2", "istio"), gateway("b", "g3", "nginx")]
+    f = by_key(network_facts(make_inputs(gateways=gws, gatewayclasses=[])), "network/gateways")
+    assert f.statement == "Gateway API: 3 gateways (istio, nginx)"
+    assert f.evidence == ("Gateway a/g1", "Gateway a/g2", "Gateway b/g3")
+    one = by_key(network_facts(make_inputs(gateways=gws[:1])), "network/gateways")
+    assert one.statement == "Gateway API: 1 gateway (istio)"
