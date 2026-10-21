@@ -1,6 +1,6 @@
 import re
 
-from fakes import by_key, crd, daemonset, deploy, make_inputs
+from fakes import by_key, crd, daemonset, deploy, make_inputs, statefulset
 
 from k8s_servant.scan.catalog import CATALOG, component_facts
 
@@ -87,3 +87,78 @@ def test_evidence_has_at_most_three_items_and_namespaces_are_joined():
     )
     f = by_key(facts, "component/kyverno")
     assert len(f.evidence) <= 3 and "`a, b, c`" in f.statement and namespaces == {"a", "b", "c"}
+
+
+def _keys(facts):
+    return {f.key: f for f in facts}
+
+
+def test_plain_cilium_with_envoy_never_gives_a_seen_mesh_fact():
+    facts, _ = component_facts(
+        make_inputs(daemonsets=[daemonset("kube-system", "cilium"), daemonset("kube-system", "cilium-envoy")])
+    )
+    mesh = _keys(facts)["component/cilium-mesh"]
+    assert mesh.certainty == "unsure" and mesh.question.startswith("Cilium Envoy runs.")
+    assert _keys(facts)["component/cilium"].certainty == "seen"
+
+
+def test_an_otel_operator_alone_is_not_a_collector():
+    facts, _ = component_facts(
+        make_inputs(
+            crds=[crd("opentelemetry.io")],
+            deployments=[deploy("otel", "opentelemetry-operator-controller-manager")],
+        )
+    )
+    assert "component/opentelemetry-collector" not in _keys(facts)
+    assert _keys(facts)["component/opentelemetry-operator"].certainty == "seen"
+
+
+def test_a_collector_without_crds_is_seen():
+    facts, _ = component_facts(make_inputs(deployments=[deploy("obs", "otel-collector")]))
+    assert _keys(facts)["component/opentelemetry-collector"].certainty == "seen"
+
+
+def test_alertmanager_bridges_are_not_alertmanager():
+    facts, _ = component_facts(
+        make_inputs(deployments=[deploy("obs", "alertmanager-webhook-teams"), deploy("obs", "alertmanager-bot")])
+    )
+    assert "component/alertmanager" not in _keys(facts)
+
+
+def test_real_alertmanager_names_match():
+    for name in ("alertmanager-main", "alertmanager-kps-alertmanager", "prometheus-alertmanager", "alertmanager"):
+        facts, _ = component_facts(make_inputs(statefulsets=[statefulset("obs", name)]))
+        assert _keys(facts)["component/alertmanager"].certainty == "seen", name
+
+
+def test_loki_promtail_is_a_log_shipper_not_loki():
+    facts, _ = component_facts(make_inputs(daemonsets=[daemonset("obs", "loki-promtail")]))
+    assert "component/loki" not in _keys(facts)
+    assert _keys(facts)["component/log-shipper"].certainty == "seen"
+
+
+def test_alloy_is_not_a_log_shipper():
+    facts, _ = component_facts(make_inputs(daemonsets=[daemonset("obs", "alloy")]))
+    assert "component/log-shipper" not in _keys(facts)
+    assert _keys(facts)["component/alloy"].certainty == "seen"
+
+
+def test_unreadable_crds_do_not_make_a_running_controller_unsure():
+    facts, _ = component_facts(
+        make_inputs(
+            failed={"crds": "Forbidden"},
+            deployments=[deploy("kyverno", "kyverno-admission-controller")],
+        )
+    )
+    assert _keys(facts)["component/kyverno"].certainty == "seen"
+
+
+def test_unreadable_workloads_do_not_make_crds_a_leftover():
+    facts, _ = component_facts(
+        make_inputs(
+            failed={"deployments": "Forbidden"},
+            crds=[crd("kyverno.io")],
+            namespaces=[{"metadata": {"name": "velero"}}],
+        )
+    )
+    assert facts == []

@@ -30,10 +30,15 @@ class Component:
     workloads: tuple[str, ...] = ()  # regexes, full match on Deployment/DaemonSet/StatefulSet names
     webhooks: tuple[str, ...] = ()  # regexes, full match on webhook configuration names
     namespaces: tuple[str, ...] = ()  # exact names its charts install into by default
+    # Set when the workloads alone do not prove the component is used: running then
+    # only raises this question, never a plain statement.
+    only_ask: str = ""
 
 
-def _c(key, name, topic, role, *, crds=(), workloads=(), webhooks=(), namespaces=()):
-    return Component(key, name, topic, role, tuple(crds), tuple(workloads), tuple(webhooks), tuple(namespaces))
+def _c(key, name, topic, role, *, crds=(), workloads=(), webhooks=(), namespaces=(), only_ask=""):
+    return Component(
+        key, name, topic, role, tuple(crds), tuple(workloads), tuple(webhooks), tuple(namespaces), only_ask
+    )
 
 
 # A row declares crds/webhooks only when its install always has them: a running
@@ -57,7 +62,7 @@ CATALOG: tuple[Component, ...] = (
     _c("istio", "Istio", "mesh", "service mesh", crds=("networking.istio.io", "security.istio.io", "telemetry.istio.io"), workloads=(r"istiod(-.+)?",), webhooks=("istio-sidecar-injector.*", "istio-revision-tag-.+", "istiod-.+"), namespaces=("istio-system",)),
     _c("linkerd", "Linkerd", "mesh", "service mesh", crds=("linkerd.io", "policy.linkerd.io"), workloads=("linkerd-destination", "linkerd-identity", "linkerd-proxy-injector"), webhooks=(r"linkerd-.+-webhook-config",), namespaces=("linkerd",)),
     _c("consul", "Consul", "mesh", "service mesh", crds=("consul.hashicorp.com",), workloads=(r"(.+-)?consul-(server|client|connect-injector(-webhook-deployment)?)", r"(.+-)?consul-webhook-cert-manager"), webhooks=(r".*consul-connect-injector.*",), namespaces=("consul",)),
-    _c("cilium-mesh", "Cilium service mesh", "mesh", "service mesh", workloads=("cilium-envoy", "clustermesh-apiserver")),
+    _c("cilium-mesh", "Cilium service mesh", "mesh", "service mesh", workloads=("cilium-envoy",), only_ask="Cilium Envoy runs. Do you use Cilium's service mesh features?"),
     _c("istio-egress-gateway", "Istio egress gateway", "mesh", "controlled outbound traffic", workloads=("istio-egress.*",)),
     _c("external-secrets", "External Secrets Operator", "secrets", "secret sync from an external store", crds=("external-secrets.io",), workloads=(r"(.+-)?external-secrets(-webhook|-cert-controller)?",), namespaces=("external-secrets",)),
     _c("secrets-store-csi", "Secrets Store CSI Driver", "secrets", "mounts external secrets as volumes", crds=("secrets-store.csi.x-k8s.io",), workloads=(r".*secrets-store-csi-driver", "csi-secrets-store")),
@@ -69,11 +74,13 @@ CATALOG: tuple[Component, ...] = (
     _c("vault-injector", "Vault Agent Injector", "secrets", "secret injection by sidecar", workloads=(r"(.+-)?(vault-)?agent-injector",)),
     _c("prometheus-operator", "Prometheus Operator", "monitoring", "runs Prometheus and Alertmanager", crds=("monitoring.coreos.com",), workloads=(r".*prometheus(-stack)?-operator", "prometheus-operator.*", r".*kube-prom-operator")),
     _c("prometheus", "Prometheus", "monitoring", "metrics store", workloads=(r"(.+-)?prometheus-server", "prometheus-.+-prometheus", "prometheus(-k8s)?")),
-    _c("alertmanager", "Alertmanager", "monitoring", "alert routing", workloads=(r"(.+-)?alertmanager(-.+)?",)),
+    _c("alertmanager", "Alertmanager", "monitoring", "alert routing", workloads=(r"alertmanager|alertmanager-main|.+-alertmanager",)),
     _c("grafana", "Grafana", "monitoring", "dashboards", workloads=(r"(.+-)?grafana",)),
-    _c("loki", "Loki", "monitoring", "log store", workloads=(r"(.+-)?loki(-.+)?",)),
-    _c("log-shipper", "Log shipper", "monitoring", "ships logs to a store", workloads=(r"(.+-)?(alloy|promtail|fluent-?bit)(-.+)?",)),
-    _c("opentelemetry-collector", "OpenTelemetry Collector", "monitoring", "telemetry pipeline", crds=("opentelemetry.io",), workloads=(r"(.+-)?(opentelemetry-collector|otel-collector)(-.+)?", r"(.+-)?opentelemetry-operator(-controller-manager)?")),
+    _c("loki", "Loki", "monitoring", "log store", workloads=(r"loki|loki-(read|write|backend|gateway|distributor|ingester|querier|query-frontend|compactor|index-gateway|canary)|.+-loki",)),
+    _c("alloy", "Grafana Alloy", "monitoring", "telemetry collector", workloads=(r"(.+-)?alloy(-.+)?",)),
+    _c("log-shipper", "Log shipper", "monitoring", "ships logs to a store", workloads=(r"(.+-)?(promtail|fluent-?bit|fluentd|vector)(-.+)?",)),
+    _c("opentelemetry-collector", "OpenTelemetry Collector", "monitoring", "telemetry pipeline", workloads=(r"(.+-)?(opentelemetry-collector|otel-collector)(-.+)?",)),
+    _c("opentelemetry-operator", "OpenTelemetry Operator", "monitoring", "manages collectors", crds=("opentelemetry.io",), workloads=(r"(.+-)?opentelemetry-operator(-controller-manager)?",)),
     _c("calico", "Calico", "network", "CNI and network policy", crds=("crd.projectcalico.org", "projectcalico.org"), workloads=("calico-node", "calico-kube-controllers", "calico-typha", "tigera-operator"), namespaces=("calico-system", "tigera-operator")),
     _c("cilium", "Cilium", "network", "CNI and network policy", workloads=("cilium", r"cilium-operator(-.+)?", "anetd")),
     _c("azure-cni", "Azure CNI", "network", "CNI", workloads=(r"azure-cns(-.+)?", r"azure-cni-.+")),
@@ -143,9 +150,15 @@ def _judge(inputs: Inputs, component: Component) -> tuple[Fact | None, set[str]]
     evidence = tuple((api[:1] + [e for _, e in running] + api[1:])[:_MAX_EVIDENCE])
     key, name = f"component/{component.key}", component.name
     question = ""
-    if running and (api or not (component.crd_groups or component.webhooks)):
+    # An unreadable input cannot show absence: skip the questions that rest on it.
+    crds_unread = "crds" in inputs.failed
+    workloads_unread = any(i in inputs.failed for i, _, _ in _WORKLOAD_INPUTS)
+    if running and component.only_ask:
+        statement = f"{name} workloads run in namespace `{', '.join(sorted(running_namespaces))}`"
+        question = component.only_ask
+    elif running and (api or crds_unread or not (component.crd_groups or component.webhooks)):
         statement = f"{name} ({component.role}) runs in namespace `{', '.join(sorted(running_namespaces))}`"
-    elif api:
+    elif api and not workloads_unread:
         statement = f"{name} CRDs or webhooks are installed"
         question = (
             f"{name} CRDs or webhooks are installed but no {name} controller is running. Left over from an uninstall?"
@@ -157,7 +170,7 @@ def _judge(inputs: Inputs, component: Component) -> tuple[Fact | None, set[str]]
         existing = sorted(
             {n.get("metadata", {}).get("name", "") for n in inputs.get("namespaces")} & set(component.namespaces)
         )
-        if not existing:
+        if not existing or workloads_unread:
             return None, running_namespaces
         statement = f"Namespace `{existing[0]}` exists"
         evidence = (f"Namespace {existing[0]}",)
