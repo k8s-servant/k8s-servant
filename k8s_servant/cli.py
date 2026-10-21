@@ -32,6 +32,7 @@ import signal
 import sqlite3
 import sys
 import time
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -58,6 +59,7 @@ from k8s_servant.scan.draft import (
     write_files,
     write_overview,
 )
+from k8s_servant.scan.drift import load_scan, rescan
 from k8s_servant.scan.facts import apply_scope
 from k8s_servant.scan.questions import BLIND_SPOTS, ask_representative, confirm, stop_at_eof, terminal_ask
 from k8s_servant.scheduler import Scheduler
@@ -121,6 +123,11 @@ def build_parser() -> argparse.ArgumentParser:
     onboard.add_argument("--force", action="store_true", help="Overwrite files that already exist.")
     onboard.add_argument("--no-input", action="store_true", help="Ask nothing; open questions stay TODO lines.")
     onboard.add_argument("--no-model", action="store_true", help="Do not ask the model for an overview.")
+    onboard.add_argument(
+        "--show",
+        action="store_true",
+        help="Print the cluster values file from the stored scan; no scan, no questions, no model.",
+    )
     onboard.add_argument("--cluster-name", metavar="NAME", help="Cluster name for the draft (default CLUSTER_NAME).")
     return parser
 
@@ -205,6 +212,15 @@ async def check_and_post(
     return result
 
 
+def _kubectl_fetch(config: dict):
+    """The scan's reader: kubectl_json with the configured binary and timeout."""
+
+    def fetch(kubectl_args: list[str]):
+        return kubectl_json(kubectl_args, config["kubectl_path"], config["kubectl_timeout_seconds"])
+
+    return fetch
+
+
 async def report_and_post(config: dict, knowledge, memory: Memory, chat, post: bool) -> MorningReport:
     """The morning report in a fresh session, posted to Teams when `post` (unless mode is off).
 
@@ -220,7 +236,14 @@ async def report_and_post(config: dict, knowledge, memory: Memory, chat, post: b
         or overview: the report then says what failed.
     """
     async with open_agent(config, knowledge, memory, chat=chat) as session:
-        report = await build_morning_report(session, memory, config)
+        scanner = None
+        if config["scan_before_report"]:
+            fetch = _kubectl_fetch(config)
+
+            async def scanner():
+                return await rescan(fetch, config, memory)
+
+        report = await build_morning_report(session, memory, config, scanner=scanner)
     if post:
         await _post(
             config,
@@ -532,8 +555,32 @@ async def _overview(config: dict, facts) -> str:
         return ""
 
 
+def _show_stored_scan(config: dict, memory: Memory) -> int:
+    """Print the cluster values file for the stored scan (the one the morning report keeps current)."""
+    stored = load_scan(memory)
+    if stored is not None and stored.cluster == "unknown-cluster":
+        stored = replace(stored, cluster="my-cluster")  # the unset default: same placeholder as cmd_onboard
+    if stored is None:
+        print(
+            "No stored scan yet: the agent stores one before each morning report (SCAN_BEFORE_REPORT).", file=sys.stderr
+        )
+        return 1
+    facts = apply_scope(stored.facts, False)  # platform facts belong in this cluster's file too
+    settings = suggested_settings(facts, config, stored.cluster)
+    files = values_files(stored, facts, settings, False)
+    print(files[target_names("values", stored.cluster, False)[0]], end="")
+    return 0
+
+
 async def cmd_onboard(args, config: dict, knowledge, memory: Memory) -> int:
     """Scan the cluster once, ask about what is unsure, and write the draft files."""
+    if args.show:
+        if (args.format, args.out, args.cluster_name) != ("values", "k8s-servant-onboard", None) or (
+            args.force or args.no_input or args.no_model
+        ):
+            print("--show prints the stored scan; it takes no other options.", file=sys.stderr)
+            return 2
+        return _show_stored_scan(config, memory)
     configured = config["cluster_name"]
     cluster = args.cluster_name or (configured if configured and configured != "unknown-cluster" else "my-cluster")
     out = Path(args.out)
@@ -546,10 +593,7 @@ async def cmd_onboard(args, config: dict, knowledge, memory: Memory) -> int:
             print(exc, file=sys.stderr)
             return 1
 
-    def fetch(kubectl_args: list[str]):
-        return kubectl_json(kubectl_args, config["kubectl_path"], config["kubectl_timeout_seconds"])
-
-    result = await scan(fetch, config, cluster, memory)
+    result = await scan(_kubectl_fetch(config), config, cluster, memory)
     if not result.ok:
         first = next(iter(result.failed.items()), ("cluster", "nothing could be read"))
         print(f"Could not read the cluster: {first[0]}: {first[1]}", file=sys.stderr)

@@ -9,6 +9,8 @@ from k8s_servant.findings import Finding
 from k8s_servant.memory import Memory
 from k8s_servant.report import build_morning_report, format_age, local_date, report_due
 from k8s_servant.runtime import Session
+from k8s_servant.scan.drift import ScanChanges
+from k8s_servant.scan.facts import Fact
 from k8s_servant.tools.registry import ToolRegistry
 
 MONDAY_0800_VILNIUS = datetime(2026, 10, 12, 5, 0, tzinfo=UTC)  # Vilnius is UTC+3 (summer time) on this date
@@ -283,3 +285,53 @@ async def test_morning_report_tells_the_story_of_the_night(tmp_path):
     overview_request = chat.calls[-1]["turns"]
     assert "since the previous report" in overview_request[0].content
     assert "blip at 02:00" in overview_request[1].content
+
+
+def _seen(key, statement):
+    return Fact(key, "components", statement, ("seen",), "seen", "cluster", ("namespaces",))
+
+
+def _returns(changes):
+    async def scanner():
+        return changes
+
+    return scanner
+
+
+def _quiet_chat():
+    return ScriptedChat(answer(findings_answer("ok", [])), answer("Quiet."))
+
+
+async def test_morning_report_includes_the_scan_changes(tmp_path):
+    changes = ScanChanges(
+        added=[_seen("component/flux", "Flux (GitOps) runs in namespace `flux-system`")],
+        removed=[],
+        changed=[],
+        not_checked={},
+    )
+    report = await build_morning_report(
+        _session(_quiet_chat()),
+        Memory(tmp_path),
+        configure_app({"CLUSTER_NAME": "my-cluster"}),
+        clock=lambda: MONDAY_0800_VILNIUS,
+        scanner=_returns(changes),
+    )
+    assert ("Since the last scan", "1 added, 0 removed, 0 changed") in report.facts()
+    assert "## Since the last scan\n\n- Added: Flux (GitOps) runs in namespace `flux-system`" in report.report_md
+
+
+async def test_a_failing_scanner_does_not_stop_the_report(tmp_path):
+    async def boom():
+        raise RuntimeError("x")
+
+    report = await build_morning_report(
+        _session(_quiet_chat()), Memory(tmp_path), configure_app({}), clock=lambda: MONDAY_0800_VILNIUS, scanner=boom
+    )
+    assert ("Since the last scan", "failed: RuntimeError") in report.facts()
+
+
+async def test_no_scanner_no_section(tmp_path):
+    report = await build_morning_report(
+        _session(_quiet_chat()), Memory(tmp_path), configure_app({}), clock=lambda: MONDAY_0800_VILNIUS
+    )
+    assert "Since the last scan" not in report.report_md

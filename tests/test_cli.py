@@ -1,10 +1,16 @@
+import asyncio
 import os
 import sys
 
 import pytest
-from fakes import ScriptedChat, answer, findings_answer
+import yaml
+from fakes import ScriptedChat, answer, findings_answer, fixture_fetch
 
 from k8s_servant import cli
+from k8s_servant.config import configure_app
+from k8s_servant.memory import Memory
+from k8s_servant.scan import scan
+from k8s_servant.scan.drift import load_scan, save_scan
 
 ENV_VARS = (
     "LLM_PROVIDER",
@@ -25,6 +31,7 @@ ENV_VARS = (
     "HEARTBEAT_FILE",
     "CHECK_SKIP_UNCHANGED",
     "CHECK_FULL_INTERVAL_HOURS",
+    "SCAN_BEFORE_REPORT",
     "TOOL_OUTPUT_MAX_CHARS",
 )
 
@@ -368,8 +375,6 @@ def test_check_model_error_inside_mcp_session_is_explained_not_a_traceback(scrip
 
 
 def test_scheduled_checks_skip_the_model_when_nothing_changed(scripted_model):
-    import asyncio
-
     from k8s_servant.config import configure_app
     from k8s_servant.knowledge import Knowledge
     from k8s_servant.memory import Memory
@@ -391,7 +396,6 @@ def test_scheduled_check_logs_the_redacted_model_error_not_the_provider_body(
     scripted_model, monkeypatch, caplog, capsys
 ):
     # OpenAI echoes the key in its 401 body; serve mode must not put it in the pod log.
-    import asyncio
     import logging
 
     import httpx2
@@ -644,3 +648,50 @@ def test_onboard_end_of_input_stops_the_questions(monkeypatch, tmp_path):
     monkeypatch.setattr(sys.stdin, "isatty", lambda: True)
     assert cli.main(["onboard", "--no-model", "--out", str(tmp_path / "out")]) == 0
     assert len(prompts) == 1 and "representative" in prompts[0]
+
+
+def test_onboard_show_prints_the_stored_scan(monkeypatch, capsys):
+    memory = Memory(configure_app()["data_dir"])
+    save_scan(memory, asyncio.run(scan(fixture_fetch("aks"), configure_app(), "my-cluster", memory)))
+    assert cli.main(["onboard", "--show"]) == 0
+    notes = yaml.safe_load(capsys.readouterr().out)["knowledge"]["clusterNotes"]
+    assert "Managed service: AKS" in notes  # a platform-default fact is still shown
+
+
+@pytest.mark.parametrize(
+    "extra",
+    [["--format", "markdown"], ["--out", "x"], ["--cluster-name", "c"], ["--force"], ["--no-input"], ["--no-model"]],
+)
+def test_onboard_show_takes_no_other_options(extra, capsys):
+    assert cli.main(["onboard", "--show", *extra]) == 2
+    assert "--show prints the stored scan; it takes no other options." in capsys.readouterr().err
+
+
+def test_onboard_show_uses_the_placeholder_for_an_unset_cluster_name(capsys):
+    memory = Memory(configure_app()["data_dir"])
+    save_scan(memory, asyncio.run(scan(fixture_fetch("aks"), configure_app(), "unknown-cluster", memory)))
+    assert cli.main(["onboard", "--show"]) == 0
+    out = capsys.readouterr().out
+    assert "TODO(onboard): Set the real cluster name." in out and "unknown-cluster" not in out
+
+
+def test_onboard_show_without_a_stored_scan(capsys):
+    assert cli.main(["onboard", "--show"]) == 1
+    assert "No stored scan yet" in capsys.readouterr().err
+
+
+def test_report_rescans_before_reporting(scripted_model, monkeypatch, capsys):
+    monkeypatch.setattr(cli, "_kubectl_fetch", lambda config: fixture_fetch("aks"))
+    scripted_model(answer(findings_answer("Fine.", [])), answer("Calm."))
+    assert cli.main(["report"]) == 0
+    assert "- Since the last scan: First scan recorded" in capsys.readouterr().out
+    assert load_scan(Memory(configure_app()["data_dir"])) is not None
+
+
+def test_report_without_scan_before_report(scripted_model, monkeypatch, capsys):
+    monkeypatch.setattr(cli, "_kubectl_fetch", lambda config: fixture_fetch("aks"))
+    monkeypatch.setenv("SCAN_BEFORE_REPORT", "false")
+    scripted_model(answer(findings_answer("Fine.", [])), answer("Calm."))
+    assert cli.main(["report"]) == 0
+    assert "Since the last scan" not in capsys.readouterr().out
+    assert load_scan(Memory(configure_app()["data_dir"])) is None

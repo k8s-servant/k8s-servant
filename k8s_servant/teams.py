@@ -218,6 +218,12 @@ def morning_card(cluster_name: str, report: MorningReport) -> dict:
             ),
         )
         limit = max_items or 15
+        if report.scan_changes is not None:
+            lines = report.scan_changes.lines()
+            shown = [_text(_cut(line, 300)) for line in lines[:limit]]
+            if len(lines) > limit:
+                shown.append(_text(f"… and {len(lines) - limit} more (see the report)", isSubtle=True))
+            body += _section("Since the last scan", shown)
         body += _section("Alerts firing now", [_text(_cut(line, 300)) for line in report.alert_lines()[:limit]])
         body += _section(
             "Alerts that fired overnight and stopped",

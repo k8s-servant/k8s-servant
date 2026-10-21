@@ -560,3 +560,15 @@ def test_version_and_fingerprints_are_cleaned():
     findings = [StoredFinding("f/`x`", "warning", "t", "", NOW - timedelta(days=5), NOW, "open", None)]
     (f,) = noise_facts(make_inputs(), configure_app({}), {}, None, findings, NOW)
     assert "`" not in f.key and "`" not in f.evidence[0]
+
+
+def test_facts_built_from_component_namespaces_declare_the_catalog_inputs():
+    from k8s_servant.scan.catalog import CATALOG_INPUTS
+
+    names = [ns("kube-system"), *[ns(f"app{i}") for i in range(4)]]
+    inputs = make_inputs(networkpolicies=[netpol("app0", {}, ["Ingress"])], namespaces=names)
+    org = by_key(organisation_facts(inputs, set()), "organisation/namespaces")
+    deny = by_key(network_facts(inputs), "network/default-deny-ingress")
+    none = by_key(network_facts(make_inputs(networkpolicies=[])), "network/no-network-policies")
+    for f in (org, deny, none):
+        assert set(CATALOG_INPUTS) <= set(f.inputs), f.key
