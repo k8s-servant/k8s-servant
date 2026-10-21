@@ -281,7 +281,7 @@ see (firewalls, maintenance windows). The scan is read-only: it runs only fixed
 `kubectl get` and `kubectl version` calls (plus GET requests to Prometheus and
 Alertmanager, directly or through the API server's service proxy) and never reads
 Secrets. It never overwrites
-existing files unless you pass `--force`. It prints the paths it wrote on stdout.
+existing files (`settings.env` included) unless you pass `--force`. It prints the paths it wrote on stdout.
 With a model configured, it adds a short overview written from the proven facts only.
 The full guide, with an example draft: [onboarding.md](onboarding.md).
 

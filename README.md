@@ -202,9 +202,10 @@ k8s-servant onboard
 
 It scans the cluster once (read-only, never Secrets), asks whether this cluster is
 representative of your platform, asks about what it is unsure of and what it cannot
-see (firewalls, maintenance windows), and writes two Helm values files to
-`k8s-servant-onboard/`: `knowledge-values.yaml` (the platform) and `<cluster>.yaml`
-(this cluster and the suggested settings). Every line carries its evidence or says it
+see (firewalls, maintenance windows), and writes up to two Helm values files plus a
+`settings.env` to `k8s-servant-onboard/`: `knowledge-values.yaml` (the platform, only
+when the cluster is representative), `<cluster>.yaml` (this cluster and the suggested
+settings) and `settings.env` (the same settings, for your shell). Every line carries its evidence or says it
 came from you; open points are `TODO(onboard):` lines. It never overwrites a file
 without `--force`. Review the files, then pass them to Helm. In the cluster the agent
 re-scans before each morning report and lists what changed since.

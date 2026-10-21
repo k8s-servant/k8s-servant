@@ -94,14 +94,15 @@ Draft the cluster's knowledge files before you install, from a laptop whose `kub
 points at the cluster:
 
 ```bash
-k8s-servant onboard                 # writes k8s-servant-onboard/knowledge-values.yaml and <cluster>.yaml
+k8s-servant onboard                 # writes k8s-servant-onboard/: up to two values files plus settings.env
 ```
 
 The scan is read-only and never reads Secrets. Review the draft (every
 `TODO(onboard):` line), then use the files as the values in
-[step 3](#3-values-for-the-cluster): `knowledge-values.yaml` is the platform
-description shared by every cluster, `<cluster>.yaml` holds this cluster's notes and
-suggested `appConfig` settings. The full guide: [onboarding.md](onboarding.md).
+[step 3](#3-values-for-the-cluster): `knowledge-values.yaml` (written only when you
+say the cluster is representative) is the platform description shared by every
+cluster, `<cluster>.yaml` holds this cluster's notes and suggested `appConfig`
+settings. `settings.env` repeats those settings for the CLI on your laptop. The full guide: [onboarding.md](onboarding.md).
 
 Once installed, the agent re-scans before each morning report and lists what changed
 since the last scan. To take a fresh draft from the running pod:

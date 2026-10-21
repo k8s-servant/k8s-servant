@@ -14,8 +14,8 @@ evidence instead of an empty page.
     never from model or human text.
 - **No Secrets.** It never asks for Secrets, the same rule as the rest of the agent
     ([security.md](security.md)).
-- **No files overwritten.** If a file it would write already exists, it stops before
-    the scan and names the file. `--force` overwrites, and replaces a symlink rather than
+- **No files overwritten.** If a file it would write already exists (`settings.env`
+    included), it stops before the scan and names the file. `--force` overwrites, and replaces a symlink rather than
     writing through it.
 - **Nothing unproven stated.** A line in the draft is either a fact with its evidence,
     a fact a human confirmed, an answer from the team, or an open question. The scan
@@ -67,15 +67,18 @@ At the end it prints the files it wrote:
 ```
 k8s-servant-onboard/knowledge-values.yaml
 k8s-servant-onboard/my-cluster.yaml
+k8s-servant-onboard/settings.env
 ```
 
 | File | Holds | Written |
 |---|---|---|
 | `knowledge-values.yaml` | `knowledge.environment`: the platform description | Only when the cluster is representative |
 | `<cluster>.yaml` | `knowledge.clusterNotes`, and `appConfig` with the suggested settings | Always |
+| `settings.env` | The same suggested settings, as `NAME=value` lines for your shell | Always |
 
-With `--format markdown` the same content goes to `environment.md`, `cluster.md` (for
-`KNOWLEDGE_DIR`) and `settings.env`.
+With `--format markdown` the knowledge goes to `environment.md` (only when
+representative) and `cluster.md` instead, for `KNOWLEDGE_DIR`; `settings.env` is the
+same in both formats.
 
 ## Reviewing the draft
 
@@ -149,24 +152,24 @@ Then use the files:
     Both the `knowledge` and the `appConfig` parts apply.
 - **On a laptop:** `k8s-servant --values knowledge-values.yaml --values my-cluster.yaml ...`
     loads only the knowledge part, because settings come only from environment
-    variables ([configuration.md](configuration.md)). For the settings, run with
-    `--format markdown` and load `settings.env` into your shell with
-    `set -a; source settings.env; set +a`, or copy the `appConfig` lines into your
-    `.env`.
+    variables ([configuration.md](configuration.md)). Load the settings from the
+    `settings.env` the draft wrote next to it:
+    `set -a; source k8s-servant-onboard/settings.env; set +a`.
 
 ## Flags
 
 | Flag | Meaning |
 |---|---|
 | `--out DIR` | Folder for the draft. Default: `k8s-servant-onboard` |
-| `--format {values,markdown}` | `values` (default): Helm values files. `markdown`: `environment.md`, `cluster.md` and `settings.env` |
-| `--force` | Overwrite files that already exist (a symlink is replaced, never written through) |
+| `--format {values,markdown}` | `values` (default): Helm values files plus `settings.env`. `markdown`: `environment.md`, `cluster.md` and `settings.env` |
+| `--force` | Overwrite files that already exist, `settings.env` included (a symlink is replaced, never written through) |
 | `--no-input` | Ask nothing. Everything goes into the cluster file and every doubt stays a `TODO(onboard):` line |
 | `--no-model` | Do not ask the model for the overview. No model call, no tokens |
 | `--cluster-name NAME` | Cluster name for the draft and the file name. Default: `CLUSTER_NAME`, else `my-cluster` |
 | `--show` | Print the cluster values file from the last stored scan; no scan, no questions, no model. Takes no other option ([in the cluster](#taking-the-draft-from-the-pod)) |
 
-Exit codes: `0` when the files were written, `1` when a file already exists, the
+Exit codes: `0` when the files were written, `1` when a file already exists (any of
+the draft files, `settings.env` included), the
 cluster could not be read or the folder could not be written (and for `--show` without
 a stored scan), `2` when `--show` is combined with another option.
 
@@ -256,6 +259,13 @@ Each change comes with what to do about it:
 - Changed: Node pool `user`: 2 nodes, 2× Standard_D8s_v5 → Node pool `user`: 3 nodes, 3× Standard_D8s_v5 — replace it in knowledge.clusterNotes
 ```
 
+When the new fact comes with a suggested setting, the line also names it, ending in
+` and appConfig.<KEY>: <value>`:
+
+```
+- Added: Prometheus service in the cluster: http://kps-prometheus.monitoring.svc:9090 — add the line "- Prometheus service in the cluster: http://kps-prometheus.monitoring.svc:9090" to knowledge.clusterNotes and appConfig.PROMETHEUS_URL: http://kps-prometheus.monitoring.svc:9090
+```
+
 A change the scan is unsure of is shown as a question (`Added (unsure): ...`), never
 as a line to paste. "Added" lines for platform facts (components, service mesh, secret
 management, monitoring stack, network design) point at `knowledge.environment`, while
@@ -272,8 +282,9 @@ prints the cluster values file built from the last stored scan, with every fact 
 `clusterNotes` (no platform file) and the suggested settings. It scans nothing, asks
 nothing and calls no model. The pod's filesystem is read-only, so use `--show` there
 rather than writing files; redirect the output on your side
-(`... --show > my-cluster.yaml`). Before the first morning report there is no stored
-scan yet, and `--show` says so.
+(`... --show > my-cluster.yaml`). The scan is stored before each morning report, and
+by a manual `k8s-servant report` in the pod; until one of them has run there is no
+stored scan yet, and `--show` says so.
 
 ### What the pod cannot check
 
@@ -293,21 +304,23 @@ A row names the component, its topic and role, and the traces its upstream chart
 by default: CRD groups (or exact CRD names when the group is shared), workload names
 (regexes, full match), webhook configuration names and namespaces.
 
+An illustrative row, for ExternalDNS (not in the catalog today):
+
 ```python
 _c(
-    "velero",
-    "Velero",
+    "external-dns",
+    "ExternalDNS",
     "components",
-    "backup",
-    crds=("velero.io",),
-    workloads=("velero",),
-    namespaces=("velero",),
+    "DNS records from Services and Ingresses",
+    workloads=("external-dns",),
+    namespaces=("external-dns",),
 )
 ```
 
 Declare CRDs or webhooks only when every install has them: a running controller
-without its declared API becomes a question. Then add one test to
+without its declared API becomes a question. (ExternalDNS installs its `DNSEndpoint`
+CRD only on request, so this row declares none.) Then add one test to
 `tests/test_scan_catalog.py` that builds inputs with `make_inputs` (from
 `tests/fakes.py`) and checks the row's fact, like
-`test_crds_and_a_running_controller_are_seen`. That is all: the draft, the questions
+`test_a_component_without_crds_is_seen_from_its_workload`. That is all: the draft, the questions
 and the re-scan pick the new row up by themselves.

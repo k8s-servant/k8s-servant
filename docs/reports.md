@@ -201,6 +201,9 @@ to apply it in your values files:
 - Changed: Node pool `user`: 2 nodes, 2× Standard_D8s_v5 → Node pool `user`: 3 nodes, 3× Standard_D8s_v5 — replace it in knowledge.clusterNotes
 ```
 
+A new fact that comes with a suggested setting also names it at the end of its line,
+for example `... to knowledge.clusterNotes and appConfig.PROMETHEUS_URL: http://kps-prometheus.monitoring.svc:9090`.
+
 - The first scan is stored as a baseline and reported once
     (`First scan recorded: 13 components, 2 node pools`).
 - Noise (alerts, events, restarts) is not compared: it changes every day.

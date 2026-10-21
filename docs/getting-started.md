@@ -80,7 +80,9 @@ k8s-servant onboard --no-input --no-model     # scans once, read-only; prints th
 
 It writes `k8s-servant-onboard/demo.yaml` (from `CLUSTER_NAME`): what runs in the cluster, each line
 with its evidence, and `TODO(onboard):` lines for what it could not tell. Without
-`--no-input` it asks you about those instead. On your own clusters this is the first
+`--no-input` it asks you about those instead. Next to it, `settings.env` holds the
+suggested settings (here `CLUSTER_NAME`); load them with
+`set -a; source k8s-servant-onboard/settings.env; set +a`. On your own clusters this is the first
 step: [onboarding.md](onboarding.md).
 
 **6. Clean up**
