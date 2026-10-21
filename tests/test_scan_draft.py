@@ -172,6 +172,26 @@ def test_a_cluster_called_knowledge_values_does_not_overwrite_the_platform_file(
     assert len(files) == 2
 
 
+def test_unsure_noise_alone_writes_no_setting_line():
+    noisy = fact(
+        "noise/event/BackOff",
+        "noise",
+        "`BackOff` is 60%",
+        ("e",),
+        (),
+        unsure_question="q",
+        setting=("EVENTS_EXCLUDE_REASONS", "BackOff"),
+    )
+    settings = suggested_settings([noisy], configure_app({}), "prod")
+    values = values_files(_result([noisy], cluster="prod"), [noisy], settings, False)["prod.yaml"]
+    env = markdown_files(_result([noisy], cluster="prod"), [noisy], settings, False)["settings.env"]
+    for text in (values, env):
+        assert "TODO(onboard): Also hide BackOff?" in text
+        assert "# Warning event reasons hidden by default (EVENTS_EXCLUDE_REASONS)" in text
+        assert "EVENTS_EXCLUDE_REASONS:" not in text and "EVENTS_EXCLUDE_REASONS=" not in text
+    assert "EVENTS_EXCLUDE_REASONS" not in yaml.safe_load(values)["appConfig"]
+
+
 def test_unsure_noise_is_a_commented_todo_not_a_setting():
     noisy = fact(
         "noise/alert/KubeCPUOvercommit",
@@ -183,7 +203,7 @@ def test_unsure_noise_is_a_commented_todo_not_a_setting():
         setting=("ALERTS_IGNORE_NAMES", "KubeCPUOvercommit"),
     )
     s = {x.name: x for x in suggested_settings([noisy], configure_app({}), "my-cluster")}["ALERTS_IGNORE_NAMES"]
-    assert s.value == "Watchdog,InfoInhibitor" and "Also ignore KubeCPUOvercommit?" in s.todo[0]
+    assert s.value == "" and "Also ignore KubeCPUOvercommit?" in s.todo[0]
 
 
 def test_confirmed_noise_is_added_and_told_facts_give_no_setting():
@@ -240,9 +260,16 @@ def test_settings_env_quotes_values():
 def test_control_characters_never_break_a_file(bad):
     result = _result([], {"crds": f"boom{bad}x"}, cluster=f"prod{bad}1")
     settings = suggested_settings([], configure_app({}), result.cluster)
-    for files in (values_files(result, [], settings, True), markdown_files(result, [], settings, True)):
-        for name, text in files.items():
-            assert not [c for c in text if ord(c) < 32 and c not in "\n\t"], name
+    told = replace(fact("x/t", "network", f"title \x1b]0;pwned\x07 {bad}", (), ()), certainty="told")
+    for representative in (True, False):
+        facts = apply_scope([told], representative)
+        built = (
+            values_files(result, facts, settings, representative, f"over{bad}view"),
+            markdown_files(result, facts, settings, representative, f"over{bad}view"),
+        )
+        for files in built:
+            for name, text in files.items():
+                assert not [c for c in text if ord(c) < 32 and c not in "\n\t"], name
             assert "\ud800" not in text
             if name.endswith(".yaml"):
                 assert isinstance(yaml.safe_load(text), dict)
@@ -331,3 +358,20 @@ def test_markdown_overview_is_cleaned_like_values():
     for text in (files["environment.md"],):
         assert "\x00" not in text and "\x1b" not in text and "\u2028" not in text
         assert "Line one[31m\nline two" in text
+
+
+async def test_no_proven_facts_means_no_model_call():
+    chat = ScriptedChat()  # no replies: a call would fail
+    unsure = fact("b", "network", "Hidden guess", ("e",), ("x",), unsure_question="q")
+    assert await write_overview(chat, [unsure]) == "" and chat.calls == []
+
+
+def test_crlf_in_a_value_becomes_one_newline():
+    note = replace(fact("x/y", "network", "a", (), (), scope="cluster"), certainty="told")
+    text = values_files(_result([note]), [note], [], False, overview="one\r\ntwo")["my-cluster.yaml"]
+    assert "one\ntwo" in yaml.safe_load(text)["knowledge"]["clusterNotes"]
+
+
+def test_noise_already_in_the_defaults_gives_no_setting():
+    seen = fact("noise/alert/Watchdog", "noise", "s", ("e",), (), setting=("ALERTS_IGNORE_NAMES", "Watchdog"))
+    assert "ALERTS_IGNORE_NAMES" not in {s.name for s in suggested_settings([seen], configure_app({}), "c")}

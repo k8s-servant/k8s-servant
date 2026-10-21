@@ -90,9 +90,12 @@ async def write_overview(chat, facts: list[Fact]) -> str:
         facts: The draft's facts; only `seen`, `confirmed` and `told` ones are sent.
 
     Returns:
-        The model's reply, stripped. Model errors propagate to the caller.
+        The model's reply, stripped; "" without a model call when no fact is proven.
+        Model errors propagate to the caller.
     """
     lines = "\n".join(f"- {_one_line(f.statement)}" for f in facts if f.certainty in ("seen", "confirmed", "told"))
+    if not lines:
+        return ""  # nothing proven: the model would only have the prompt to go on
     reply = await chat.complete([Turn("system", OVERVIEW_PROMPT), Turn("user", lines)], [])
     return reply.content.strip()
 
@@ -120,6 +123,7 @@ class Setting:
     value: str
     reason: str
     todo: tuple[str, ...] = ()  # TODO(onboard) questions, one comment line each
+    placeholder: bool = True  # with no value, write a commented-out `NAME: ""` line
 
 
 def _clean(text: str, block: bool = False) -> str:
@@ -128,6 +132,7 @@ def _clean(text: str, block: bool = False) -> str:
     Removes control characters (except tab and newline), surrogates and U+FFFE/U+FFFF.
     A line or paragraph separator becomes a newline in a literal block, else a space.
     """
+    text = text.replace("\r\n", "\n")
     out = []
     for c in text:
         category = unicodedata.category(c)
@@ -154,16 +159,29 @@ def _why(f: Fact) -> str:
 
 
 def _noise_setting(facts: list[Fact], config: dict, name: str, config_key: str, prefix: str, reason: str, verb: str):
+    """The setting for one noise list, or None when there is nothing to add or ask.
+
+    A value is the configured list plus every seen or confirmed name; unsure names
+    become TODO lines only.
+    """
     noise = [f for f in facts if f.key.startswith(prefix) and f.setting and f.setting[0] == name]
     noise = [f for f in noise if f.certainty != "told"]
     if not noise:
         return None
     values = list(config[config_key])
+    added = False
     for f in noise:
         if f.certainty in ("seen", "confirmed") and f.setting[1] not in values:
             values.append(f.setting[1])
+            added = True
     todo = tuple(f"Also {verb} {f.setting[1]}? It {_why(f)}." for f in noise if f.certainty == "unsure")
-    return Setting(name, ",".join(values), reason, todo)
+    if added:
+        return Setting(name, ",".join(values), reason, todo)
+    if not todo:
+        return None
+    # Without a proven name there is nothing to set: writing today's list would pin the defaults.
+    # The comment names the setting, since no setting line follows.
+    return Setting(name, "", f"{reason} ({name})", todo, placeholder=False)
 
 
 def suggested_settings(facts: list[Fact], config: dict, cluster: str) -> list[Setting]:
@@ -239,19 +257,18 @@ def target_names(fmt: str, cluster: str, representative: bool = True) -> list[st
     return (["environment.md"] if representative else []) + ["cluster.md", "settings.env"]
 
 
-def _texts(result: ScanResult, facts: list[Fact], representative: bool, overview: str) -> tuple[str, str]:
-    # Model text: cleaned here so the Markdown files get the same treatment as YAML.
-    overview = _clean(overview, block=True)
+def _texts(facts: list[Fact], representative: bool, overview: str) -> tuple[str, str]:
+    """The platform and cluster bodies, cleaned for every file format alike."""
     environment = render_markdown(facts, "platform", overview) if representative else ""
     notes = render_markdown(facts, "cluster", "" if representative else overview)
-    return environment, notes
+    return _clean(environment, block=True), _clean(notes, block=True)
 
 
 def values_files(
     result: ScanResult, facts: list[Fact], settings: list[Setting], representative: bool, overview: str = ""
 ) -> dict[str, str]:
     """Helm values files: the platform description (when representative) and this cluster."""
-    environment, notes = _texts(result, facts, representative, overview)
+    environment, notes = _texts(facts, representative, overview)
     top = "".join(f"# {line}\n" for line in header(result))
     platform_name, cluster_name = target_names("values", result.cluster, True)
     files = {}
@@ -261,9 +278,10 @@ def values_files(
     for s in settings:
         config += f"  # {_comment(s.reason)}\n"
         config += "".join(f"  # TODO(onboard): {_comment(t)}\n" for t in s.todo)
-        config += (
-            f"  {s.name}: {json.dumps(_clean(s.value), ensure_ascii=False)}\n" if s.value else f'  # {s.name}: ""\n'
-        )
+        if s.value:
+            config += f"  {s.name}: {json.dumps(_clean(s.value), ensure_ascii=False)}\n"
+        elif s.placeholder:
+            config += f'  # {s.name}: ""\n'
     # With only commented-out settings, a bare `appConfig:` would be null, not a mapping.
     app_config = ("appConfig:\n" if any(s.value for s in settings) else "appConfig: {}\n") + config
     files[cluster_name] = top + "knowledge:\n" + _yaml_text("clusterNotes", notes) + app_config
@@ -283,7 +301,7 @@ def markdown_files(
     result: ScanResult, facts: list[Fact], settings: list[Setting], representative: bool, overview: str = ""
 ) -> dict[str, str]:
     """Plain files: `environment.md` (when representative), `cluster.md` and `settings.env`."""
-    environment, notes = _texts(result, facts, representative, overview)
+    environment, notes = _texts(facts, representative, overview)
     top = _html_comment(header(result))
     files = {}
     if representative:
@@ -293,7 +311,10 @@ def markdown_files(
     for s in settings:
         env += f"\n# {_comment(s.reason)}\n"
         env += "".join(f"# TODO(onboard): {_comment(t)}\n" for t in s.todo)
-        env += f"{s.name}={shlex.quote(_clean(s.value))}\n" if s.value else f"# {s.name}=\n"
+        if s.value:
+            env += f"{s.name}={shlex.quote(_clean(s.value))}\n"
+        elif s.placeholder:
+            env += f"# {s.name}=\n"
     files["settings.env"] = env
     return files
 
