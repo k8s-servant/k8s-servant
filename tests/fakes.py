@@ -5,7 +5,7 @@ from dataclasses import replace
 from pathlib import Path
 
 from k8s_servant.llm.types import ToolCall, Turn
-from k8s_servant.scan.inputs import INPUTS
+from k8s_servant.scan.inputs import INPUTS, Inputs
 from k8s_servant.tools.cluster_tools import Fetch
 
 
@@ -77,3 +77,43 @@ def fixture_fetch(flavor: str, calls: list | None = None, fail: dict[str, Except
         return json.loads(path.read_text())
 
     return fetch
+
+
+def make_inputs(*, failed: dict[str, str] | None = None, **items: list[dict]) -> Inputs:
+    """Scan `Inputs` built by hand from per-input item lists (and optional failures)."""
+    return Inputs(items=dict(items), failed=dict(failed or {}))
+
+
+def crd(group: str, name: str | None = None) -> dict:
+    """A CustomResourceDefinition of an API group."""
+    return {"metadata": {"name": name or f"things.{group}"}, "spec": {"group": group}}
+
+
+def deploy(namespace: str, name: str, ready: int = 1) -> dict:
+    """A Deployment with `ready` ready replicas."""
+    return {"metadata": {"namespace": namespace, "name": name}, "status": {"readyReplicas": ready}}
+
+
+def daemonset(namespace: str, name: str, ready: int = 1) -> dict:
+    """A DaemonSet with `ready` ready pods."""
+    return {"metadata": {"namespace": namespace, "name": name}, "status": {"numberReady": ready}}
+
+
+def statefulset(namespace: str, name: str, ready: int = 1) -> dict:
+    """A StatefulSet with `ready` ready replicas."""
+    return {"metadata": {"namespace": namespace, "name": name}, "status": {"readyReplicas": ready}}
+
+
+def webhook(name: str) -> dict:
+    """A (mutating or validating) webhook configuration."""
+    return {"metadata": {"name": name}}
+
+
+def ns(name: str, labels: dict[str, str] | None = None) -> dict:
+    """A Namespace."""
+    return {"metadata": {"name": name, "labels": labels or {}}}
+
+
+def by_key(facts: list, key: str):
+    """The fact with this key; fails the test when there is none."""
+    return next(f for f in facts if f.key == key)

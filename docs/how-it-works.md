@@ -66,6 +66,7 @@ k8s-servant/
 │   ├── teams.py                    # Adaptive Cards, posting to the Teams Workflows webhook
 │   ├── scheduler.py                # `serve`: hourly checks + the morning report, heartbeat, SIGTERM
 │   ├── scan/
+│   │   ├── catalog.py              # Well-known components and how to recognise them
 │   │   ├── facts.py                # Scan facts: evidence, certainty, scope; scan results
 │   │   └── inputs.py               # Scan inputs read once each; Prometheus and Alertmanager access
 │   └── tools/
