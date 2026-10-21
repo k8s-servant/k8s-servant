@@ -15,6 +15,7 @@ cannot end the comment early.
 import json
 import re
 import shlex
+import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -69,8 +70,14 @@ _PLACEHOLDER_CLUSTER = "my-cluster"
 _MAX_COMMENT = 200
 _URL_KEYS = {"monitoring/prometheus-url": "PROMETHEUS_URL", "monitoring/alertmanager-url": "ALERTMANAGER_URL"}
 _NOISE = (
-    ("ALERTS_IGNORE_NAMES", "alerts_ignore_names", "noise/alert/", "Alerts left out of reports"),
-    ("EVENTS_EXCLUDE_REASONS", "events_exclude_reasons", "noise/event/", "Warning event reasons hidden by default"),
+    ("ALERTS_IGNORE_NAMES", "alerts_ignore_names", "noise/alert/", "Alerts left out of reports", "ignore"),
+    (
+        "EVENTS_EXCLUDE_REASONS",
+        "events_exclude_reasons",
+        "noise/event/",
+        "Warning event reasons hidden by default",
+        "hide",
+    ),
 )
 
 
@@ -81,16 +88,41 @@ class Setting:
     name: str
     value: str
     reason: str
-    todo: str = ""  # a TODO(onboard) question shown next to it
+    todo: tuple[str, ...] = ()  # TODO(onboard) questions, one comment line each
+
+
+def _clean(text: str, block: bool = False) -> str:
+    """Remove what YAML forbids and map Unicode spaces to plain ones.
+
+    Removes control characters (except tab and newline), surrogates and U+FFFE/U+FFFF.
+    A line or paragraph separator becomes a newline in a literal block, else a space.
+    """
+    out = []
+    for c in text:
+        category = unicodedata.category(c)
+        if category in ("Zl", "Zp") or c in "\r\x85":
+            out.append("\n" if block else " ")
+        elif category == "Zs":
+            out.append(" ")
+        elif (category in ("Cc", "Cs") and c not in "\t\n") or c in "\ufffe\uffff":
+            continue
+        else:
+            out.append(c)
+    return "".join(out)
 
 
 def _comment(text: str) -> str:
     """Text safe for a `#` comment: one line, at most 200 characters."""
-    text = " ".join(text.split())
+    text = " ".join(_clean(text).split())
     return text if len(text) <= _MAX_COMMENT else text[: _MAX_COMMENT - 1] + "\u2026"
 
 
-def _noise_setting(facts: list[Fact], config: dict, name: str, config_key: str, prefix: str, reason: str):
+def _why(f: Fact) -> str:
+    """The statement of a noise fact without its leading `name`, e.g. "fired 96% of ..."."""
+    return re.sub(r"^`[^`]*`\s*", "", f.statement).strip()
+
+
+def _noise_setting(facts: list[Fact], config: dict, name: str, config_key: str, prefix: str, reason: str, verb: str):
     noise = [f for f in facts if f.key.startswith(prefix) and f.setting and f.setting[0] == name]
     noise = [f for f in noise if f.certainty != "told"]
     if not noise:
@@ -99,7 +131,7 @@ def _noise_setting(facts: list[Fact], config: dict, name: str, config_key: str, 
     for f in noise:
         if f.certainty in ("seen", "confirmed") and f.setting[1] not in values:
             values.append(f.setting[1])
-    todo = " ".join(_comment(f"Also ignore {f.setting[1]}? {f.question}") for f in noise if f.certainty == "unsure")
+    todo = tuple(f"Also {verb} {f.setting[1]}? It {_why(f)}." for f in noise if f.certainty == "unsure")
     return Setting(name, ",".join(values), reason, todo)
 
 
@@ -109,7 +141,7 @@ def suggested_settings(facts: list[Fact], config: dict, cluster: str) -> list[Se
     An unsure fact gives its question as a TODO and no value; a `told` fact (the human
     wrote their own note instead) never gives a setting, because the note may disagree.
     """
-    todo = "Set the real cluster name." if cluster == _PLACEHOLDER_CLUSTER else ""
+    todo = ("Set the real cluster name.",) if cluster == _PLACEHOLDER_CLUSTER else ()
     settings = [Setting("CLUSTER_NAME", cluster, "Name shown in reports and Teams cards", todo)]
     for key, name in _URL_KEYS.items():
         for f in facts:
@@ -117,12 +149,12 @@ def suggested_settings(facts: list[Fact], config: dict, cluster: str) -> list[Se
                 continue
             reason = f.setting_reason or f"Address of {name.split('_')[0].capitalize()}"
             if f.certainty == "unsure" or not f.setting:
-                settings.append(Setting(name, "", reason, f.question))
+                settings.append(Setting(name, "", reason, (f.question,) if f.question else ()))
             else:
                 settings.append(Setting(f.setting[0], f.setting[1], reason))
             break
-    for name, config_key, prefix, reason in _NOISE:
-        noise = _noise_setting(facts, config, name, config_key, prefix, reason)
+    for name, config_key, prefix, reason, verb in _NOISE:
+        noise = _noise_setting(facts, config, name, config_key, prefix, reason, verb)
         if noise:
             settings.append(noise)
     return settings
@@ -150,8 +182,7 @@ def header(result: ScanResult) -> list[str]:
 
 def _block(text: str) -> str:
     """Markdown as the body of a YAML `|` block (4 spaces deep) that cannot break out of it."""
-    text = "".join(c for c in text if c.isprintable() or c in "\n\t")
-    lines = [line.rstrip() for line in text.strip().splitlines()]
+    lines = [line.rstrip() for line in _clean(text, block=True).strip().splitlines()]
     return "\n".join(f"    {line}" if line else "" for line in lines)
 
 
@@ -184,9 +215,10 @@ def values_files(
     config = ""
     for s in settings:
         config += f"  # {_comment(s.reason)}\n"
-        if s.todo:
-            config += f"  # TODO(onboard): {_comment(s.todo)}\n"
-        config += f"  {s.name}: {json.dumps(s.value)}\n" if s.value else f'  # {s.name}: ""\n'
+        config += "".join(f"  # TODO(onboard): {_comment(t)}\n" for t in s.todo)
+        config += (
+            f"  {s.name}: {json.dumps(_clean(s.value), ensure_ascii=False)}\n" if s.value else f'  # {s.name}: ""\n'
+        )
     # With only commented-out settings, a bare `appConfig:` would be null, not a mapping.
     app_config = ("appConfig:\n" if any(s.value for s in settings) else "appConfig: {}\n") + config
     files[_cluster_file(result.cluster)] = top + "knowledge:\n" + _yaml_text("clusterNotes", notes) + app_config
@@ -215,9 +247,8 @@ def markdown_files(
     env = "".join(f"# {line}\n" for line in header(result))
     for s in settings:
         env += f"\n# {_comment(s.reason)}\n"
-        if s.todo:
-            env += f"# TODO(onboard): {_comment(s.todo)}\n"
-        env += f"{s.name}={shlex.quote(s.value)}\n" if s.value else f"# {s.name}=\n"
+        env += "".join(f"# TODO(onboard): {_comment(t)}\n" for t in s.todo)
+        env += f"{s.name}={shlex.quote(_clean(s.value))}\n" if s.value else f"# {s.name}=\n"
     files["settings.env"] = env
     return files
 
@@ -235,5 +266,7 @@ def write_files(out_dir: Path, files: dict[str, str], force: bool) -> list[Path]
         raise FileExistsError("Already exist (use --force to overwrite): " + ", ".join(p.name for p in existing))
     out_dir.mkdir(parents=True, exist_ok=True)
     for path, text in zip(targets, files.values(), strict=True):
+        # Replace, never write through: an existing symlink could point anywhere.
+        path.unlink(missing_ok=True)
         path.write_text(text, encoding="utf-8")
     return targets

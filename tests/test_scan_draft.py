@@ -181,7 +181,7 @@ def test_unsure_noise_is_a_commented_todo_not_a_setting():
         setting=("ALERTS_IGNORE_NAMES", "KubeCPUOvercommit"),
     )
     s = {x.name: x for x in suggested_settings([noisy], configure_app({}), "my-cluster")}["ALERTS_IGNORE_NAMES"]
-    assert s.value == "Watchdog,InfoInhibitor" and "KubeCPUOvercommit" in s.todo
+    assert s.value == "Watchdog,InfoInhibitor" and "Also ignore KubeCPUOvercommit?" in s.todo[0]
 
 
 def test_confirmed_noise_is_added_and_told_facts_give_no_setting():
@@ -198,14 +198,14 @@ def test_unsure_url_fact_gives_a_todo_and_no_value():
         "monitoring/prometheus-url", "monitoring", "s", ("e",), (), unsure_question="Which Prometheus?", scope="cluster"
     )
     s = {x.name: x for x in suggested_settings([url], configure_app({}), "c")}["PROMETHEUS_URL"]
-    assert s.value == "" and s.todo == "Which Prometheus?"
+    assert s.value == "" and s.todo == ("Which Prometheus?",)
     text = values_files(_result([]), [], [s], False)["my-cluster.yaml"]
     assert "PROMETHEUS_URL" not in yaml.safe_load(text)["appConfig"] and "TODO(onboard): Which Prometheus?" in text
 
 
 def test_placeholder_cluster_name_gets_a_todo():
-    assert suggested_settings([], configure_app({}), "my-cluster")[0].todo == "Set the real cluster name."
-    assert suggested_settings([], configure_app({}), "prod")[0].todo == ""
+    assert suggested_settings([], configure_app({}), "my-cluster")[0].todo == ("Set the real cluster name.",)
+    assert suggested_settings([], configure_app({}), "prod")[0].todo == ()
 
 
 def test_file_slug():
@@ -222,7 +222,7 @@ def test_existing_files_are_not_overwritten_without_force(tmp_path):
 
 
 def test_markdown_format_and_settings_env():
-    s = [Setting("PROMETHEUS_URL", "http://p.monitoring.svc:9090", "found", "")]
+    s = [Setting("PROMETHEUS_URL", "http://p.monitoring.svc:9090", "found")]
     files = markdown_files(_result([]), [], s, False)
     assert set(files) == {"cluster.md", "settings.env"}
     assert "# found\nPROMETHEUS_URL=http://p.monitoring.svc:9090" in files["settings.env"]
@@ -232,3 +232,70 @@ def test_markdown_format_and_settings_env():
 def test_settings_env_quotes_values():
     s = [Setting("ALERTS_IGNORE_NAMES", "a; rm -rf $HOME", "r")]
     assert "ALERTS_IGNORE_NAMES='a; rm -rf $HOME'" in markdown_files(_result([]), [], s, False)["settings.env"]
+
+
+@pytest.mark.parametrize("bad", ["\x1b[31m", "\x07", "\x00", "\ud800"])
+def test_control_characters_never_break_a_file(bad):
+    result = _result([], {"crds": f"boom{bad}x"}, cluster=f"prod{bad}1")
+    settings = suggested_settings([], configure_app({}), result.cluster)
+    for files in (values_files(result, [], settings, True), markdown_files(result, [], settings, True)):
+        for name, text in files.items():
+            assert not [c for c in text if ord(c) < 32 and c not in "\n\t"], name
+            assert "\ud800" not in text
+            if name.endswith(".yaml"):
+                assert isinstance(yaml.safe_load(text), dict)
+
+
+def test_a_no_break_space_stays_readable():
+    note = replace(fact("x/y", "network", "uses 10\u00a0GB", (), (), scope="cluster"), certainty="told")
+    text = values_files(_result([note]), [note], [], False, overview="needs 10\u00a0GB")["my-cluster.yaml"]
+    assert "needs 10 GB" in yaml.safe_load(text)["knowledge"]["clusterNotes"]
+    assert "10 GB" in yaml.safe_load(text)["knowledge"]["clusterNotes"]
+
+
+def test_every_unsure_noise_name_gets_its_own_todo_line():
+    names = ["KubeCPUOvercommit", "KubeMemoryOvercommit", "NodeFilesystemAlmostFull", "TargetDown"]
+    noisy = [
+        fact(
+            f"noise/alert/{n}",
+            "noise",
+            f"`{n}` fired 96% of the last 7 days",
+            ("e",),
+            (),
+            unsure_question=f"`{n}` fired 96% of the last 7 days. Is it expected here, so I stop reporting it?",
+            setting=("ALERTS_IGNORE_NAMES", n),
+        )
+        for n in names
+    ]
+    settings = suggested_settings(noisy, configure_app({}), "prod")
+    text = values_files(_result(noisy, cluster="prod"), noisy, settings, False)["prod.yaml"]
+    for n in names:
+        assert f"# TODO(onboard): Also ignore {n}? It fired 96% of the last 7 days." in text
+    event = fact(
+        "noise/event/BackOff",
+        "noise",
+        "`BackOff` makes up 60% of all warning events",
+        ("e",),
+        (),
+        unsure_question="`BackOff` makes up 60% of all warning events. Hide it by default?",
+        setting=("EVENTS_EXCLUDE_REASONS", "BackOff"),
+    )
+    todo = {s.name: s for s in suggested_settings([event], configure_app({}), "prod")}["EVENTS_EXCLUDE_REASONS"].todo
+    assert todo == ("Also hide BackOff? It makes up 60% of all warning events.",)
+
+
+def test_non_bmp_characters_stay_utf8_in_values():
+    s = [Setting("CLUSTER_NAME", "prod \U0001f680", "r")]
+    text = values_files(_result([]), [], s, False)["my-cluster.yaml"]
+    assert "\U0001f680" in text and yaml.safe_load(text)["appConfig"]["CLUSTER_NAME"] == "prod \U0001f680"
+
+
+def test_force_never_writes_through_a_symlink(tmp_path):
+    outside = tmp_path / "outside.txt"
+    outside.write_text("keep")
+    out = tmp_path / "out"
+    out.mkdir()
+    (out / "cluster.md").symlink_to(outside)
+    write_files(out, {"cluster.md": "new"}, force=True)
+    assert outside.read_text() == "keep" and not (out / "cluster.md").is_symlink()
+    assert (out / "cluster.md").read_text() == "new"
