@@ -1,0 +1,22 @@
+{
+  "items": [
+    {
+      "metadata": {
+        "name": "my-cluster-control-plane",
+        "labels": {
+          "node-role.kubernetes.io/control-plane": "",
+          "kubernetes.io/arch": "amd64"
+        }
+      },
+      "spec": {
+        "providerID": "kind://docker/my-cluster/my-cluster-control-plane"
+      },
+      "status": {
+        "nodeInfo": {
+          "kubeletVersion": "v1.31.0",
+          "osImage": "Debian GNU/Linux 12 (bookworm)"
+        }
+      }
+    }
+  ]
+}

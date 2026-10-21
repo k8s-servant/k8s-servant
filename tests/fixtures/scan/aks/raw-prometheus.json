@@ -1,0 +1,16 @@
+{
+  "status": "success",
+  "data": {
+    "result": [
+      {
+        "metric": {
+          "alertname": "KubeCPUOvercommit"
+        },
+        "value": [
+          0,
+          "0.96"
+        ]
+      }
+    ]
+  }
+}
