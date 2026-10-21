@@ -1,17 +1,25 @@
-"""Platform, organisation and network facts: what the cluster runs on, how it is split
-up and how traffic is kept in check.
+"""Platform, organisation, network, monitoring and noise facts: what the cluster runs on,
+how it is split up, how traffic is kept in check, where monitoring lives and what is
+normal background noise.
 
 Why: the Kubernetes version, the managed service, the node pools and the namespace
 layout are the first things an environment description states, and all of them can
 be read off the nodes and namespaces without asking anyone. The same holds for
 network policies, load balancers and ingress classes. A fact is only made
 from an input that was actually read; a failed read never becomes a statement.
+
+Noise facts are always questions: that an alert fires all week or a pod restarts
+often is observed, but whether that is by design is only known to the people who run
+the cluster.
 """
 
 from collections import Counter
+from datetime import datetime, timedelta
 
+from k8s_servant.findings import StoredFinding
 from k8s_servant.scan.facts import Fact, fact
 from k8s_servant.scan.inputs import Inputs
+from k8s_servant.tools.cluster_tools import _owner, _parse_time
 
 _INSTANCE_TYPE = "node.kubernetes.io/instance-type"
 
@@ -468,3 +476,211 @@ def _entry_point_facts(inputs: Inputs) -> list[Fact]:
 def network_facts(inputs: Inputs) -> list[Fact]:
     """Facts about network policies, load balancers, ingress classes and gateways."""
     return [*_policy_facts(inputs), *_exposure_facts(inputs), *_entry_point_facts(inputs)]
+
+
+def find_service(services: list[dict], name_part: str, port: int) -> tuple[str, str, int] | None:
+    """The (namespace, name, port) of the Service to reach a monitoring tool through.
+
+    The name must contain `name_part` and the Service must expose `port`; headless
+    and `-operated` Services are skipped, since they are not stable entry points.
+    The shortest name wins, which prefers `kps-prometheus` over its sidecars.
+    """
+    found = []
+    for svc in services:
+        meta, spec = svc.get("metadata", {}), svc.get("spec", {})
+        name = meta.get("name", "")
+        if name_part not in name or name.endswith("-operated") or spec.get("clusterIP") == "None":
+            continue
+        if any(p.get("port") == port for p in spec.get("ports") or []):
+            found.append((len(name), meta.get("namespace", ""), name))
+    if not found:
+        return None
+    _, namespace, name = min(found)
+    return namespace, name, port
+
+
+def monitoring_facts(inputs: Inputs, prometheus_checked: bool, alertmanager_checked: bool) -> list[Fact]:
+    """Where Prometheus and Alertmanager can be reached, as suggested settings."""
+    if not inputs.ok("services"):
+        return []
+    facts = []
+    for label, part, port, setting, checked in (
+        ("Prometheus", "prometheus", 9090, "PROMETHEUS_URL", prometheus_checked),
+        ("Alertmanager", "alertmanager", 9093, "ALERTMANAGER_URL", alertmanager_checked),
+    ):
+        found = find_service(inputs.get("services"), part, port)
+        if not found:
+            continue
+        namespace, name, port = found
+        url = f"http://{name}.{namespace}.svc:{port}"
+        outcome = "checked: it answered through the API server proxy" if checked else "not checked"
+        facts.append(
+            fact(
+                f"monitoring/{label.lower()}-url",
+                "monitoring",
+                f"{label} service in the cluster: {url}",
+                (f"Service {namespace}/{name} port {port}",),
+                ("services",),
+                scope="cluster",
+                setting=(setting, url),
+                setting_reason=f"{label} service found in namespace {namespace}; {outcome}",
+            )
+        )
+    return facts
+
+
+NOISY_ALERT_SHARE = 0.5
+NOISY_EVENT_MIN = 50
+NOISY_EVENT_SHARE = 0.25
+NOISY_RESTARTS = 20
+STALE_FINDING_DAYS = 3
+LONG_FIRING = timedelta(hours=24)
+
+
+def _noise(key: str, statement: str, question: str, evidence: tuple[str, ...], inputs: tuple[str, ...], setting=None):
+    return fact(
+        f"noise/{key}",
+        "noise",
+        statement,
+        evidence,
+        inputs,
+        unsure_question=question,
+        scope="cluster",
+        setting=setting,
+    )
+
+
+def _alert_noise(name: str, statement: str, question: str, evidence: str, source: str) -> Fact:
+    return _noise(f"alert/{name}", statement, question, (evidence,), (source,), ("ALERTS_IGNORE_NAMES", name))
+
+
+def _alert_facts(config: dict, shares: dict[str, float] | None, firing_now: list[dict] | None, now: datetime):
+    """Alerts that fire all week (Prometheus), or without history those firing for over a day."""
+    ignored = set(config["alerts_ignore_names"])
+    facts = []
+    if shares is not None:
+        for name, share in sorted(shares.items()):
+            if share < NOISY_ALERT_SHARE or name in ignored:
+                continue
+            pct = min(100, round(share * 100))
+            facts.append(
+                _alert_noise(
+                    name,
+                    f"`{name}` fires most of the time ({pct}% of the last 7 days)",
+                    f"`{name}` fired {pct}% of the last 7 days. Is it expected here, so I stop reporting it?",
+                    "Prometheus ALERTS over 7 days",
+                    "prometheus",
+                )
+            )
+    elif firing_now is not None:
+        seen = set()
+        for alert in firing_now:
+            name = alert.get("labels", {}).get("alertname", "")
+            since = _parse_time(alert.get("startsAt"))
+            if not name or name in ignored or name in seen or since is None or now - since <= LONG_FIRING:
+                continue
+            seen.add(name)
+            date = since.strftime("%Y-%m-%d")
+            facts.append(
+                _alert_noise(
+                    name,
+                    f"`{name}` has been firing for more than a day",
+                    f"`{name}` has been firing since {date}. Is it expected here, so I stop reporting it?",
+                    f"Alertmanager: firing since {since.strftime('%Y-%m-%d %H:%M UTC')}",
+                    "alertmanager",
+                )
+            )
+    return facts
+
+
+def _event_facts(inputs: Inputs, config: dict) -> list[Fact]:
+    """Warning event reasons that dominate, unless already hidden by default."""
+    counts: Counter = Counter()
+    for event in inputs.get("events"):
+        counts[event.get("reason", "")] += event.get("count") or 1
+    total = sum(counts.values())
+    facts = []
+    for reason, count in counts.most_common():
+        if not reason or reason in config["events_exclude_reasons"]:
+            continue
+        if count < NOISY_EVENT_MIN or count / total < NOISY_EVENT_SHARE:
+            continue
+        pct = min(100, round(100 * count / total))
+        facts.append(
+            _noise(
+                f"event/{reason}",
+                f"`{reason}` makes up {pct}% of all warning events",
+                f"`{reason}` makes up {pct}% of all warning events. Hide it by default?",
+                (f"{count} of {total} warning events with reason {reason}",),
+                ("events",),
+                ("EVENTS_EXCLUDE_REASONS", reason),
+            )
+        )
+    return facts
+
+
+def _restart_facts(inputs: Inputs) -> list[Fact]:
+    """Running containers with many restarts, one fact per owning workload."""
+    worst: dict[tuple[str, str, str], tuple[int, str]] = {}
+    for pod in inputs.get("pods"):
+        meta = pod.get("metadata", {})
+        for status in pod.get("status", {}).get("containerStatuses") or []:
+            restarts = status.get("restartCount", 0)
+            if restarts < NOISY_RESTARTS or not status.get("ready"):
+                continue
+            kind, name = _owner(pod)
+            key = (meta.get("namespace", ""), kind, name)
+            if restarts > worst.get(key, (0, ""))[0]:
+                worst[key] = (restarts, meta.get("name", ""))
+    facts = []
+    for (namespace, kind, name), (restarts, pod_name) in sorted(worst.items()):
+        facts.append(
+            _noise(
+                f"restarts/{namespace}/{kind}/{name}",
+                f"{kind} `{namespace}/{name}` restarted {restarts} times but is running",
+                f"{kind} `{namespace}/{name}` restarted {restarts} times but is running. Is that by design?",
+                (f"Pod {namespace}/{pod_name}: {restarts} restarts",),
+                ("pods",),
+            )
+        )
+    return facts
+
+
+def _stale_finding_facts(findings: list[StoredFinding], now: datetime) -> list[Fact]:
+    """Findings that stayed open for days, which may be accepted state."""
+    facts = []
+    for finding in findings:
+        age = now - finding.first_seen
+        if finding.status != "open" or age <= timedelta(days=STALE_FINDING_DAYS):
+            continue
+        facts.append(
+            _noise(
+                f"finding/{finding.fingerprint}",
+                f'"{finding.title}" has been open for {age.days} days',
+                f'"{finding.title}" has been open for {age.days} days. Is it expected here?',
+                (f"Finding {finding.fingerprint} open since {finding.first_seen.strftime('%Y-%m-%d')}",),
+                ("memory",),
+            )
+        )
+    return facts
+
+
+def noise_facts(
+    inputs: Inputs,
+    config: dict,
+    shares: dict[str, float] | None,
+    firing_now: list[dict] | None,
+    findings: list[StoredFinding],
+    now: datetime,
+) -> list[Fact]:
+    """Questions about what looks like background noise: recurring alerts, events, restarts.
+
+    Every fact is `unsure`: the scan can see that something repeats, not whether it is
+    meant to. A failed input contributes nothing.
+    """
+    facts = _alert_facts(config, shares, firing_now, now)
+    if inputs.ok("events"):
+        facts += _event_facts(inputs, config)
+    if inputs.ok("pods"):
+        facts += _restart_facts(inputs)
+    return facts + _stale_finding_facts(findings, now)

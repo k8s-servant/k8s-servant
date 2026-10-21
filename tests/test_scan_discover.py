@@ -1,8 +1,21 @@
 """Tests for the platform and organisation facts of the scan."""
 
-from fakes import by_key, crd, gateway, ingressclass, make_inputs, netpol, node, ns, service
+from datetime import UTC, datetime, timedelta
 
-from k8s_servant.scan.discover import network_facts, organisation_facts, platform_facts
+from fakes import by_key, crd, event, gateway, ingressclass, make_inputs, netpol, node, ns, pod, service
+
+from k8s_servant.config import configure_app
+from k8s_servant.findings import StoredFinding
+from k8s_servant.scan.discover import (
+    find_service,
+    monitoring_facts,
+    network_facts,
+    noise_facts,
+    organisation_facts,
+    platform_facts,
+)
+
+NOW = datetime(2026, 10, 21, 9, 0, tzinfo=UTC)
 
 
 def test_aks_node_pools_and_cloud():
@@ -315,3 +328,100 @@ def test_no_policies_is_unsure_when_a_policy_crd_exists():
         networkpolicies=[], crds=[crd("cilium.io", "ciliumnetworkpolicies.cilium.io")], **{"cilium-policies": []}
     )
     assert by_key(network_facts(inputs), "network/no-network-policies").certainty == "unsure"
+
+
+def _prom(ns_, name, port=9090, **kw):
+    return service(ns_, name, "ClusterIP", {}, ports=[{"port": port}], **kw)
+
+
+def test_prometheus_url_is_built_from_the_service():
+    svc = _prom("monitoring", "kps-prometheus")
+    operated = _prom("monitoring", "prometheus-operated", cluster_ip="None")
+    f = by_key(monitoring_facts(make_inputs(services=[operated, svc]), True, False), "monitoring/prometheus-url")
+    assert f.setting == ("PROMETHEUS_URL", "http://kps-prometheus.monitoring.svc:9090")
+    assert f.statement == "Prometheus service in the cluster: http://kps-prometheus.monitoring.svc:9090"
+    assert f.setting_reason.endswith("checked: it answered through the API server proxy")
+    assert f.evidence == ("Service monitoring/kps-prometheus port 9090",)
+
+
+def test_alertmanager_url_not_checked_and_find_service_prefers_shortest():
+    am = _prom("monitoring", "kps-alertmanager", 9093)
+    f = by_key(monitoring_facts(make_inputs(services=[am]), True, False), "monitoring/alertmanager-url")
+    assert f.setting == ("ALERTMANAGER_URL", "http://kps-alertmanager.monitoring.svc:9093")
+    assert f.setting_reason.endswith("; not checked")
+    long = _prom("a", "prometheus-long-name")
+    short = _prom("b", "prometheus")
+    assert find_service([long, short], "prometheus", 9090) == ("b", "prometheus", 9090)
+    assert find_service([short], "prometheus", 9091) is None
+
+
+def test_no_url_facts_when_services_failed():
+    assert monitoring_facts(make_inputs(failed={"services": "forbidden"}), False, False) == []
+
+
+def test_an_alert_firing_most_of_the_week_is_asked():
+    config = configure_app({})
+    shares = {"KubeCPUOvercommit": 0.96, "Watchdog": 1.0, "Rare": 0.1}
+    facts = noise_facts(make_inputs(), config, shares, None, [], NOW)
+    assert [f.key for f in facts] == ["noise/alert/KubeCPUOvercommit"]
+    assert (
+        facts[0].question
+        == "`KubeCPUOvercommit` fired 96% of the last 7 days. Is it expected here, so I stop reporting it?"
+    )
+    assert facts[0].evidence and facts[0].setting == ("ALERTS_IGNORE_NAMES", "KubeCPUOvercommit")
+
+
+def test_alert_share_above_one_is_clamped():
+    facts = noise_facts(make_inputs(), configure_app({}), {"Always": 1.004}, None, [], NOW)
+    assert "100%" in facts[0].question and "101" not in facts[0].question
+
+
+def test_without_history_long_firing_alerts_are_used():
+    alerts = [
+        {"labels": {"alertname": "Old"}, "startsAt": "2026-10-18T00:00:00Z"},
+        {"labels": {"alertname": "New"}, "startsAt": "2026-10-21T08:00:00Z"},
+    ]
+    facts = noise_facts(make_inputs(), configure_app({}), None, alerts, [], NOW)
+    assert [f.key for f in facts] == ["noise/alert/Old"]
+    assert facts[0].question.startswith("`Old` has been firing since 2026-10-18.")
+    assert facts[0].evidence == ("Alertmanager: firing since 2026-10-18 00:00 UTC",)
+
+
+def test_a_dominant_event_reason_is_asked_unless_already_hidden():
+    events = [event("shop", "BackOff", 60), event("shop", "PolicyViolation", 900), event("x", "Other", 40)]
+    inputs = make_inputs(events=events)
+    assert noise_facts(inputs, configure_app({}), None, None, [], NOW) == []
+    events = [event("shop", "BackOff", 60), event("x", "Other", 40)]
+    facts = noise_facts(make_inputs(events=events), configure_app({}), None, None, [], NOW)
+    assert [f.key for f in facts] == ["noise/event/BackOff"]
+    assert facts[0].question == "`BackOff` makes up 60% of all warning events. Hide it by default?"
+
+
+def test_a_running_pod_with_many_restarts_is_one_fact_per_workload():
+    pods = [
+        pod("shop", "api-abc-1", "ReplicaSet", "api-abc", restarts=25),
+        pod("shop", "api-abc-2", "ReplicaSet", "api-abc", restarts=30),
+        pod("shop", "crashing", "ReplicaSet", "bad-abc", restarts=99, ready=False),
+        pod("shop", "calm", "ReplicaSet", "calm-abc", restarts=2),
+    ]
+    facts = noise_facts(make_inputs(pods=pods), configure_app({}), None, None, [], NOW)
+    assert [f.key for f in facts] == ["noise/restarts/shop/Deployment/api"]
+    assert facts[0].question == "Deployment `shop/api` restarted 30 times but is running. Is that by design?"
+    assert facts[0].evidence == ("Pod shop/api-abc-2: 30 restarts",)
+
+
+def test_failed_inputs_give_no_noise_facts():
+    inputs = make_inputs(failed={"pods": "forbidden", "events": "forbidden"})
+    assert noise_facts(inputs, configure_app({}), None, None, [], NOW) == []
+
+
+def test_noise_is_cluster_scope_and_never_seen():
+    findings = [
+        StoredFinding("oom/x/Deployment/a", "warning", "a is OOM", "", NOW - timedelta(days=5), NOW, "open", None),
+        StoredFinding("oom/x/Deployment/b", "warning", "b", "", NOW - timedelta(days=1), NOW, "open", None),
+    ]
+    facts = noise_facts(make_inputs(), configure_app({}), {}, None, findings, NOW)
+    assert [f.key for f in facts] == ["noise/finding/oom/x/Deployment/a"]
+    assert facts[0].question == '"a is OOM" has been open for 5 days. Is it expected here?'
+    assert facts[0].evidence == ("Finding oom/x/Deployment/a open since 2026-10-16",)
+    assert all(f.scope == "cluster" and f.certainty == "unsure" for f in facts)

@@ -167,3 +167,28 @@ def ingressclass(name: str, default: bool = False) -> dict:
 def gateway(namespace: str, name: str, class_name: str) -> dict:
     """A Gateway API Gateway of a class."""
     return {"metadata": {"namespace": namespace, "name": name}, "spec": {"gatewayClassName": class_name}}
+
+
+def event(
+    namespace: str, reason: str, count: int = 1, kind: str = "Pod", name: str = "x", last: str = "2026-10-21T08:00:00Z"
+) -> dict:
+    """A Warning Event of a reason, seen `count` times."""
+    return {
+        "metadata": {"namespace": namespace},
+        "reason": reason,
+        "count": count,
+        "lastTimestamp": last,
+        "involvedObject": {"kind": kind, "name": name},
+    }
+
+
+def pod(namespace: str, name: str, owner_kind: str, owner_name: str, restarts: int = 0, ready: bool = True) -> dict:
+    """A Pod owned by a workload, with one container."""
+    return {
+        "metadata": {
+            "namespace": namespace,
+            "name": name,
+            "ownerReferences": [{"kind": owner_kind, "name": owner_name}],
+        },
+        "status": {"containerStatuses": [{"name": "app", "restartCount": restarts, "ready": ready}]},
+    }
