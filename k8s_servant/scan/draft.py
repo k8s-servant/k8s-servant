@@ -2,7 +2,7 @@
 
 Why: the draft is what a human reviews and what the agent later reads as its
 environment description. Each line shows where it came from: a scanned fact ends
-with its evidence in brackets, a fact a human gave ends with "(from the team)", and
+with its evidence in brackets (and is left out without any), a fact a human gave ends with "(from the team)", and
 an unsure fact is never stated, only asked as a `TODO(onboard):` line.
 """
 
@@ -29,7 +29,10 @@ def _line(f: Fact) -> str | None:
     if f.certainty not in ("seen", "confirmed"):
         return None
     evidence = "; ".join([e for e in map(_one_line, f.evidence) if e][:_MAX_EVIDENCE])
-    return f"- {statement} [{evidence}]" if evidence else f"- {statement}"
+    if evidence:
+        return f"- {statement} [{evidence}]"
+    # A scanned fact must show its proof; only a human-confirmed one may stand alone.
+    return f"- {statement}" if f.certainty == "confirmed" else None
 
 
 def render_markdown(facts: list[Fact], scope: str, overview: str = "") -> str:

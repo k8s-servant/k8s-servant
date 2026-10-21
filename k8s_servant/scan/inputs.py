@@ -27,7 +27,6 @@ INPUTS: tuple[tuple[str, list[str], str | None], ...] = (
     ("namespaces", ["get", "namespaces", "-o", "json"], None),
     ("crds", ["get", "customresourcedefinitions", "-o", "json"], None),
     ("ingressclasses", ["get", "ingressclasses", "-o", "json"], None),
-    ("csidrivers", ["get", "csidrivers", "-o", "json"], None),
     ("mutatingwebhooks", ["get", "mutatingwebhookconfigurations", "-o", "json"], None),
     ("validatingwebhooks", ["get", "validatingwebhookconfigurations", "-o", "json"], None),
     ("services", ["get", "services", "-A", "-o", "json"], None),
@@ -36,7 +35,6 @@ INPUTS: tuple[tuple[str, list[str], str | None], ...] = (
     ("statefulsets", ["get", "statefulsets", "-A", "-o", "json"], None),
     ("pods", ["get", "pods", "-A", "-o", "json"], None),
     ("networkpolicies", ["get", "networkpolicies", "-A", "-o", "json"], None),
-    ("ingresses", ["get", "ingresses", "-A", "-o", "json"], None),
     ("events", ["get", "events", "-A", "--field-selector", "type=Warning", "-o", "json"], None),
     (
         "gateways",

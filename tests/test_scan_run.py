@@ -96,7 +96,7 @@ async def test_scan_result_carries_cluster_time_failures_and_sorted_facts():
     result = await scan(fixture_fetch("gke"), configure_app({}), "my-cluster", clock=lambda: NOW)
     assert result.cluster == "my-cluster" and result.scanned_at == NOW
     assert result.failed["cilium-policies"] == "RuntimeError: Forbidden"
-    order = [(TOPICS.index(f.topic), f.key) for f in result.facts]
+    order = [(TOPICS.index(f.topic), f.key != "platform/kubernetes-version", f.key) for f in result.facts]
     assert order == sorted(order)
 
 
@@ -166,7 +166,7 @@ async def test_several_prometheus_services_mean_no_proxy_query():
 async def test_a_failing_detector_is_recorded_and_the_scan_goes_on(monkeypatch):
     import k8s_servant.scan.run as run
 
-    def boom(inputs):
+    def boom(*args):
         raise ValueError("bug")
 
     monkeypatch.setattr(run, "network_facts", boom)
@@ -219,3 +219,14 @@ async def test_unreadable_memory_is_a_failure_not_an_exception():
 
     result = await scan(fixture_fetch("kind"), configure_app({}), "my-cluster", memory=Broken(), clock=lambda: NOW)
     assert result.ok and result.failed["memory"] == "OSError: disk I/O error"
+
+
+async def test_the_kubernetes_version_comes_first_in_platform():
+    result = await scan(fixture_fetch("aks"), configure_app({}), "my-cluster", clock=lambda: NOW)
+    platform = [f.key for f in result.facts if f.topic == "platform"]
+    assert platform[0] == "platform/kubernetes-version"
+
+
+async def test_eks_mesh_makes_missing_network_policies_a_question():
+    result = await scan(fixture_fetch("eks"), configure_app({}), "my-cluster", clock=lambda: NOW)
+    assert by_key(result.facts, "network/no-network-policies").certainty == "unsure"

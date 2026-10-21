@@ -2,7 +2,21 @@
 
 from datetime import UTC, datetime, timedelta
 
-from fakes import by_key, crd, event, gateway, ingressclass, make_inputs, netpol, node, ns, pod, service, statefulset
+from fakes import (
+    by_key,
+    crd,
+    deploy,
+    event,
+    gateway,
+    ingressclass,
+    make_inputs,
+    netpol,
+    node,
+    ns,
+    pod,
+    service,
+    statefulset,
+)
 
 from k8s_servant.config import configure_app
 from k8s_servant.findings import StoredFinding
@@ -201,7 +215,7 @@ def test_a_failed_policy_read_makes_no_policy_fact():
 def test_no_policies_is_seen_when_nothing_else_could_restrict():
     f = by_key(network_facts(make_inputs(networkpolicies=[])), "network/no-network-policies")
     assert f.certainty == "seen"
-    assert f.statement == "No NetworkPolicies: pod traffic inside the cluster is not restricted"
+    assert f.statement == "No NetworkPolicies: Kubernetes network policy does not restrict pod traffic"
     assert f.evidence
 
 
@@ -495,3 +509,50 @@ def test_pool_evidence_counts_and_labels_are_exact():
     assert by_key(facts, "nodepool/control-plane").evidence == (
         "1 node with label node-role.kubernetes.io/control-plane",
     )
+
+
+def test_network_and_organisation_agree_on_application_namespaces():
+    names = [ns("kube-system"), ns("default"), ns("kyverno"), ns("shop"), ns("orders")]
+    inputs = make_inputs(networkpolicies=[netpol("shop", {}, ["Ingress"])], namespaces=names)
+    f = by_key(network_facts(inputs, {"kyverno"}), "network/default-deny-ingress")
+    assert f.statement == "Inbound pod traffic is denied by default in 1 of 2 application namespaces"
+    org = by_key(organisation_facts(inputs, {"kyverno"}), "organisation/namespaces")
+    assert org.statement.endswith("2 for applications")
+
+
+def test_default_deny_ingress_wording_when_every_namespace_is_covered():
+    two = [netpol("shop", {}, ["Ingress"]), netpol("orders", {}, ["Ingress"])]
+    f = by_key(
+        network_facts(make_inputs(networkpolicies=two, namespaces=[ns("shop"), ns("orders")])),
+        "network/default-deny-ingress",
+    )
+    assert f.statement == "Inbound pod traffic is denied by default in all 2 application namespaces"
+    one = make_inputs(networkpolicies=two[:1], namespaces=[ns("shop")])
+    f = by_key(network_facts(one), "network/default-deny-ingress")
+    assert f.statement == "Inbound pod traffic is denied by default in the only application namespace"
+
+
+def test_no_policies_is_unsure_with_a_mesh():
+    mesh_crd = make_inputs(
+        networkpolicies=[], crds=[crd("security.istio.io", "authorizationpolicies.security.istio.io")]
+    )
+    assert by_key(network_facts(mesh_crd), "network/no-network-policies").certainty == "unsure"
+    f = by_key(network_facts(make_inputs(networkpolicies=[]), mesh_seen=True), "network/no-network-policies")
+    assert f.certainty == "unsure" and "service mesh" in f.question
+
+
+def test_a_service_port_forwarding_to_9090_counts():
+    svc = service("monitoring", "prometheus-server", ports=[{"port": 80, "targetPort": 9090}])
+    inputs = make_inputs(services=[svc], deployments=[deploy("monitoring", "prometheus-server")])
+    assert monitoring_services(inputs, "prometheus") == [("monitoring", "prometheus-server", 80)]
+    f = by_key(monitoring_facts(inputs, False, False), "monitoring/prometheus-url")
+    assert f.setting == ("PROMETHEUS_URL", "http://prometheus-server.monitoring.svc:80")
+    assert "daemonsets" in f.inputs
+
+
+def test_version_and_fingerprints_are_cleaned():
+    version = make_inputs(version=[{"serverVersion": {"gitVersion": "v1.31`\nx"}}])
+    assert by_key(platform_facts(version), "platform/kubernetes-version").statement == "Kubernetes v1.31 x"
+    findings = [StoredFinding("f/`x`", "warning", "t", "", NOW - timedelta(days=5), NOW, "open", None)]
+    (f,) = noise_facts(make_inputs(), configure_app({}), {}, None, findings, NOW)
+    assert "`" not in f.key and "`" not in f.evidence[0]

@@ -24,7 +24,7 @@ from k8s_servant.scan.discover import (
     organisation_facts,
     platform_facts,
 )
-from k8s_servant.scan.facts import TOPICS, ScanResult
+from k8s_servant.scan.facts import TOPICS, Fact, ScanResult
 from k8s_servant.scan.inputs import (
     _reason,
     alert_shares,
@@ -84,6 +84,15 @@ async def _reach(
     return None, False, label
 
 
+def _mesh_seen(components: list[Fact]) -> bool:
+    return any(f.topic == "mesh" and f.certainty == "seen" for f in components)
+
+
+def _order(f: Fact) -> tuple[int, bool, str]:
+    """By topic, then key; the Kubernetes version leads the platform section."""
+    return TOPICS.index(f.topic), f.key != "platform/kubernetes-version", f.key
+
+
 async def _firing_now(alerts) -> list[dict]:
     return [a for a in await alerts() if isinstance(a, dict)]
 
@@ -117,7 +126,7 @@ async def scan(
         *components,
         *_guard("platform", failed, lambda: platform_facts(inputs), []),
         *_guard("organisation", failed, lambda: organisation_facts(inputs, namespaces), []),
-        *_guard("network", failed, lambda: network_facts(inputs), []),
+        *_guard("network", failed, lambda: network_facts(inputs, namespaces, _mesh_seen(components)), []),
     ]
     timeout = config["prometheus_timeout_seconds"]
 
@@ -169,5 +178,5 @@ async def scan(
         ),
         [],
     )
-    facts.sort(key=lambda f: (TOPICS.index(f.topic), f.key))
+    facts.sort(key=_order)
     return ScanResult(scanned_at=now, cluster=cluster, facts=facts, failed=failed, kubectl_ok=bool(inputs.items))

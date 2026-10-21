@@ -1,5 +1,6 @@
 """Tests for the Markdown body of a scan draft."""
 
+import re
 from dataclasses import replace
 from datetime import UTC, datetime
 
@@ -52,7 +53,7 @@ def test_evidence_is_capped_at_two_and_text_is_one_line():
     told = replace(fact("component/c", "components", "C runs", ("x",), ("crds",)), certainty="told")
     text = render_markdown([seen, bare, told], "platform")
     assert "- A runs [one; two]\n" in text
-    assert "- B runs\n" in text
+    assert "B runs" not in text
     assert "- C runs (from the team)" in text
 
 
@@ -68,9 +69,11 @@ async def test_no_fixture_draft_states_anything_without_evidence_or_a_human():
         facts = apply_scope(result.facts, representative=False)
         for line in render_markdown(facts, "cluster").splitlines():
             if line.startswith("- "):
-                assert line.startswith("- TODO(onboard): ") or line.endswith("]") or line.endswith("(from the team)"), (
-                    line
-                )
+                assert (
+                    line.startswith("- TODO(onboard): ")
+                    or line.endswith("(from the team)")
+                    or re.search(r" \[[^\]]+\]$", line)
+                ), line
 
 
 def test_unknown_certainty_and_empty_questions_are_left_out():
@@ -85,3 +88,8 @@ def test_long_text_is_capped():
     lines = render_markdown([long, asked], "platform").splitlines()
     assert lines[2] == "- " + "S" * 299 + "\u2026 [" + "E" * 299 + "\u2026]"
     assert lines[3] == "- TODO(onboard): " + "Q" * 299 + "\u2026"
+
+
+def test_confirmed_without_evidence_is_still_written():
+    f = replace(fact("component/a", "components", "A runs", (), ("crds",)), certainty="confirmed")
+    assert "- A runs\n" in render_markdown([f], "platform")

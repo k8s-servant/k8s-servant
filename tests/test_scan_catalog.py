@@ -10,7 +10,7 @@ def test_every_catalog_row_is_valid():
     assert len(keys) == len(set(keys))
     for c in CATALOG:
         assert c.topic in {"components", "mesh", "secrets", "monitoring", "network"}
-        assert c.crd_groups or c.workloads or c.webhooks
+        assert c.crd_groups or c.crd_names or c.workloads or c.webhooks
         for pattern in c.workloads + c.webhooks:
             re.compile(pattern)
 
@@ -86,7 +86,8 @@ def test_evidence_has_at_most_three_items_and_namespaces_are_joined():
         )
     )
     f = by_key(facts, "component/kyverno")
-    assert len(f.evidence) <= 3 and "`a, b, c`" in f.statement and namespaces == {"a", "b", "c"}
+    assert len(f.evidence) <= 3 and namespaces == {"a", "b", "c"}
+    assert f.statement == "Kyverno (policy engine) runs in namespaces `a`, `b`, `c`"
 
 
 def _keys(facts):
@@ -162,3 +163,30 @@ def test_unreadable_workloads_do_not_make_crds_a_leftover():
         )
     )
     assert facts == []
+
+
+def test_argo_rollouts_alone_is_not_argo_cd():
+    facts, _ = component_facts(
+        make_inputs(
+            crds=[crd("argoproj.io", "rollouts.argoproj.io")],
+            deployments=[deploy("argo-rollouts", "argo-rollouts")],
+        )
+    )
+    assert "component/argo-cd" not in _keys(facts)
+
+
+def test_monitoring_crds_alone_are_not_a_leftover_operator():
+    crds = [crd("monitoring.coreos.com", "servicemonitors.monitoring.coreos.com")]
+    facts, _ = component_facts(make_inputs(crds=crds, deployments=[], daemonsets=[], statefulsets=[]))
+    assert "component/prometheus-operator" not in _keys(facts)
+
+
+def test_argo_cd_is_proven_by_its_application_crd():
+    facts, _ = component_facts(
+        make_inputs(
+            crds=[crd("argoproj.io", "applications.argoproj.io")],
+            deployments=[deploy("argocd", "argocd-server")],
+        )
+    )
+    f = by_key(facts, "component/argo-cd")
+    assert f.certainty == "seen" and "CRD applications.argoproj.io" in f.evidence

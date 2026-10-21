@@ -81,3 +81,8 @@ async def test_alertmanager_through_the_proxy_path():
         "/api/v1/namespaces/monitoring/services/kps-alertmanager:9093/proxy"
         "/api/v2/alerts?active=true&silenced=false&inhibited=false",
     ]
+
+
+def test_unused_inputs_are_not_read():
+    names = {name for name, _, _ in INPUTS}
+    assert not names & {"csidrivers", "ingresses"}

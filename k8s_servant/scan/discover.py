@@ -151,7 +151,7 @@ def platform_facts(inputs: Inputs) -> list[Fact]:
                 fact(
                     "platform/kubernetes-version",
                     "platform",
-                    f"Kubernetes {version}",
+                    f"Kubernetes {clean(version)}",
                     ("kubectl version",),
                     ("version",),
                 )
@@ -169,13 +169,23 @@ def platform_facts(inputs: Inputs) -> list[Fact]:
     return facts
 
 
+def platform_namespaces(inputs: Inputs, component_namespaces: set[str]) -> set[str]:
+    """Namespaces of the platform: `kube-*`, `default` and those the catalog's components run in.
+
+    Every other namespace counts as an application namespace, the same way for the
+    organisation and the network facts.
+    """
+    names = {n.get("metadata", {}).get("name", "") for n in inputs.get("namespaces")} - {""}
+    return {name for name in names if name.startswith("kube-") or name == "default" or name in component_namespaces}
+
+
 def organisation_facts(inputs: Inputs, component_namespaces: set[str]) -> list[Fact]:
     """Facts about how the namespaces are split between platform and applications."""
     if not inputs.ok("namespaces"):
         return []
     names = {n.get("metadata", {}).get("name", ""): n for n in inputs.get("namespaces")}
     names.pop("", None)
-    platform = {name for name in names if name.startswith("kube-") or name == "default" or name in component_namespaces}
+    platform = platform_namespaces(inputs, component_namespaces)
     apps = [n for name, n in names.items() if name not in platform]
     facts = [
         fact(
@@ -246,6 +256,13 @@ _POLICY_CRDS = {
     "baselineadminnetworkpolicies.policy.networking.k8s.io",
 }
 
+# CRDs of service mesh authorization: a mesh may restrict traffic without any NetworkPolicy.
+_MESH_POLICY_CRDS = {
+    "authorizationpolicies.security.istio.io",
+    "authorizationpolicies.policy.linkerd.io",
+    "servers.policy.linkerd.io",
+}
+
 
 def _covering(policies: list[dict], direction: str) -> dict[str, list[dict]]:
     """Per namespace, the empty-podSelector policies that cover `direction`.
@@ -308,31 +325,44 @@ def _listed(items: list[str]) -> str:
     return text + ", and more" if len(items) > _MAX_LISTED else text
 
 
-def _policy_facts(inputs: Inputs) -> list[Fact]:
-    """Default-deny and missing-policy facts from NetworkPolicies, Calico and Cilium."""
+def _share(n: int, m: int) -> str:
+    """`1 of 3 application namespaces`, `all 3 ...`, or `the only ...`."""
+    if n < m:
+        return f"{n} of {_count(m, 'application namespace')}"
+    return "the only application namespace" if m == 1 else f"all {m} application namespaces"
+
+
+def _policy_facts(inputs: Inputs, component_namespaces: set[str], mesh_seen: bool) -> list[Fact]:
+    """Default-deny and missing-policy facts from NetworkPolicies, Calico and Cilium.
+
+    A running service mesh may enforce its own authorization policies, so with one
+    the missing NetworkPolicies become a question too.
+    """
     if not inputs.ok("networkpolicies"):
         return []
     policies = inputs.get("networkpolicies")
     facts: list[Fact] = []
     if not policies:
-        # Calico or Cilium may restrict traffic where no NetworkPolicy exists.
+        # Calico, Cilium or a service mesh may restrict traffic where no NetworkPolicy exists.
         others = (
             bool(inputs.crd_names() & _POLICY_CRDS)
             or any(inputs.get(name) for name in ("calico-policies", "cilium-policies"))
             or any(name in inputs.failed for name in ("calico-policies", "cilium-policies", "crds"))
         )
+        mesh = mesh_seen or bool(inputs.crd_names() & _MESH_POLICY_CRDS)
+        question = ""
+        if others:
+            question = "No NetworkPolicies, but Calico or Cilium policies may restrict traffic. Which rules apply?"
+        elif mesh:
+            question = "No NetworkPolicies, but the service mesh may restrict traffic with its own policies. Which rules apply?"
         facts.append(
             fact(
                 "network/no-network-policies",
                 "network",
-                "No NetworkPolicies: pod traffic inside the cluster is not restricted",
+                "No NetworkPolicies: Kubernetes network policy does not restrict pod traffic",
                 ("kubectl get networkpolicies -A",),
                 ("networkpolicies", "crds", "calico-policies", "cilium-policies"),
-                unsure_question=(
-                    "No NetworkPolicies, but Calico or Cilium policies may restrict traffic. Which rules apply?"
-                    if others
-                    else ""
-                ),
+                unsure_question=question,
             )
         )
     for name, label, noun in (
@@ -353,11 +383,7 @@ def _policy_facts(inputs: Inputs) -> list[Fact]:
             )
     ingress = _covering(policies, "Ingress")
     if inputs.ok("namespaces"):
-        apps = {
-            _ref(n)
-            for n in inputs.get("namespaces")
-            if not _ref(n).startswith("kube-") and _ref(n) not in ("default", "")
-        }
+        apps = {_ref(n) for n in inputs.get("namespaces")} - {""} - platform_namespaces(inputs, component_namespaces)
         # Strict: another covering policy with rules, or allowing everything, opens the namespace.
         covered = {
             space: group
@@ -369,8 +395,7 @@ def _policy_facts(inputs: Inputs) -> list[Fact]:
                 fact(
                     "network/default-deny-ingress",
                     "network",
-                    f"Inbound pod traffic is denied by default in {len(covered)} of "
-                    f"{_count(len(apps), 'application namespace')}",
+                    f"Inbound pod traffic is denied by default in {_share(len(covered), len(apps))}",
                     _evidence("NetworkPolicy", [p for group in covered.values() for p in group]),
                     ("networkpolicies", "namespaces"),
                 )
@@ -494,9 +519,19 @@ def _entry_point_facts(inputs: Inputs) -> list[Fact]:
     return facts
 
 
-def network_facts(inputs: Inputs) -> list[Fact]:
-    """Facts about network policies, load balancers, ingress classes and gateways."""
-    return [*_policy_facts(inputs), *_exposure_facts(inputs), *_entry_point_facts(inputs)]
+def network_facts(inputs: Inputs, component_namespaces: set[str] = frozenset(), mesh_seen: bool = False) -> list[Fact]:
+    """Facts about network policies, load balancers, ingress classes and gateways.
+
+    Args:
+        inputs: What the scan read.
+        component_namespaces: Namespaces the catalog's components run in (platform, not applications).
+        mesh_seen: Whether a service mesh was seen running.
+    """
+    return [
+        *_policy_facts(inputs, component_namespaces, mesh_seen),
+        *_exposure_facts(inputs),
+        *_entry_point_facts(inputs),
+    ]
 
 
 # tool -> (label, port, setting, catalog rows whose controller vouches for the namespace)
@@ -512,7 +547,8 @@ def monitoring_services(inputs: Inputs, tool: str) -> list[tuple[str, str, int]]
     Only namespaces where the catalog saw the tool's controller running count: any
     team can create a Service named `prometheus`, and the scan must not send a query
     (or suggest a URL) to one of theirs. The name must contain the tool's name and
-    the Service must expose its port; headless and `-operated` Services are skipped,
+    the Service must expose its port (or forward to it, and then the Service port is
+    used); headless and `-operated` Services are skipped,
     since they are not stable entry points.
     """
     _, port, _, keys = MONITORING_TOOLS[tool]
@@ -523,8 +559,13 @@ def monitoring_services(inputs: Inputs, tool: str) -> list[tuple[str, str, int]]
         name, namespace = meta.get("name", ""), meta.get("namespace", "")
         if namespace not in namespaces or tool not in name or name.endswith("-operated"):
             continue
-        if spec.get("clusterIP") != "None" and any(p.get("port") == port for p in spec.get("ports") or []):
-            found.append((namespace, name, port))
+        if spec.get("clusterIP") == "None":
+            continue
+        # The Service port itself, or one forwarding to the tool's port (prometheus-server: 80 -> 9090).
+        for p in spec.get("ports") or []:
+            if p.get("port") == port or str(p.get("targetPort")) == str(port):
+                found.append((namespace, name, p.get("port")))
+                break
     return sorted(found)
 
 
@@ -539,7 +580,7 @@ def monitoring_facts(inputs: Inputs, prometheus_checked: bool, alertmanager_chec
     for tool, checked in (("prometheus", prometheus_checked), ("alertmanager", alertmanager_checked)):
         label, _, setting, _ = MONITORING_TOOLS[tool]
         found = monitoring_services(inputs, tool)
-        sources = ("services", "deployments", "statefulsets")
+        sources = ("services", "deployments", "daemonsets", "statefulsets")
         if len(found) > 1:
             names = ", ".join(f"{namespace}/{name}" for namespace, name, _ in found)
             facts.append(
@@ -723,13 +764,13 @@ def _stale_finding_facts(findings: list[StoredFinding], now: datetime) -> list[F
         age = now - first_seen
         if finding.status != "open" or age <= timedelta(days=STALE_FINDING_DAYS):
             continue
-        title = clean(finding.title)
+        title, fingerprint = clean(finding.title), clean(finding.fingerprint)
         facts.append(
             _noise(
-                f"finding/{finding.fingerprint}",
+                f"finding/{fingerprint}",
                 f'"{title}" has been open for {age.days} days',
                 f'"{title}" has been open for {age.days} days. Is it expected here?',
-                (f"Finding {finding.fingerprint} open since {first_seen.strftime('%Y-%m-%d')}",),
+                (f"Finding {fingerprint} open since {first_seen.strftime('%Y-%m-%d')}",),
                 ("memory",),
             )
         )
