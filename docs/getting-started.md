@@ -72,10 +72,21 @@ k8s-servant findings                  # what is open now
 On a laptop `doctor` warns that your identity can read Secrets: that is expected with
 an admin kubeconfig. In the cluster the agent's own RBAC must say no.
 
-**5. Clean up**
+**5. Draft the cluster's knowledge**
 
 ```bash
-kind delete cluster --name k8s-servant-demo && rm -rf .data
+k8s-servant onboard --no-input --no-model     # scans once, read-only; prints the files it wrote
+```
+
+It writes `k8s-servant-onboard/demo.yaml` (from `CLUSTER_NAME`): what runs in the cluster, each line
+with its evidence, and `TODO(onboard):` lines for what it could not tell. Without
+`--no-input` it asks you about those instead. On your own clusters this is the first
+step: [onboarding.md](onboarding.md).
+
+**6. Clean up**
+
+```bash
+kind delete cluster --name k8s-servant-demo && rm -rf .data k8s-servant-onboard
 ```
 
 ## Going further

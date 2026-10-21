@@ -128,9 +128,12 @@ when there was no earlier report.
 
 ### How it is built
 
-1. A fresh full health check, so the report reflects the cluster right now. If it
+1. **A re-scan of the cluster** (`SCAN_BEFORE_REPORT`, on by default): no model, no
+      tokens. What changed since the last scan becomes the "Since the last scan"
+      section ([below](#since-the-last-scan)).
+2. A fresh full health check, so the report reflects the cluster right now. If it
       fails, the report still goes out and says so.
-2. From memory, for the window:
+3. From memory, for the window:
       - **open findings** and how long each has been open;
       - **new overnight, still open**;
       - **resolved overnight** (open before the window);
@@ -138,13 +141,13 @@ when there was no earlier report.
           These are easy to miss and often worth a look (a rollout blocked by a quota for
           three minutes, a pod crash-looping at 03:00);
       - **health checks**: how many ran in full, were skipped as unchanged, failed.
-3. **Alerts firing now** (Alertmanager), without `ALERTS_IGNORE_NAMES`.
-4. **Alerts that fired overnight and stopped**: from Prometheus' `ALERTS` history for
+4. **Alerts firing now** (Alertmanager), without `ALERTS_IGNORE_NAMES`.
+5. **Alerts that fired overnight and stopped**: from Prometheus' `ALERTS` history for
       the window (`max_over_time(ALERTS{alertstate="firing"}[window])`). Only warning and
       critical; info alerts are muted by Alertmanager too, and a large cluster can fire dozens per
       night. Needs `PROMETHEUS_URL`.
-5. **Notes the agent saved overnight**, so people can remove wrong ones.
-6. **The overview:** the model (no tools) writes 3–6 sentences from these facts only:
+6. **Notes the agent saved overnight**, so people can remove wrong ones.
+7. **The overview:** the model (no tools) writes 3–6 sentences from these facts only:
       how the night went, what needs attention today (most important first), and what
       recovered by itself but is worth a look.
 
@@ -182,6 +185,36 @@ come back.
 - KubeJobFailed [warning]
 ```
 
+### Since the last scan
+
+Before the report, the agent scans the cluster again with the same read-only scan as
+`k8s-servant onboard` ([onboarding.md](onboarding.md)) and compares it with the scan it
+stored last time. The at-a-glance list gets one line (`Since the last scan: 1 added,
+1 removed, 1 changed`, or `no changes`), and the section lists each change with where
+to apply it in your values files:
+
+```
+## Since the last scan
+
+- Added: cert-manager (certificate manager) runs in namespace `cert-manager` — add the line "- cert-manager (certificate manager) runs in namespace `cert-manager`" to knowledge.environment
+- Gone: Velero (backup) runs in namespace `velero` — remove it from knowledge.environment
+- Changed: Node pool `user`: 2 nodes, 2× Standard_D8s_v5 → Node pool `user`: 3 nodes, 3× Standard_D8s_v5 — replace it in knowledge.clusterNotes
+```
+
+- The first scan is stored as a baseline and reported once
+    (`First scan recorded: 13 components, 2 node pools`).
+- Noise (alerts, events, restarts) is not compared: it changes every day.
+- Facts from an input that could not be read this time are kept and never shown as
+    gone. A failing input is listed once, when it starts failing
+    (`Not checked this time: ...`); a crashed detector in every report while it lasts.
+- A change the scan is unsure of is a question (`Added (unsure): ...`), not a line to
+    paste. Nothing is applied for you.
+- A scan that cannot read the cluster at all changes nothing in memory; the report
+    says the scan failed and goes out as usual.
+
+Details, including what the pod's RBAC cannot check:
+[onboarding.md](onboarding.md#in-the-cluster).
+
 ### When it is sent
 
 - `serve` checks every minute whether it is due: at `MORNING_REPORT_TIME` in
@@ -190,7 +223,8 @@ come back.
 - The date it was sent is kept in memory, so a restart never sends it twice, and a pod
     that was down at 08:00 sends it as soon as it is back the same day.
 - `k8s-servant report` produces one on demand. It counts as a morning report: the next
-    scheduled one covers the time since it.
+    scheduled one covers the time since it. It also re-scans and stores the scan, so the changes it
+    shows are not shown again in the next scheduled report.
 
 ## Teams cards
 
@@ -200,7 +234,7 @@ Cards are Adaptive Cards posted to a Teams **Workflows** webhook (setup:
 | Card | Headline | Content |
 |---|---|---|
 | Health check | 🔴 / 🟠 / ✅ `my-cluster: 2 new, 0 resolved, 4 open`, time | summary; New (with details); Resolved; Still open (with age) |
-| Morning report | ☀️ `Morning report — my-cluster — Mon 12 Oct 2026` | overview; the at-a-glance facts; open findings; new / resolved / came and went; alerts firing now and stopped overnight; new notes |
+| Morning report | ☀️ `Morning report — my-cluster — Mon 12 Oct 2026` | overview; the at-a-glance facts; open findings; new / resolved / came and went; since the last scan; alerts firing now and stopped overnight; new notes |
 
 **When a health check is posted** (`TEAMS_POST_MODE`):
 

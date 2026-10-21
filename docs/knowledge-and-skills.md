@@ -24,7 +24,9 @@ full. Skills work differently, as described next.
 **An example** for a fictional platform is in
 [`examples/knowledge-values.yaml`](https://github.com/k8s-servant/k8s-servant/blob/main/examples/knowledge-values.yaml) (environment
 description) and [`examples/values-azure.yaml`](https://github.com/k8s-servant/k8s-servant/blob/main/examples/values-azure.yaml) (cluster
-notes). Copy them and describe your own platform.
+notes). Copy them and describe your own platform, or start from a draft:
+`k8s-servant onboard` scans a cluster and writes both for you to review
+([onboarding.md](onboarding.md)).
 
 **Built-in skills:** `cluster-health-check` (used by every scheduled check),
 `workload-troubleshooting`, `node-troubleshooting`, `flux-gitops-status` and

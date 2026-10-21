@@ -20,6 +20,7 @@ python3 -m venv .venv && .venv/bin/pip install -e '.[dev,azure]'     # setup
 .venv/bin/ruff check . && .venv/bin/ruff format --check .       # lint
 set -a; source .env; set +a                                     # local settings (see .env.example)
 .venv/bin/k8s-servant doctor | tools | ask "..."                # CLI
+.venv/bin/k8s-servant onboard --no-input                        # draft the knowledge files from a scan
 kubernetes-mcp-server --config deploy/local/mcp-config.toml     # local MCP server
 helm lint charts/k8s-servant                                    # chart
 helm template k8s-servant charts/k8s-servant -f examples/values-azure.yaml   # render
