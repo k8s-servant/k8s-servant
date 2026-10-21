@@ -423,3 +423,134 @@ def test_scheduled_check_logs_the_redacted_model_error_not_the_provider_body(
     # The failed run is still recorded, with the redacted reason.
     run = memory.runs(1)[0]
     assert run.kind == "check" and run.status != "ok" and "sk-test-secret" not in run.summary
+
+
+def _fixture_scan(monkeypatch, flavor, fail_all=False):
+    """Replace the cluster with a scan fixture; `fail_all` makes every input fail."""
+    from fakes import fixture_fetch
+
+    from k8s_servant.scan.inputs import INPUTS
+
+    fail = {name: RuntimeError("connection refused") for name, _, _ in INPUTS} if fail_all else None
+    real_scan = cli.scan
+
+    async def fake_scan(fetch, config, cluster, memory=None, **kwargs):
+        return await real_scan(fixture_fetch(flavor, fail=fail), config, cluster, memory, **kwargs)
+
+    monkeypatch.setattr(cli, "scan", fake_scan)
+
+
+def test_onboard_no_input_writes_the_cluster_file_only(monkeypatch, tmp_path, capsys):
+    _fixture_scan(monkeypatch, "aks")
+    assert cli.main(["onboard", "--no-input", "--no-model", "--out", str(tmp_path)]) == 0
+    out, err = capsys.readouterr()
+    assert out.strip() == str(tmp_path / "my-cluster.yaml")
+    assert "TODO(onboard)" in (tmp_path / "my-cluster.yaml").read_text() and "questions left open" in err
+
+
+def test_onboard_refuses_to_overwrite(monkeypatch, tmp_path, capsys):
+    _fixture_scan(monkeypatch, "aks")
+    (tmp_path / "my-cluster.yaml").write_text("mine")
+    assert cli.main(["onboard", "--no-input", "--no-model", "--out", str(tmp_path)]) == 1
+    assert "--force" in capsys.readouterr().err and (tmp_path / "my-cluster.yaml").read_text() == "mine"
+
+
+def test_onboard_checks_existing_files_before_the_scan(monkeypatch, tmp_path, capsys):
+    """The platform file counts too, even when the run would not write it."""
+    called = []
+
+    async def no_scan(*args, **kwargs):
+        called.append(True)
+
+    monkeypatch.setattr(cli, "scan", no_scan)
+    (tmp_path / "knowledge-values.yaml").write_text("mine")
+    assert cli.main(["onboard", "--no-input", "--no-model", "--out", str(tmp_path)]) == 1
+    assert "knowledge-values.yaml" in capsys.readouterr().err and not called
+
+
+def test_onboard_force_overwrites(monkeypatch, tmp_path):
+    _fixture_scan(monkeypatch, "aks")
+    (tmp_path / "my-cluster.yaml").write_text("mine")
+    assert cli.main(["onboard", "--no-input", "--no-model", "--force", "--out", str(tmp_path)]) == 0
+    assert (tmp_path / "my-cluster.yaml").read_text() != "mine"
+
+
+def test_onboard_markdown_format(monkeypatch, tmp_path):
+    _fixture_scan(monkeypatch, "kind")
+    out = tmp_path / "out"  # tmp_path also holds the fake kubectl and DATA_DIR
+    assert cli.main(["onboard", "--no-input", "--no-model", "--format", "markdown", "--out", str(out)]) == 0
+    assert {p.name for p in out.iterdir()} == {"cluster.md", "settings.env"}
+
+
+def test_onboard_cluster_name_names_the_file(monkeypatch, tmp_path, capsys):
+    _fixture_scan(monkeypatch, "kind")
+    assert cli.main(["onboard", "--no-input", "--no-model", "--cluster-name", "Prod EU", "--out", str(tmp_path)]) == 0
+    assert capsys.readouterr().out.strip() == str(tmp_path / "prod-eu.yaml")
+    assert 'CLUSTER_NAME: "Prod EU"' in (tmp_path / "prod-eu.yaml").read_text()
+
+
+def test_onboard_without_a_model_still_writes(monkeypatch, tmp_path, capsys):
+    _fixture_scan(monkeypatch, "kind")
+    assert cli.main(["onboard", "--no-input", "--out", str(tmp_path)]) == 0
+    assert "without an overview" in capsys.readouterr().err
+
+
+def test_onboard_writes_the_model_overview(scripted_model, monkeypatch, tmp_path):
+    _fixture_scan(monkeypatch, "kind")
+    chat = scripted_model(answer("A small test cluster."))
+    assert cli.main(["onboard", "--no-input", "--out", str(tmp_path)]) == 0
+    assert "A small test cluster." in (tmp_path / "my-cluster.yaml").read_text()
+    assert len(chat.calls) == 1
+
+
+def test_onboard_model_error_still_writes(scripted_model, monkeypatch, tmp_path, capsys):
+    from k8s_servant.llm.types import ModelOutputTruncated
+
+    _fixture_scan(monkeypatch, "kind")
+    scripted_model(ModelOutputTruncated("cut"))
+    assert cli.main(["onboard", "--no-input", "--out", str(tmp_path)]) == 0
+    assert "without an overview" in capsys.readouterr().err
+    assert "## Overview" not in (tmp_path / "my-cluster.yaml").read_text()
+
+
+def test_onboard_unreachable_cluster_exits_1(monkeypatch, tmp_path, capsys):
+    _fixture_scan(monkeypatch, "kind", fail_all=True)
+    assert cli.main(["onboard", "--no-input", "--out", str(tmp_path)]) == 1
+    assert "Could not read the cluster" in capsys.readouterr().err
+    assert not list(tmp_path.glob("*.yaml"))
+
+
+def test_onboard_asks_when_run_in_a_terminal(monkeypatch, tmp_path, capsys):
+    _fixture_scan(monkeypatch, "aks")
+    answers = iter(["y"])  # representative; every later question is skipped (EOF)
+    prompts = []
+
+    def ask(prompt):
+        prompts.append(prompt)
+        return next(answers, "")
+
+    monkeypatch.setattr(cli, "terminal_ask", ask)
+    monkeypatch.setattr(sys.stdin, "isatty", lambda: True)
+    assert cli.main(["onboard", "--no-model", "--out", str(tmp_path)]) == 0
+    out = capsys.readouterr().out
+    assert out.split() == [str(tmp_path / "knowledge-values.yaml"), str(tmp_path / "my-cluster.yaml")]
+    assert len(prompts) > 1 and any("outbound traffic" in p for p in prompts)
+    assert "TODO(onboard): How does outbound traffic" in (tmp_path / "knowledge-values.yaml").read_text()
+
+
+def test_onboard_confirmed_doubts_leave_fewer_todos(monkeypatch, tmp_path):
+    _fixture_scan(monkeypatch, "aks")
+    assert cli.main(["onboard", "--no-input", "--no-model", "--out", str(tmp_path / "plain")]) == 0
+    plain = (tmp_path / "plain" / "my-cluster.yaml").read_text()
+
+    def ask(prompt):
+        # Not representative; yes to every doubt; skip the open questions.
+        return "n" if "representative" in prompt else "y" if "[y]es" in prompt else ""
+
+    monkeypatch.setattr(cli, "terminal_ask", ask)
+    monkeypatch.setattr(sys.stdin, "isatty", lambda: True)
+    assert cli.main(["onboard", "--no-model", "--out", str(tmp_path / "asked")]) == 0
+    assert not (tmp_path / "asked" / "knowledge-values.yaml").exists()
+    asked = (tmp_path / "asked" / "my-cluster.yaml").read_text()
+    assert asked.count("TODO(onboard)") < plain.count("TODO(onboard)")
+    assert "How does outbound traffic" in asked

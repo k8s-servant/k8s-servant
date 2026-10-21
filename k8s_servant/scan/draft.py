@@ -3,7 +3,8 @@
 Why: the draft is what a human reviews and what the agent later reads as its
 environment description. Each line shows where it came from: a scanned fact ends
 with its evidence in brackets (and is left out without any), a fact a human gave ends with "(from the team)", and
-an unsure fact is never stated, only asked as a `TODO(onboard):` line.
+an unsure fact is never stated, only asked as a `TODO(onboard):` line. The optional
+overview at the top is written by the model from proven facts only.
 
 The draft goes to disk either as Helm values files (`knowledge:` and `appConfig:`)
 or as plain Markdown plus a `settings.env`. Cluster text is untrusted: values are
@@ -19,6 +20,7 @@ import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
 
+from k8s_servant.llm.types import Turn
 from k8s_servant.scan.facts import SECTION_TITLES, TOPICS, Fact, ScanResult
 
 _MAX_EVIDENCE = 2
@@ -64,6 +66,30 @@ def render_markdown(facts: list[Fact], scope: str, overview: str = "") -> str:
         if lines:
             parts.append(f"## {SECTION_TITLES[topic]}\n\n" + "\n".join(lines))
     return "\n\n".join(parts) + "\n" if parts else ""
+
+
+OVERVIEW_PROMPT = (
+    "You write the first lines of a Kubernetes platform description for the engineers who run it. "
+    "In 2 to 4 short sentences of plain language, say what this platform is and what stands out. "
+    "Use only the facts given; do not add anything, do not guess, no headings, no lists."
+)
+
+
+async def write_overview(chat, facts: list[Fact]) -> str:
+    """A short plain-language overview, written by the model from proven facts only.
+
+    Unsure facts are left out, so the model cannot turn a guess into a statement.
+
+    Args:
+        chat: Model client (`complete(turns, tools)`).
+        facts: The draft's facts; only `seen`, `confirmed` and `told` ones are sent.
+
+    Returns:
+        The model's reply, stripped. Model errors propagate to the caller.
+    """
+    lines = "\n".join(f"- {_one_line(f.statement)}" for f in facts if f.certainty in ("seen", "confirmed", "told"))
+    reply = await chat.complete([Turn("system", OVERVIEW_PROMPT), Turn("user", lines)], [])
+    return reply.content.strip()
 
 
 _PLACEHOLDER_CLUSTER = "my-cluster"
@@ -197,6 +223,17 @@ def _cluster_file(cluster: str) -> str:
     return f"{name}-cluster.yaml" if name == "knowledge-values" else f"{name}.yaml"
 
 
+def target_names(fmt: str, cluster: str, representative: bool = True) -> list[str]:
+    """The file names `values_files` (fmt `values`) or `markdown_files` (`markdown`) write.
+
+    Lets a caller check for existing files before scanning; with `representative`
+    True it names every file a run could write.
+    """
+    if fmt == "values":
+        return (["knowledge-values.yaml"] if representative else []) + [_cluster_file(cluster)]
+    return (["environment.md"] if representative else []) + ["cluster.md", "settings.env"]
+
+
 def _texts(result: ScanResult, facts: list[Fact], representative: bool, overview: str) -> tuple[str, str]:
     environment = render_markdown(facts, "platform", overview) if representative else ""
     notes = render_markdown(facts, "cluster", "" if representative else overview)
@@ -209,9 +246,10 @@ def values_files(
     """Helm values files: the platform description (when representative) and this cluster."""
     environment, notes = _texts(result, facts, representative, overview)
     top = "".join(f"# {line}\n" for line in header(result))
+    platform_name, cluster_name = target_names("values", result.cluster, True)
     files = {}
     if representative:
-        files["knowledge-values.yaml"] = top + "knowledge:\n" + _yaml_text("environment", environment)
+        files[platform_name] = top + "knowledge:\n" + _yaml_text("environment", environment)
     config = ""
     for s in settings:
         config += f"  # {_comment(s.reason)}\n"
@@ -221,7 +259,7 @@ def values_files(
         )
     # With only commented-out settings, a bare `appConfig:` would be null, not a mapping.
     app_config = ("appConfig:\n" if any(s.value for s in settings) else "appConfig: {}\n") + config
-    files[_cluster_file(result.cluster)] = top + "knowledge:\n" + _yaml_text("clusterNotes", notes) + app_config
+    files[cluster_name] = top + "knowledge:\n" + _yaml_text("clusterNotes", notes) + app_config
     return files
 
 
@@ -253,6 +291,17 @@ def markdown_files(
     return files
 
 
+def refuse_existing(out_dir: Path, names: list[str]) -> None:
+    """Raise when any of `names` already exists in `out_dir` (a dangling symlink counts).
+
+    Raises:
+        FileExistsError: Naming every target that already exists.
+    """
+    existing = [name for name in names if (Path(out_dir) / name).exists() or (Path(out_dir) / name).is_symlink()]
+    if existing:
+        raise FileExistsError("Already exist (use --force to overwrite): " + ", ".join(existing))
+
+
 def write_files(out_dir: Path, files: dict[str, str], force: bool) -> list[Path]:
     """Write the files into `out_dir`; without `force` nothing is written if any exists.
 
@@ -261,9 +310,8 @@ def write_files(out_dir: Path, files: dict[str, str], force: bool) -> list[Path]
     """
     out_dir = Path(out_dir)
     targets = [out_dir / name for name in files]
-    existing = [p for p in targets if p.exists() or p.is_symlink()]
-    if existing and not force:
-        raise FileExistsError("Already exist (use --force to overwrite): " + ", ".join(p.name for p in existing))
+    if not force:
+        refuse_existing(out_dir, list(files))
     out_dir.mkdir(parents=True, exist_ok=True)
     for path, text in zip(targets, files.values(), strict=True):
         # Replace, never write through: an existing symlink could point anywhere.

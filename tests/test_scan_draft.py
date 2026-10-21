@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 
 import pytest
 import yaml
-from fakes import fixture_fetch
+from fakes import ScriptedChat, answer, fixture_fetch
 
 from k8s_servant.config import configure_app
 from k8s_servant.knowledge import load_knowledge
@@ -18,8 +18,10 @@ from k8s_servant.scan.draft import (
     markdown_files,
     render_markdown,
     suggested_settings,
+    target_names,
     values_files,
     write_files,
+    write_overview,
 )
 from k8s_servant.scan.facts import ScanResult, apply_scope, fact
 
@@ -299,3 +301,25 @@ def test_force_never_writes_through_a_symlink(tmp_path):
     write_files(out, {"cluster.md": "new"}, force=True)
     assert outside.read_text() == "keep" and not (out / "cluster.md").is_symlink()
     assert (out / "cluster.md").read_text() == "new"
+
+
+async def test_overview_gets_only_confirmed_facts():
+    chat = ScriptedChat(answer("  A small AKS platform.\n"))
+    facts = [
+        fact("a", "platform", "Kubernetes v1.33.2", ("kubectl version",), ("version",)),
+        fact("b", "network", "Hidden guess", ("e",), ("x",), unsure_question="q"),
+        replace(fact("c", "network", "Told by the team", (), ()), certainty="told"),
+    ]
+    assert await write_overview(chat, facts) == "A small AKS platform."
+    sent = chat.calls[0]["turns"][-1].content
+    assert "- Kubernetes v1.33.2" in sent and "- Told by the team" in sent and "Hidden guess" not in sent
+    assert chat.calls[0]["tools"] == []
+
+
+@pytest.mark.parametrize("representative", [True, False])
+@pytest.mark.parametrize("cluster", ["prod", "knowledge-values", "My Cluster!"])
+def test_target_names_match_the_written_files(representative, cluster):
+    result = _result([], cluster=cluster)
+    s = [Setting("CLUSTER_NAME", cluster, "r")]
+    assert target_names("values", cluster, representative) == list(values_files(result, [], s, representative))
+    assert target_names("markdown", cluster, representative) == list(markdown_files(result, [], s, representative))
