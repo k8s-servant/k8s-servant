@@ -22,6 +22,8 @@ log = logging.getLogger(__name__)
 LAST_SCAN_KEY = "last_cluster_scan"
 _VERSION = 1
 _SCOPES = ("platform", "cluster")
+# Failures that only cost noise detail; they are normal on many clusters and never reported.
+_NOISE_ONLY = frozenset({"prometheus", "alertmanager", "prometheus-url", "alertmanager-url", "memory"})
 
 
 def save_scan(memory: Memory, result: ScanResult) -> None:
@@ -62,6 +64,12 @@ def load_scan(memory: Memory) -> ScanResult | None:
         cluster, failed = data["cluster"], data["failed"]
         if not isinstance(cluster, str) or not isinstance(failed, dict):
             raise TypeError("cluster or failed has the wrong type")
+        if scanned_at.tzinfo is None:
+            raise ValueError("scanned_at has no timezone")
+        if not all(isinstance(k, str) and isinstance(v, str) for k, v in failed.items()):
+            raise TypeError("failed holds a non-string")
+        if not all(isinstance(f.key, str) and isinstance(f.statement, str) for f in facts):
+            raise TypeError("a fact has a non-string key or statement")
     except (KeyError, TypeError, ValueError, IndexError, AttributeError):
         log.warning("The stored scan has a malformed field; ignoring it")
         return None
@@ -128,7 +136,11 @@ def compare(old: ScanResult | None, new: ScanResult) -> tuple[ScanChanges, ScanR
 
     noise = [f for f in new.facts if f.topic == "noise"]
     new_facts = {f.key: f for f in new.facts if f.topic != "noise" and not untouched(f)}
-    changes = ScanChanges(not_checked=dict(new.failed))
+    # A failure is reported once: when it is new since the stored scan (all on a baseline).
+    previous = set(old.failed) if old else set()
+    changes = ScanChanges(
+        not_checked={k: v for k, v in new.failed.items() if k not in _NOISE_ONLY and k not in previous}
+    )
     stored = dict(new_facts)
     if old is None:
         components = sum(k.startswith("component/") for k in new_facts)

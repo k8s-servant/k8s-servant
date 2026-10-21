@@ -117,3 +117,44 @@ async def test_rescan_twice_reports_no_changes(tmp_path):
     memory = Memory(tmp_path)
     assert (await rescan(fixture_fetch("aks"), configure_app({}), memory, clock=lambda: NOW)).baseline
     assert (await rescan(fixture_fetch("aks"), configure_app({}), memory, clock=lambda: NOW)).headline() == "no changes"
+
+
+def test_a_failure_present_in_both_scans_is_not_listed_again():
+    old = _r([], failed={"calico-policies": "Forbidden"})
+    changes, _ = compare(old, _r([], failed={"calico-policies": "Forbidden"}))
+    assert changes.not_checked == {} and changes.lines() == []
+
+
+def test_noise_only_sources_are_never_listed():
+    failed = {k: "x" for k in ("prometheus", "alertmanager", "prometheus-url", "alertmanager-url", "memory")}
+    changes, _ = compare(_r([]), _r([], failed=failed))
+    assert changes.not_checked == {}
+    changes, _ = compare(None, _r([], failed=failed))
+    assert changes.not_checked == {}
+
+
+def test_a_new_failure_is_listed_once():
+    old = _r([], failed={"a": "x"})
+    changes, _ = compare(old, _r([], failed={"a": "x", "b": "y"}))
+    assert changes.not_checked == {"b": "y"}
+
+
+def test_a_baseline_lists_its_failed_inputs():
+    changes, _ = compare(None, _r([], failed={"calico-policies": "Forbidden", "prometheus": "x"}))
+    assert changes.not_checked == {"calico-policies": "Forbidden"}
+
+
+def test_stored_scans_with_naive_time_or_non_string_values_are_ignored(tmp_path):
+    memory = Memory(tmp_path)
+    good = _f("component/a").to_dict()
+    base = {"version": 1, "scanned_at": NOW.isoformat(), "cluster": "c", "facts": [good], "failed": {}}
+    for change in (
+        {"scanned_at": "2026-10-21T09:00:00"},
+        {"failed": {"a": 1}},
+        {"facts": [{**good, "key": 1}]},
+        {"facts": [{**good, "statement": None}]},
+    ):
+        memory.set_meta(LAST_SCAN_KEY, json.dumps({**base, **change}))
+        assert load_scan(memory) is None
+    memory.set_meta(LAST_SCAN_KEY, json.dumps(base))
+    assert load_scan(memory) is not None
