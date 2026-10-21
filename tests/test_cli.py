@@ -375,8 +375,6 @@ def test_check_model_error_inside_mcp_session_is_explained_not_a_traceback(scrip
 
 
 def test_scheduled_checks_skip_the_model_when_nothing_changed(scripted_model):
-    import asyncio
-
     from k8s_servant.config import configure_app
     from k8s_servant.knowledge import Knowledge
     from k8s_servant.memory import Memory
@@ -398,7 +396,6 @@ def test_scheduled_check_logs_the_redacted_model_error_not_the_provider_body(
     scripted_model, monkeypatch, caplog, capsys
 ):
     # OpenAI echoes the key in its 401 body; serve mode must not put it in the pod log.
-    import asyncio
     import logging
 
     import httpx2
