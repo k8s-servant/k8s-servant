@@ -1,14 +1,19 @@
+import asyncio
 import os
 import sys
 
 import pytest
-from fakes import ScriptedChat, answer, findings_answer
+import yaml
+from fakes import ScriptedChat, answer, findings_answer, fixture_fetch
 
 from k8s_servant import cli
+from k8s_servant.config import configure_app
+from k8s_servant.memory import Memory
+from k8s_servant.scan import scan
+from k8s_servant.scan.drift import load_scan, save_scan
 
 ENV_VARS = (
     "LLM_PROVIDER",
-    "SCAN_BEFORE_REPORT",
     "LLM_ENDPOINT",
     "LLM_MODEL",
     "LLM_API_KEY",
@@ -26,6 +31,7 @@ ENV_VARS = (
     "HEARTBEAT_FILE",
     "CHECK_SKIP_UNCHANGED",
     "CHECK_FULL_INTERVAL_HOURS",
+    "SCAN_BEFORE_REPORT",
     "TOOL_OUTPUT_MAX_CHARS",
 )
 
@@ -648,22 +654,30 @@ def test_onboard_end_of_input_stops_the_questions(monkeypatch, tmp_path):
 
 
 def test_onboard_show_prints_the_stored_scan(monkeypatch, capsys):
-    import asyncio
-
-    import yaml
-    from fakes import fixture_fetch
-
-    from k8s_servant.config import configure_app
-    from k8s_servant.memory import Memory
-    from k8s_servant.scan import scan
-    from k8s_servant.scan.drift import save_scan
-
     memory = Memory(configure_app()["data_dir"])
     save_scan(memory, asyncio.run(scan(fixture_fetch("aks"), configure_app(), "my-cluster", memory)))
     assert cli.main(["onboard", "--show"]) == 0
-    assert yaml.safe_load(capsys.readouterr().out)["knowledge"]["clusterNotes"]
+    notes = yaml.safe_load(capsys.readouterr().out)["knowledge"]["clusterNotes"]
+    assert "Managed service: AKS" in notes  # a platform-default fact is still shown
 
 
 def test_onboard_show_without_a_stored_scan(capsys):
     assert cli.main(["onboard", "--show"]) == 1
     assert "No stored scan yet" in capsys.readouterr().err
+
+
+def test_report_rescans_before_reporting(scripted_model, monkeypatch, capsys):
+    monkeypatch.setattr(cli, "_kubectl_fetch", lambda config: fixture_fetch("aks"))
+    scripted_model(answer(findings_answer("Fine.", [])), answer("Calm."))
+    assert cli.main(["report"]) == 0
+    assert "- Since the last scan: First scan recorded" in capsys.readouterr().out
+    assert load_scan(Memory(configure_app()["data_dir"])) is not None
+
+
+def test_report_without_scan_before_report(scripted_model, monkeypatch, capsys):
+    monkeypatch.setattr(cli, "_kubectl_fetch", lambda config: fixture_fetch("aks"))
+    monkeypatch.setenv("SCAN_BEFORE_REPORT", "false")
+    scripted_model(answer(findings_answer("Fine.", [])), answer("Calm."))
+    assert cli.main(["report"]) == 0
+    assert "Since the last scan" not in capsys.readouterr().out
+    assert load_scan(Memory(configure_app()["data_dir"])) is None

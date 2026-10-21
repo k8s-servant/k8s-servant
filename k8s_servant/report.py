@@ -157,7 +157,7 @@ class MorningReport:
         """The 'at a glance' lines (Markdown report and Teams FactSet)."""
         by_severity = Counter(f.severity for f in self.open_findings)
         checks = self.checks_full + self.checks_skipped + self.checks_failed
-        scan = [("Since the last scan", self.scan_changes.headline())] if self.scan_changes else []
+        scan = [("Since the last scan", self.scan_changes.headline())] if self.scan_changes is not None else []
         return [
             ("Covers", self.window_text()),
             (
@@ -220,7 +220,7 @@ def render_facts_md(report: MorningReport) -> str:
             for f in report.came_and_went
         ],
     )
-    if report.scan_changes:
+    if report.scan_changes is not None:
         listing("Since the last scan", report.scan_changes.lines())
     listing("Alerts firing now", report.alert_lines())
     listing("Alerts that fired overnight and stopped", report.stopped_alert_lines())

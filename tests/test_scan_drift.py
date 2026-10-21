@@ -7,7 +7,7 @@ from fakes import fixture_fetch
 
 from k8s_servant.config import configure_app
 from k8s_servant.memory import Memory
-from k8s_servant.scan.drift import LAST_SCAN_KEY, compare, load_scan, rescan, save_scan
+from k8s_servant.scan.drift import LAST_SCAN_KEY, ScanChanges, compare, load_scan, rescan, save_scan
 from k8s_servant.scan.facts import Fact, ScanResult
 from k8s_servant.scan.inputs import INPUTS
 
@@ -172,3 +172,7 @@ def test_a_crashed_detector_is_listed_on_every_scan():
     failed = {"detector:catalog": "KeyError"}
     changes, _ = compare(_r([], failed=failed), _r([], failed=failed))
     assert changes.not_checked == failed
+
+
+def test_a_long_error_is_cut_in_the_headline():
+    assert len(ScanChanges(error="x" * 1000).headline()) <= 400

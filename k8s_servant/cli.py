@@ -562,8 +562,9 @@ def _show_stored_scan(config: dict, memory: Memory) -> int:
             "No stored scan yet: the agent stores one before each morning report (SCAN_BEFORE_REPORT).", file=sys.stderr
         )
         return 1
-    settings = suggested_settings(stored.facts, config, stored.cluster)
-    files = values_files(stored, stored.facts, settings, False)
+    facts = apply_scope(stored.facts, False)  # platform facts belong in this cluster's file too
+    settings = suggested_settings(facts, config, stored.cluster)
+    files = values_files(stored, facts, settings, False)
     print(files[target_names("values", stored.cluster, False)[0]], end="")
     return 0
 

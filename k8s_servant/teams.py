@@ -218,7 +218,7 @@ def morning_card(cluster_name: str, report: MorningReport) -> dict:
             ),
         )
         limit = max_items or 15
-        if report.scan_changes:
+        if report.scan_changes is not None:
             body += _section(
                 "Since the last scan", [_text(_cut(line, 300)) for line in report.scan_changes.lines()[:limit]]
             )

@@ -94,7 +94,7 @@ class ScanChanges:
     def headline(self) -> str:
         """One line saying what happened."""
         if self.error:
-            return f"failed: {self.error}"
+            return f"failed: {self.error[:300]}"
         if self.baseline:
             return self.summary
         if not (self.added or self.removed or self.changed):
