@@ -13,15 +13,18 @@ often is observed, but whether that is by design is only known to the people who
 the cluster.
 """
 
+import re
 from collections import Counter
 from datetime import UTC, datetime, timedelta
 
 from k8s_servant.findings import StoredFinding
+from k8s_servant.scan.catalog import running_namespaces
 from k8s_servant.scan.facts import Fact, fact
 from k8s_servant.scan.inputs import Inputs
 from k8s_servant.tools.cluster_tools import _owner, _parse_time
 
 _INSTANCE_TYPE = "node.kubernetes.io/instance-type"
+_CONTROL_PLANE = "node-role.kubernetes.io/control-plane"
 
 # Pool label, in order of preference.
 _POOL_LABELS = (
@@ -45,6 +48,19 @@ _PROVIDER_PREFIXES = (("azure://", "Azure"), ("aws://", "AWS"), ("gce://", "Goog
 
 _MIN_LABELLED_NAMESPACES = 3
 
+_FREE_TEXT_LIMIT = 100
+
+
+def clean(text: object) -> str:
+    """Free text from the cluster or memory, made safe to put inside a statement.
+
+    Backticks and line breaks would let a label or an alert name break out of its
+    Markdown quoting (and into the agent's prompt), so they are removed, and the
+    text is capped at 100 characters.
+    """
+    text = " ".join(str(text).replace("`", "").split())
+    return text if len(text) <= _FREE_TEXT_LIMIT else text[: _FREE_TEXT_LIMIT - 1] + "\u2026"
+
 
 def _labels(item: dict) -> dict:
     return item.get("metadata", {}).get("labels") or {}
@@ -56,8 +72,8 @@ def _pool_of(node: dict) -> tuple[str, str]:
     for label in _POOL_LABELS:
         if label in labels:
             return labels[label], label
-    if "node-role.kubernetes.io/control-plane" in labels:
-        return "control-plane", "node-role.kubernetes.io/control-plane"
+    if _CONTROL_PLANE in labels:
+        return "control-plane", _CONTROL_PLANE
     return "workers", ""
 
 
@@ -70,7 +86,7 @@ def _cloud_fact(nodes: list[dict]) -> Fact | None:
                 "platform/cloud",
                 "platform",
                 f"Managed service: {service}",
-                (f"{count} nodes with label {label}",),
+                (f"{_count(count, 'node')} with label {label}",),
                 ("nodes",),
                 scope="platform",
             )
@@ -91,7 +107,7 @@ def _cloud_fact(nodes: list[dict]) -> Fact | None:
                 "platform/cloud",
                 "platform",
                 f"Nodes run on {cloud}",
-                (f"{count} nodes with providerID {prefix}",),
+                (f"{_count(count, 'node')} with providerID {prefix}",),
                 ("nodes",),
                 unsure_question=(
                     f"Nodes run on {cloud}, but not with the managed service's labels. Is this a self-managed cluster?"
@@ -101,23 +117,28 @@ def _cloud_fact(nodes: list[dict]) -> Fact | None:
     return None
 
 
+def _label_value(label: str, pool: str) -> str:
+    """`=pool` for a pool label; the control-plane role label carries no value."""
+    return "" if label == _CONTROL_PLANE else f"={clean(pool)}"
+
+
 def _pool_fact(pool: str, members: list[tuple[dict, str]]) -> Fact:
     """One fact per pool name; the evidence lists each label that named the pool."""
     nodes = [n for n, _ in members]
     types = Counter(_labels(n).get(_INSTANCE_TYPE) for n in nodes)
     types.pop(None, None)
-    listed = ", ".join(f"{count}\u00d7 {name}" for name, count in types.most_common())
-    statement = f"Node pool `{pool}`: {len(nodes)} node{'s' if len(nodes) != 1 else ''}"
+    listed = ", ".join(f"{count}\u00d7 {clean(name)}" for name, count in types.most_common())
+    statement = f"Node pool `{clean(pool)}`: {_count(len(nodes), 'node')}"
     if listed:
         statement += f", {listed}"
     if any(_labels(n).get("kubernetes.azure.com/mode") == "system" for n in nodes):
         statement += " (system pool)"
     by_label = Counter(label for _, label in members)
     evidence = tuple(
-        f"{count} nodes with label {label}={pool}" if label else "kubectl get nodes"
+        f"{_count(count, 'node')} with label {label}{_label_value(label, pool)}" if label else "kubectl get nodes"
         for label, count in by_label.items()
     )
-    return fact(f"nodepool/{pool}", "platform", statement, evidence, ("nodes",))
+    return fact(f"nodepool/{clean(pool)}", "platform", statement, evidence, ("nodes",))
 
 
 def platform_facts(inputs: Inputs) -> list[Fact]:
@@ -172,7 +193,7 @@ def organisation_facts(inputs: Inputs, component_namespaces: set[str]) -> list[F
             key for key, count in sorted(counts.items(), key=lambda kv: (-kv[1], kv[0])) if count * 2 >= len(apps)
         ]
         if common:
-            listed = ", ".join(f"`{key}`" for key in common)
+            listed = ", ".join(f"`{clean(key)}`" for key in common)
             facts.append(
                 fact(
                     "organisation/namespace-labels",
@@ -478,49 +499,73 @@ def network_facts(inputs: Inputs) -> list[Fact]:
     return [*_policy_facts(inputs), *_exposure_facts(inputs), *_entry_point_facts(inputs)]
 
 
-def find_service(services: list[dict], name_part: str, port: int) -> tuple[str, str, int] | None:
-    """The (namespace, name, port) of the Service to reach a monitoring tool through.
+# tool -> (label, port, setting, catalog rows whose controller vouches for the namespace)
+MONITORING_TOOLS = {
+    "prometheus": ("Prometheus", 9090, "PROMETHEUS_URL", ("prometheus", "prometheus-operator")),
+    "alertmanager": ("Alertmanager", 9093, "ALERTMANAGER_URL", ("alertmanager", "prometheus-operator")),
+}
 
-    The name must contain `name_part` and the Service must expose `port`; headless
-    and `-operated` Services are skipped, since they are not stable entry points.
-    The shortest name wins, which prefers `kps-prometheus` over its sidecars.
+
+def monitoring_services(inputs: Inputs, tool: str) -> list[tuple[str, str, int]]:
+    """The (namespace, name, port) Services that may lead to a monitoring tool.
+
+    Only namespaces where the catalog saw the tool's controller running count: any
+    team can create a Service named `prometheus`, and the scan must not send a query
+    (or suggest a URL) to one of theirs. The name must contain the tool's name and
+    the Service must expose its port; headless and `-operated` Services are skipped,
+    since they are not stable entry points.
     """
+    _, port, _, keys = MONITORING_TOOLS[tool]
+    namespaces = running_namespaces(inputs, *keys)
     found = []
-    for svc in services:
+    for svc in inputs.get("services"):
         meta, spec = svc.get("metadata", {}), svc.get("spec", {})
-        name = meta.get("name", "")
-        if name_part not in name or name.endswith("-operated") or spec.get("clusterIP") == "None":
+        name, namespace = meta.get("name", ""), meta.get("namespace", "")
+        if namespace not in namespaces or tool not in name or name.endswith("-operated"):
             continue
-        if any(p.get("port") == port for p in spec.get("ports") or []):
-            found.append((len(name), meta.get("namespace", ""), name))
-    if not found:
-        return None
-    _, namespace, name = min(found)
-    return namespace, name, port
+        if spec.get("clusterIP") != "None" and any(p.get("port") == port for p in spec.get("ports") or []):
+            found.append((namespace, name, port))
+    return sorted(found)
 
 
 def monitoring_facts(inputs: Inputs, prometheus_checked: bool, alertmanager_checked: bool) -> list[Fact]:
-    """Where Prometheus and Alertmanager can be reached, as suggested settings."""
+    """Where Prometheus and Alertmanager can be reached, as suggested settings.
+
+    With more than one candidate Service the scan does not pick one: it asks.
+    """
     if not inputs.ok("services"):
         return []
     facts = []
-    for label, part, port, setting, checked in (
-        ("Prometheus", "prometheus", 9090, "PROMETHEUS_URL", prometheus_checked),
-        ("Alertmanager", "alertmanager", 9093, "ALERTMANAGER_URL", alertmanager_checked),
-    ):
-        found = find_service(inputs.get("services"), part, port)
+    for tool, checked in (("prometheus", prometheus_checked), ("alertmanager", alertmanager_checked)):
+        label, _, setting, _ = MONITORING_TOOLS[tool]
+        found = monitoring_services(inputs, tool)
+        sources = ("services", "deployments", "statefulsets")
+        if len(found) > 1:
+            names = ", ".join(f"{namespace}/{name}" for namespace, name, _ in found)
+            facts.append(
+                fact(
+                    f"monitoring/{tool}-url",
+                    "monitoring",
+                    f"Several {label} services in the cluster",
+                    tuple(f"Service {namespace}/{name} port {port}" for namespace, name, port in found),
+                    sources,
+                    unsure_question=f"Several {label} services found: {names}. Which one should the agent use?",
+                    scope="cluster",
+                )
+            )
+            continue
         if not found:
             continue
-        namespace, name, port = found
+        namespace, name, port = found[0]
         url = f"http://{name}.{namespace}.svc:{port}"
         outcome = "checked: it answered through the API server proxy" if checked else "not checked"
         facts.append(
             fact(
-                f"monitoring/{label.lower()}-url",
+                f"monitoring/{tool}-url",
                 "monitoring",
                 f"{label} service in the cluster: {url}",
                 (f"Service {namespace}/{name} port {port}",),
-                ("services",),
+                sources,
                 scope="cluster",
                 setting=(setting, url),
                 setting_reason=f"{label} service found in namespace {namespace}; {outcome}",
@@ -536,8 +581,17 @@ NOISY_RESTARTS = 20
 STALE_FINDING_DAYS = 3
 LONG_FIRING = timedelta(hours=24)
 
+# Only names like these become a suggested setting: the settings are comma-separated
+# lists, so a comma or space in a name would smuggle in another entry.
+_SETTING_SAFE = {
+    "ALERTS_IGNORE_NAMES": re.compile(r"[A-Za-z_:][A-Za-z0-9_:]*"),
+    "EVENTS_EXCLUDE_REASONS": re.compile(r"[A-Za-z][A-Za-z0-9]*"),
+}
+
 
 def _noise(key: str, statement: str, question: str, evidence: tuple[str, ...], inputs: tuple[str, ...], setting=None):
+    if setting and not _SETTING_SAFE[setting[0]].fullmatch(setting[1]):
+        setting = None
     return fact(
         f"noise/{key}",
         "noise",
@@ -556,11 +610,20 @@ def _utc(when: datetime | None) -> datetime | None:
 
 
 def _alert_noise(name: str, statement: str, question: str, evidence: str, source: str) -> Fact:
-    return _noise(f"alert/{name}", statement, question, (evidence,), (source,), ("ALERTS_IGNORE_NAMES", name))
+    return _noise(f"alert/{clean(name)}", statement, question, (evidence,), (source,), ("ALERTS_IGNORE_NAMES", name))
 
 
-def _alert_facts(config: dict, shares: dict[str, float] | None, firing_now: list[dict] | None, now: datetime):
-    """Alerts that fire all week (Prometheus), or without history those firing for over a day."""
+def _alert_facts(
+    config: dict,
+    shares: dict[str, float] | None,
+    firing_now: list[dict] | None,
+    now: datetime,
+    sources: tuple[str, str],
+):
+    """Alerts that fire all week (Prometheus), or without history those firing for over a day.
+
+    `sources` names where the Prometheus and the Alertmanager answers came from.
+    """
     ignored = set(config["alerts_ignore_names"])
     facts = []
     if shares is not None:
@@ -568,12 +631,13 @@ def _alert_facts(config: dict, shares: dict[str, float] | None, firing_now: list
             if share < NOISY_ALERT_SHARE or name in ignored:
                 continue
             pct = min(100, round(share * 100))
+            shown = clean(name)
             facts.append(
                 _alert_noise(
                     name,
-                    f"`{name}` fires most of the time ({pct}% of the last 7 days)",
-                    f"`{name}` fired {pct}% of the last 7 days. Is it expected here, so I stop reporting it?",
-                    "Prometheus ALERTS over 7 days",
+                    f"`{shown}` fires most of the time ({pct}% of the last 7 days)",
+                    f"`{shown}` fired {pct}% of the last 7 days. Is it expected here, so I stop reporting it?",
+                    f"{sources[0]}: ALERTS over 7 days",
                     "prometheus",
                 )
             )
@@ -585,13 +649,13 @@ def _alert_facts(config: dict, shares: dict[str, float] | None, firing_now: list
             if not name or name in ignored or name in seen or since is None or now - since <= LONG_FIRING:
                 continue
             seen.add(name)
-            date = since.strftime("%Y-%m-%d")
+            date, shown = since.strftime("%Y-%m-%d"), clean(name)
             facts.append(
                 _alert_noise(
                     name,
-                    f"`{name}` has been firing for more than a day",
-                    f"`{name}` has been firing since {date}. Is it expected here, so I stop reporting it?",
-                    f"Alertmanager: firing since {since.strftime('%Y-%m-%d %H:%M UTC')}",
+                    f"`{shown}` has been firing for more than a day",
+                    f"`{shown}` has been firing since {date}. Is it expected here, so I stop reporting it?",
+                    f"{sources[1]}: firing since {since.strftime('%Y-%m-%d %H:%M UTC')}",
                     "alertmanager",
                 )
             )
@@ -610,13 +674,13 @@ def _event_facts(inputs: Inputs, config: dict) -> list[Fact]:
             continue
         if count < NOISY_EVENT_MIN or count / total < NOISY_EVENT_SHARE:
             continue
-        pct = min(100, round(100 * count / total))
+        pct, shown = min(100, round(100 * count / total)), clean(reason)
         facts.append(
             _noise(
-                f"event/{reason}",
-                f"`{reason}` makes up {pct}% of all warning events",
-                f"`{reason}` makes up {pct}% of all warning events. Hide it by default?",
-                (f"{count} of {total} warning events with reason {reason}",),
+                f"event/{shown}",
+                f"`{shown}` makes up {pct}% of all warning events",
+                f"`{shown}` makes up {pct}% of all warning events. Hide it by default?",
+                (f"{count} of {total} warning events with reason {shown}",),
                 ("events",),
                 ("EVENTS_EXCLUDE_REASONS", reason),
             )
@@ -659,11 +723,12 @@ def _stale_finding_facts(findings: list[StoredFinding], now: datetime) -> list[F
         age = now - first_seen
         if finding.status != "open" or age <= timedelta(days=STALE_FINDING_DAYS):
             continue
+        title = clean(finding.title)
         facts.append(
             _noise(
                 f"finding/{finding.fingerprint}",
-                f'"{finding.title}" has been open for {age.days} days',
-                f'"{finding.title}" has been open for {age.days} days. Is it expected here?',
+                f'"{title}" has been open for {age.days} days',
+                f'"{title}" has been open for {age.days} days. Is it expected here?',
                 (f"Finding {finding.fingerprint} open since {first_seen.strftime('%Y-%m-%d')}",),
                 ("memory",),
             )
@@ -678,14 +743,18 @@ def noise_facts(
     firing_now: list[dict] | None,
     findings: list[StoredFinding],
     now: datetime,
+    *,
+    prometheus_source: str = "Prometheus",
+    alertmanager_source: str = "Alertmanager",
 ) -> list[Fact]:
     """Questions about what looks like background noise: recurring alerts, events, restarts.
 
     Every fact is `unsure`: the scan can see that something repeats, not whether it is
-    meant to. A failed input contributes nothing.
+    meant to. A failed input contributes nothing. The sources name where `shares` and
+    `firing_now` came from, for the evidence.
     """
     now = _utc(now)
-    facts = _alert_facts(config, shares, firing_now, now)
+    facts = _alert_facts(config, shares, firing_now, now, (prometheus_source, alertmanager_source))
     if inputs.ok("events"):
         facts += _event_facts(inputs, config)
     if inputs.ok("pods"):

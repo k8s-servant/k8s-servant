@@ -191,3 +191,8 @@ def component_facts(inputs: Inputs) -> tuple[list[Fact], set[str]]:
         if found:
             facts.append(found)
     return facts, namespaces
+
+
+def running_namespaces(inputs: Inputs, *keys: str) -> set[str]:
+    """Namespaces where a ready controller of any of these catalog rows runs."""
+    return {namespace for c in CATALOG if c.key in keys for namespace, _ in _running(inputs, c)}

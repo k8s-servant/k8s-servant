@@ -2,13 +2,13 @@
 
 from datetime import UTC, datetime, timedelta
 
-from fakes import by_key, crd, event, gateway, ingressclass, make_inputs, netpol, node, ns, pod, service
+from fakes import by_key, crd, event, gateway, ingressclass, make_inputs, netpol, node, ns, pod, service, statefulset
 
 from k8s_servant.config import configure_app
 from k8s_servant.findings import StoredFinding
 from k8s_servant.scan.discover import (
-    find_service,
     monitoring_facts,
+    monitoring_services,
     network_facts,
     noise_facts,
     organisation_facts,
@@ -334,25 +334,47 @@ def _prom(ns_, name, port=9090, **kw):
     return service(ns_, name, "ClusterIP", {}, ports=[{"port": port}], **kw)
 
 
+def _kps(*services, **workloads):
+    """Inputs with a running kube-prometheus-stack in `monitoring` and these Services."""
+    sts = [
+        statefulset("monitoring", "prometheus-kps-prometheus"),
+        statefulset("monitoring", "alertmanager-kps-alertmanager"),
+    ]
+    return make_inputs(services=list(services), statefulsets=sts, **workloads)
+
+
 def test_prometheus_url_is_built_from_the_service():
     svc = _prom("monitoring", "kps-prometheus")
     operated = _prom("monitoring", "prometheus-operated", cluster_ip="None")
-    f = by_key(monitoring_facts(make_inputs(services=[operated, svc]), True, False), "monitoring/prometheus-url")
+    f = by_key(monitoring_facts(_kps(operated, svc), True, False), "monitoring/prometheus-url")
     assert f.setting == ("PROMETHEUS_URL", "http://kps-prometheus.monitoring.svc:9090")
     assert f.statement == "Prometheus service in the cluster: http://kps-prometheus.monitoring.svc:9090"
     assert f.setting_reason.endswith("checked: it answered through the API server proxy")
     assert f.evidence == ("Service monitoring/kps-prometheus port 9090",)
 
 
-def test_alertmanager_url_not_checked_and_find_service_prefers_shortest():
+def test_alertmanager_url_not_checked():
     am = _prom("monitoring", "kps-alertmanager", 9093)
-    f = by_key(monitoring_facts(make_inputs(services=[am]), True, False), "monitoring/alertmanager-url")
+    f = by_key(monitoring_facts(_kps(am), True, False), "monitoring/alertmanager-url")
     assert f.setting == ("ALERTMANAGER_URL", "http://kps-alertmanager.monitoring.svc:9093")
     assert f.setting_reason.endswith("; not checked")
-    long = _prom("a", "prometheus-long-name")
-    short = _prom("b", "prometheus")
-    assert find_service([long, short], "prometheus", 9090) == ("b", "prometheus", 9090)
-    assert find_service([short], "prometheus", 9091) is None
+
+
+def test_services_outside_a_monitoring_namespace_are_ignored():
+    decoy = _prom("shop", "evil-prometheus")
+    assert monitoring_services(_kps(decoy), "prometheus") == []
+    assert monitoring_facts(_kps(decoy), False, False) == []
+    assert monitoring_services(make_inputs(services=[_prom("monitoring", "kps-prometheus")]), "prometheus") == []
+
+
+def test_several_prometheus_services_are_asked_about_without_a_setting():
+    inputs = _kps(_prom("monitoring", "kps-prometheus"), _prom("monitoring", "other-prometheus"))
+    f = by_key(monitoring_facts(inputs, False, False), "monitoring/prometheus-url")
+    assert f.certainty == "unsure" and f.setting is None
+    assert f.question == (
+        "Several Prometheus services found: monitoring/kps-prometheus, monitoring/other-prometheus. "
+        "Which one should the agent use?"
+    )
 
 
 def test_no_url_facts_when_services_failed():
@@ -435,3 +457,41 @@ def test_naive_timestamps_count_as_utc():
     facts = noise_facts(make_inputs(), configure_app({}), None, alerts, findings, NOW)
     assert [f.key for f in facts] == ["noise/alert/Old", "noise/finding/oom/x/Deployment/a"]
     assert facts[0].evidence == ("Alertmanager: firing since 2026-10-18 00:00 UTC",)
+
+
+def test_odd_names_get_no_setting():
+    events = [event("shop", "BackOff,Evil", 60), event("x", "Other", 40)]
+    facts = noise_facts(make_inputs(events=events), configure_app({}), {"Kube CPU": 0.9}, None, [], NOW)
+    assert {f.key for f in facts} == {"noise/alert/Kube CPU", "noise/event/BackOff,Evil"}
+    assert all(f.setting is None for f in facts)
+
+
+def test_free_text_loses_backticks_and_is_capped():
+    title = "`rm -rf`\n" + "x" * 500
+    findings = [StoredFinding("f/1", "warning", title, "", NOW - timedelta(days=5), NOW, "open", None)]
+    (f,) = noise_facts(make_inputs(), configure_app({}), {}, None, findings, NOW)
+    quoted = f.statement.split('"')[1]
+    assert "`" not in quoted and "\n" not in f.statement and len(quoted) <= 100
+
+
+def test_alert_evidence_names_the_source():
+    facts = noise_facts(
+        make_inputs(),
+        configure_app({}),
+        {"A": 0.9},
+        None,
+        [],
+        NOW,
+        prometheus_source="Prometheus at the configured URL",
+    )
+    assert facts[0].evidence == ("Prometheus at the configured URL: ALERTS over 7 days",)
+
+
+def test_pool_evidence_counts_and_labels_are_exact():
+    one = node("n1", {"kubernetes.azure.com/agentpool": "user"})
+    cp = node("cp", {"node-role.kubernetes.io/control-plane": ""})
+    facts = platform_facts(make_inputs(nodes=[one, cp]))
+    assert by_key(facts, "nodepool/user").evidence == ("1 node with label kubernetes.azure.com/agentpool=user",)
+    assert by_key(facts, "nodepool/control-plane").evidence == (
+        "1 node with label node-role.kubernetes.io/control-plane",
+    )

@@ -71,3 +71,17 @@ async def test_no_fixture_draft_states_anything_without_evidence_or_a_human():
                 assert line.startswith("- TODO(onboard): ") or line.endswith("]") or line.endswith("(from the team)"), (
                     line
                 )
+
+
+def test_unknown_certainty_and_empty_questions_are_left_out():
+    odd = replace(fact("component/a", "components", "A runs", ("x",), ("crds",)), certainty="guessed")
+    empty = replace(fact("component/b", "components", "B runs", ("x",), ("crds",)), certainty="unsure")
+    assert render_markdown([odd, empty], "platform") == ""
+
+
+def test_long_text_is_capped():
+    long = fact("component/a", "components", "S" * 500, ("E" * 500,), ("crds",))
+    asked = fact("component/b", "components", "B", ("x",), ("crds",), unsure_question="Q" * 500)
+    lines = render_markdown([long, asked], "platform").splitlines()
+    assert lines[2] == "- " + "S" * 299 + "\u2026 [" + "E" * 299 + "\u2026]"
+    assert lines[3] == "- TODO(onboard): " + "Q" * 299 + "\u2026"

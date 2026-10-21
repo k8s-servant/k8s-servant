@@ -100,7 +100,7 @@ async def test_scan_result_carries_cluster_time_failures_and_sorted_facts():
     assert order == sorted(order)
 
 
-async def test_an_unreachable_configured_url_falls_back_to_the_proxy():
+async def test_an_unreachable_configured_url_is_recorded_then_the_proxy_is_used():
     def refuse(request):
         raise httpx2.ConnectError("refused")
 
@@ -109,9 +109,71 @@ async def test_an_unreachable_configured_url_falls_back_to_the_proxy():
     result = await scan(
         fixture_fetch("aks", calls), config, "my-cluster", clock=lambda: NOW, transport=httpx2.MockTransport(refuse)
     )
-    assert "noise/alert/KubeCPUOvercommit" in {f.key for f in result.facts}
+    assert by_key(result.facts, "noise/alert/KubeCPUOvercommit").evidence == (
+        "Prometheus through the API server proxy, service monitoring/kps-prometheus: ALERTS over 7 days",
+    )
     assert any("/api/v2/alerts" in c[2] for c in calls if c[:2] == ["get", "--raw"])
+    assert result.failed["prometheus-url"] == "configured URL failed (ConnectError)"
+    assert result.failed["alertmanager-url"] == "configured URL failed (ConnectError)"
     assert "prometheus" not in result.failed and "alertmanager" not in result.failed
+
+
+async def test_alert_evidence_names_the_configured_url_when_it_answered():
+    body = {"status": "success", "data": {"result": [{"metric": {"alertname": "Noisy"}, "value": [0, "0.9"]}]}}
+    transport = httpx2.MockTransport(lambda r: httpx2.Response(200, json=body))
+    config = configure_app({"PROMETHEUS_URL": "http://p:9090"})
+    result = await scan(fixture_fetch("kind"), config, "my-cluster", clock=lambda: NOW, transport=transport)
+    assert by_key(result.facts, "noise/alert/Noisy").evidence == (
+        "Prometheus at the configured URL: ALERTS over 7 days",
+    )
+    assert "prometheus-url" not in result.failed
+
+
+def _with_service(fetch, extra):
+    async def wrapped(args):
+        body = await fetch(args)
+        if args[:2] == ["get", "services"]:
+            body = {"items": [*body["items"], extra]}
+        return body
+
+    return wrapped
+
+
+def _svc(namespace, name, port):
+    return {
+        "metadata": {"namespace": namespace, "name": name},
+        "spec": {"clusterIP": "10.0.0.9", "ports": [{"port": port}]},
+    }
+
+
+async def test_a_decoy_service_in_an_app_namespace_is_never_queried():
+    calls = []
+    fetch = _with_service(fixture_fetch("aks", calls), _svc("shop", "evil-prometheus", 9090))
+    result = await scan(fetch, configure_app({}), "my-cluster", clock=lambda: NOW)
+    assert not any("evil-prometheus" in " ".join(c) for c in calls)
+    assert by_key(result.facts, "monitoring/prometheus-url").setting[1] == "http://kps-prometheus.monitoring.svc:9090"
+
+
+async def test_several_prometheus_services_mean_no_proxy_query():
+    calls = []
+    fetch = _with_service(fixture_fetch("aks", calls), _svc("monitoring", "other-prometheus", 9090))
+    result = await scan(fetch, configure_app({}), "my-cluster", clock=lambda: NOW)
+    assert not any("/api/v1/query" in c[2] for c in calls if c[:2] == ["get", "--raw"])
+    assert by_key(result.facts, "monitoring/prometheus-url").certainty == "unsure"
+    assert result.failed["prometheus"].startswith("not reachable")
+
+
+async def test_a_failing_detector_is_recorded_and_the_scan_goes_on(monkeypatch):
+    import k8s_servant.scan.run as run
+
+    def boom(inputs):
+        raise ValueError("bug")
+
+    monkeypatch.setattr(run, "network_facts", boom)
+    result = await scan(fixture_fetch("aks"), configure_app({}), "my-cluster", clock=lambda: NOW)
+    assert result.ok and result.failed["detector:network"] == "ValueError"
+    assert not any(f.key.startswith("network/") for f in result.facts)
+    assert "component/kyverno" in {f.key for f in result.facts}
 
 
 async def test_the_url_fact_says_checked_only_when_the_proxy_answered():
