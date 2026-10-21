@@ -91,15 +91,23 @@ def _cloud_fact(nodes: list[dict]) -> Fact | None:
     return None
 
 
-def _pool_fact(pool: str, evidence_label: str, nodes: list[dict]) -> Fact:
+def _pool_fact(pool: str, members: list[tuple[dict, str]]) -> Fact:
+    """One fact per pool name; the evidence lists each label that named the pool."""
+    nodes = [n for n, _ in members]
     types = Counter(_labels(n).get(_INSTANCE_TYPE) for n in nodes)
     types.pop(None, None)
     listed = ", ".join(f"{count}\u00d7 {name}" for name, count in types.most_common())
-    statement = f"Node pool `{pool}`: {len(nodes)} nodes, {listed}"
+    statement = f"Node pool `{pool}`: {len(nodes)} node{'s' if len(nodes) != 1 else ''}"
+    if listed:
+        statement += f", {listed}"
     if any(_labels(n).get("kubernetes.azure.com/mode") == "system" for n in nodes):
         statement += " (system pool)"
-    evidence = f"{len(nodes)} nodes with label {evidence_label}={pool}" if evidence_label else "kubectl get nodes"
-    return fact(f"nodepool/{pool}", "platform", statement, (evidence,), ("nodes",))
+    by_label = Counter(label for _, label in members)
+    evidence = tuple(
+        f"{count} nodes with label {label}={pool}" if label else "kubectl get nodes"
+        for label, count in by_label.items()
+    )
+    return fact(f"nodepool/{pool}", "platform", statement, evidence, ("nodes",))
 
 
 def platform_facts(inputs: Inputs) -> list[Fact]:
@@ -122,10 +130,11 @@ def platform_facts(inputs: Inputs) -> list[Fact]:
         cloud = _cloud_fact(nodes)
         if cloud:
             facts.append(cloud)
-        pools: dict[tuple[str, str], list[dict]] = {}
+        pools: dict[str, list[tuple[dict, str]]] = {}
         for n in nodes:
-            pools.setdefault(_pool_of(n), []).append(n)
-        facts.extend(_pool_fact(pool, label, members) for (pool, label), members in pools.items())
+            pool, label = _pool_of(n)
+            pools.setdefault(pool, []).append((n, label))
+        facts.extend(_pool_fact(pool, members) for pool, members in pools.items())
     return facts
 
 

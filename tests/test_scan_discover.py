@@ -76,7 +76,7 @@ def test_kind_nodes_fall_back_to_roles():
 
 def test_other_nodes_are_workers_and_no_cloud_means_no_fact():
     facts = platform_facts(make_inputs(nodes=[node("n1")]))
-    assert by_key(facts, "nodepool/workers").statement == "Node pool `workers`: 1 nodes, "
+    assert by_key(facts, "nodepool/workers").statement == "Node pool `workers`: 1 node"
     assert not [f for f in facts if f.key == "platform/cloud"]
 
 
@@ -113,3 +113,16 @@ def test_component_namespaces_count_as_platform():
     assert f.key == "organisation/namespaces"
     assert f.statement == "3 namespaces: 2 for the platform, 1 for applications"
     assert f.scope == "cluster"
+
+
+def test_a_pool_without_instance_types_ends_after_the_count():
+    facts = platform_facts(make_inputs(nodes=[node(f"n{i}", {"agentpool": "p"}) for i in range(3)]))
+    assert by_key(facts, "nodepool/p").statement == "Node pool `p`: 3 nodes"
+
+
+def test_one_pool_name_is_one_fact_even_with_different_labels():
+    nodes = [node("a", {"agentpool": "x"}), node("b", {"kubernetes.azure.com/agentpool": "x"})]
+    pools = [f for f in platform_facts(make_inputs(nodes=nodes)) if f.key == "nodepool/x"]
+    assert len(pools) == 1
+    assert pools[0].statement == "Node pool `x`: 2 nodes"
+    assert len(pools[0].evidence) == 2
