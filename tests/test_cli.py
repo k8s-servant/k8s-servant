@@ -487,6 +487,20 @@ def test_onboard_markdown_format(monkeypatch, tmp_path):
     assert {p.name for p in out.iterdir()} == {"cluster.md", "settings.env"}
 
 
+def test_onboard_counts_each_open_question_once(monkeypatch, tmp_path, capsys):
+    _fixture_scan(monkeypatch, "aks")
+    out = tmp_path / "out"
+    assert cli.main(["onboard", "--no-input", "--no-model", "--out", str(out)]) == 0
+    err = capsys.readouterr().err
+    distinct = {
+        line.strip().lstrip("#- ").strip()
+        for path in out.iterdir()
+        for line in path.read_text().splitlines()
+        if "TODO(onboard):" in line
+    }
+    assert distinct and f", {len(distinct)} questions left open" in err
+
+
 def test_onboard_cluster_name_names_the_file(monkeypatch, tmp_path, capsys):
     _fixture_scan(monkeypatch, "kind")
     assert cli.main(["onboard", "--no-input", "--no-model", "--cluster-name", "Prod EU", "--out", str(tmp_path)]) == 0
