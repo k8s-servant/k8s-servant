@@ -1,0 +1,14 @@
+{
+  "items": [
+    {
+      "metadata": {
+        "name": "pd.csi.storage.gke.io"
+      }
+    },
+    {
+      "metadata": {
+        "name": "secrets-store-gke.csi.k8s.io"
+      }
+    }
+  ]
+}

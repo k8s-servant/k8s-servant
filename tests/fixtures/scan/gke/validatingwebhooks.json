@@ -1,0 +1,9 @@
+{
+  "items": [
+    {
+      "metadata": {
+        "name": "istio-validator-istio-system"
+      }
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "items": [
+    {
+      "metadata": {
+        "name": "argocd-application-controller",
+        "namespace": "argocd"
+      },
+      "status": {
+        "readyReplicas": 1
+      }
+    }
+  ]
+}

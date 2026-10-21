@@ -1,3 +1,22 @@
 {
-  "items": []
+  "items": [
+    {
+      "metadata": {
+        "name": "coredns",
+        "namespace": "kube-system"
+      },
+      "status": {
+        "readyReplicas": 2
+      }
+    },
+    {
+      "metadata": {
+        "name": "local-path-provisioner",
+        "namespace": "local-path-storage"
+      },
+      "status": {
+        "readyReplicas": 1
+      }
+    }
+  ]
 }

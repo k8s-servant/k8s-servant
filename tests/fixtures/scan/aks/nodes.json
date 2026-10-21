@@ -1,0 +1,74 @@
+{
+  "items": [
+    {
+      "metadata": {
+        "name": "aks-system-12345678-vmss000000",
+        "labels": {
+          "kubernetes.azure.com/cluster": "MC_my-resource-group_my-cluster_westeurope",
+          "kubernetes.azure.com/agentpool": "system",
+          "kubernetes.azure.com/mode": "system",
+          "node.kubernetes.io/instance-type": "Standard_D4s_v5"
+        }
+      },
+      "spec": {
+        "providerID": "azure:///subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/mc_my-resource-group_my-cluster_westeurope/providers/Microsoft.Compute/virtualMachineScaleSets/aks-system-12345678-vmss/virtualMachines/0"
+      }
+    },
+    {
+      "metadata": {
+        "name": "aks-system-12345678-vmss000001",
+        "labels": {
+          "kubernetes.azure.com/cluster": "MC_my-resource-group_my-cluster_westeurope",
+          "kubernetes.azure.com/agentpool": "system",
+          "kubernetes.azure.com/mode": "system",
+          "node.kubernetes.io/instance-type": "Standard_D4s_v5"
+        }
+      },
+      "spec": {
+        "providerID": "azure:///subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/mc_my-resource-group_my-cluster_westeurope/providers/Microsoft.Compute/virtualMachineScaleSets/aks-system-12345678-vmss/virtualMachines/1"
+      }
+    },
+    {
+      "metadata": {
+        "name": "aks-user-12345678-vmss000000",
+        "labels": {
+          "kubernetes.azure.com/cluster": "MC_my-resource-group_my-cluster_westeurope",
+          "kubernetes.azure.com/agentpool": "user",
+          "kubernetes.azure.com/mode": "user",
+          "node.kubernetes.io/instance-type": "Standard_D8s_v5"
+        }
+      },
+      "spec": {
+        "providerID": "azure:///subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/mc_my-resource-group_my-cluster_westeurope/providers/Microsoft.Compute/virtualMachineScaleSets/aks-user-12345678-vmss/virtualMachines/0"
+      }
+    },
+    {
+      "metadata": {
+        "name": "aks-user-12345678-vmss000001",
+        "labels": {
+          "kubernetes.azure.com/cluster": "MC_my-resource-group_my-cluster_westeurope",
+          "kubernetes.azure.com/agentpool": "user",
+          "kubernetes.azure.com/mode": "user",
+          "node.kubernetes.io/instance-type": "Standard_D8s_v5"
+        }
+      },
+      "spec": {
+        "providerID": "azure:///subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/mc_my-resource-group_my-cluster_westeurope/providers/Microsoft.Compute/virtualMachineScaleSets/aks-user-12345678-vmss/virtualMachines/1"
+      }
+    },
+    {
+      "metadata": {
+        "name": "aks-user-12345678-vmss000002",
+        "labels": {
+          "kubernetes.azure.com/cluster": "MC_my-resource-group_my-cluster_westeurope",
+          "kubernetes.azure.com/agentpool": "user",
+          "kubernetes.azure.com/mode": "user",
+          "node.kubernetes.io/instance-type": "Standard_D8s_v5"
+        }
+      },
+      "spec": {
+        "providerID": "azure:///subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/mc_my-resource-group_my-cluster_westeurope/providers/Microsoft.Compute/virtualMachineScaleSets/aks-user-12345678-vmss/virtualMachines/2"
+      }
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "items": [
+    {
+      "metadata": {
+        "name": "kube-dns",
+        "namespace": "kube-system"
+      },
+      "status": {
+        "readyReplicas": 2
+      }
+    },
+    {
+      "metadata": {
+        "name": "istiod",
+        "namespace": "istio-system"
+      },
+      "status": {
+        "readyReplicas": 2
+      }
+    }
+  ]
+}

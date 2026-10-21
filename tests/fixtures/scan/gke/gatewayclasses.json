@@ -1,0 +1,9 @@
+{
+  "items": [
+    {
+      "metadata": {
+        "name": "gke-l7-global-external-managed"
+      }
+    }
+  ]
+}

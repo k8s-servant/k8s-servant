@@ -1,0 +1,139 @@
+{
+  "items": [
+    {
+      "metadata": {
+        "name": "coredns",
+        "namespace": "kube-system"
+      },
+      "status": {
+        "readyReplicas": 2
+      }
+    },
+    {
+      "metadata": {
+        "name": "metrics-server",
+        "namespace": "kube-system"
+      },
+      "status": {
+        "readyReplicas": 2
+      }
+    },
+    {
+      "metadata": {
+        "name": "kyverno-admission-controller",
+        "namespace": "kyverno"
+      },
+      "status": {
+        "readyReplicas": 3
+      }
+    },
+    {
+      "metadata": {
+        "name": "source-controller",
+        "namespace": "flux-system"
+      },
+      "status": {
+        "readyReplicas": 1
+      }
+    },
+    {
+      "metadata": {
+        "name": "kustomize-controller",
+        "namespace": "flux-system"
+      },
+      "status": {
+        "readyReplicas": 1
+      }
+    },
+    {
+      "metadata": {
+        "name": "helm-controller",
+        "namespace": "flux-system"
+      },
+      "status": {
+        "readyReplicas": 1
+      }
+    },
+    {
+      "metadata": {
+        "name": "notification-controller",
+        "namespace": "flux-system"
+      },
+      "status": {
+        "readyReplicas": 1
+      }
+    },
+    {
+      "metadata": {
+        "name": "cert-manager",
+        "namespace": "cert-manager"
+      },
+      "status": {
+        "readyReplicas": 1
+      }
+    },
+    {
+      "metadata": {
+        "name": "cert-manager-webhook",
+        "namespace": "cert-manager"
+      },
+      "status": {
+        "readyReplicas": 1
+      }
+    },
+    {
+      "metadata": {
+        "name": "cert-manager-cainjector",
+        "namespace": "cert-manager"
+      },
+      "status": {
+        "readyReplicas": 1
+      }
+    },
+    {
+      "metadata": {
+        "name": "ingress-nginx-controller",
+        "namespace": "ingress-nginx"
+      },
+      "status": {
+        "readyReplicas": 2
+      }
+    },
+    {
+      "metadata": {
+        "name": "kps-prometheus-operator",
+        "namespace": "monitoring"
+      },
+      "status": {
+        "readyReplicas": 1
+      }
+    },
+    {
+      "metadata": {
+        "name": "external-secrets",
+        "namespace": "external-secrets"
+      },
+      "status": {
+        "readyReplicas": 1
+      }
+    },
+    {
+      "metadata": {
+        "name": "external-secrets-webhook",
+        "namespace": "external-secrets"
+      },
+      "status": {
+        "readyReplicas": 1
+      }
+    },
+    {
+      "metadata": {
+        "name": "consul-connect-injector",
+        "namespace": "consul"
+      },
+      "status": {
+        "readyReplicas": 2
+      }
+    }
+  ]
+}

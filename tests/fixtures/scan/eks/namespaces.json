@@ -1,0 +1,58 @@
+{
+  "items": [
+    {
+      "metadata": {
+        "name": "default",
+        "labels": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "kube-system",
+        "labels": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "kube-public",
+        "labels": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "kube-node-lease",
+        "labels": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "karpenter",
+        "labels": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "argocd",
+        "labels": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "gatekeeper-system",
+        "labels": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "linkerd",
+        "labels": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "shop",
+        "labels": {}
+      }
+    }
+  ]
+}

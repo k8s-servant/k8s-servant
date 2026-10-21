@@ -53,7 +53,9 @@ def fixture_fetch(flavor: str, calls: list | None = None, fail: dict[str, Except
 
     The file name is the scan input's name (matched against INPUTS), or
     `raw-prometheus` / `raw-alertmanager` for `get --raw` service-proxy paths. A
-    missing file raises RuntimeError("NotFound"); `fail[name]` is raised instead.
+    missing file raises RuntimeError("NotFound"), a file holding `{"error": "..."}`
+    raises RuntimeError with that text (a forbidden input); `fail[name]` is raised
+    instead.
     """
     root = Path(__file__).parent / "fixtures" / "scan" / flavor
 
@@ -74,7 +76,10 @@ def fixture_fetch(flavor: str, calls: list | None = None, fail: dict[str, Except
         path = root / f"{name}.json"
         if name is None or not path.exists():
             raise RuntimeError("NotFound")
-        return json.loads(path.read_text())
+        body = json.loads(path.read_text())
+        if isinstance(body, dict) and "error" in body:
+            raise RuntimeError(body["error"])
+        return body
 
     return fetch
 

@@ -1,0 +1,14 @@
+{
+  "items": [
+    {
+      "metadata": {
+        "name": "kyverno-resource-validating-webhook-cfg"
+      }
+    },
+    {
+      "metadata": {
+        "name": "cert-manager-webhook"
+      }
+    }
+  ]
+}

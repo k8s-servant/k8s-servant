@@ -1,0 +1,14 @@
+{
+  "items": [
+    {
+      "metadata": {
+        "name": "consul-connect-injector"
+      }
+    },
+    {
+      "metadata": {
+        "name": "kyverno-resource-mutating-webhook-cfg"
+      }
+    }
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "items": [
+    {
+      "metadata": {
+        "namespace": "shop"
+      },
+      "reason": "PolicyViolation",
+      "count": 900,
+      "lastTimestamp": "2026-10-21T08:00:00Z",
+      "involvedObject": {
+        "kind": "Deployment",
+        "name": "api"
+      }
+    },
+    {
+      "metadata": {
+        "namespace": "shop"
+      },
+      "reason": "BackOff",
+      "count": 12,
+      "lastTimestamp": "2026-10-21T08:00:00Z",
+      "involvedObject": {
+        "kind": "Pod",
+        "name": "x"
+      }
+    }
+  ]
+}

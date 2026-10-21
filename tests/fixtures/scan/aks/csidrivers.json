@@ -1,0 +1,14 @@
+{
+  "items": [
+    {
+      "metadata": {
+        "name": "disk.csi.azure.com"
+      }
+    },
+    {
+      "metadata": {
+        "name": "secrets-store.csi.k8s.io"
+      }
+    }
+  ]
+}

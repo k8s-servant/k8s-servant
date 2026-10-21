@@ -67,7 +67,8 @@ k8s-servant/
 │   ├── scheduler.py                # `serve`: hourly checks + the morning report, heartbeat, SIGTERM
 │   ├── scan/
 │   │   ├── catalog.py              # Well-known components and how to recognise them
-│   │   ├── discover.py             # Platform, network, monitoring and noise facts: version, cloud, pools, URLs, noisy alerts
+│   │   ├── discover.py             # scan(); platform, network, monitoring and noise facts: version, cloud, pools, URLs, noisy alerts
+│   │   ├── draft.py                # Facts as Markdown: sections, evidence, TODO(onboard) questions
 │   │   ├── facts.py                # Scan facts: evidence, certainty, scope; scan results
 │   │   └── inputs.py               # Scan inputs read once each; Prometheus and Alertmanager access
 │   └── tools/

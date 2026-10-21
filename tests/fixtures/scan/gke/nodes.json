@@ -1,0 +1,40 @@
+{
+  "items": [
+    {
+      "metadata": {
+        "name": "gke-my-cluster-default-pool-00000000-0",
+        "labels": {
+          "cloud.google.com/gke-nodepool": "default-pool",
+          "node.kubernetes.io/instance-type": "e2-standard-4"
+        }
+      },
+      "spec": {
+        "providerID": "gce://my-project/europe-west1-b/gke-my-cluster-default-pool-00000000-0"
+      }
+    },
+    {
+      "metadata": {
+        "name": "gke-my-cluster-default-pool-00000000-1",
+        "labels": {
+          "cloud.google.com/gke-nodepool": "default-pool",
+          "node.kubernetes.io/instance-type": "e2-standard-4"
+        }
+      },
+      "spec": {
+        "providerID": "gce://my-project/europe-west1-b/gke-my-cluster-default-pool-00000000-1"
+      }
+    },
+    {
+      "metadata": {
+        "name": "gke-my-cluster-default-pool-00000000-2",
+        "labels": {
+          "cloud.google.com/gke-nodepool": "default-pool",
+          "node.kubernetes.io/instance-type": "e2-standard-4"
+        }
+      },
+      "spec": {
+        "providerID": "gce://my-project/europe-west1-b/gke-my-cluster-default-pool-00000000-2"
+      }
+    }
+  ]
+}

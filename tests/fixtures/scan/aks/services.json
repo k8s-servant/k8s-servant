@@ -1,0 +1,91 @@
+{
+  "items": [
+    {
+      "metadata": {
+        "name": "kps-prometheus",
+        "namespace": "monitoring",
+        "annotations": {}
+      },
+      "spec": {
+        "type": "ClusterIP",
+        "clusterIP": "10.0.0.10",
+        "ports": [
+          {
+            "name": "http",
+            "port": 9090
+          }
+        ]
+      }
+    },
+    {
+      "metadata": {
+        "name": "kps-alertmanager",
+        "namespace": "monitoring",
+        "annotations": {}
+      },
+      "spec": {
+        "type": "ClusterIP",
+        "clusterIP": "10.0.0.10",
+        "ports": [
+          {
+            "name": "http",
+            "port": 9093
+          }
+        ]
+      }
+    },
+    {
+      "metadata": {
+        "name": "prometheus-operated",
+        "namespace": "monitoring",
+        "annotations": {}
+      },
+      "spec": {
+        "type": "ClusterIP",
+        "clusterIP": "None",
+        "ports": [
+          {
+            "name": "http",
+            "port": 9090
+          }
+        ]
+      }
+    },
+    {
+      "metadata": {
+        "name": "kps-prometheus-operator",
+        "namespace": "monitoring",
+        "annotations": {}
+      },
+      "spec": {
+        "type": "ClusterIP",
+        "clusterIP": "10.0.0.10",
+        "ports": [
+          {
+            "name": "http",
+            "port": 443
+          }
+        ]
+      }
+    },
+    {
+      "metadata": {
+        "name": "ingress-nginx-controller",
+        "namespace": "ingress-nginx",
+        "annotations": {
+          "service.beta.kubernetes.io/azure-load-balancer-internal": "true"
+        }
+      },
+      "spec": {
+        "type": "LoadBalancer",
+        "clusterIP": "10.0.0.10",
+        "ports": [
+          {
+            "name": "http",
+            "port": 80
+          }
+        ]
+      }
+    }
+  ]
+}

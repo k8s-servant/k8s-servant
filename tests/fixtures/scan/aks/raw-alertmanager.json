@@ -1,0 +1,12 @@
+[
+  {
+    "labels": {
+      "alertname": "KubeCPUOvercommit",
+      "severity": "warning"
+    },
+    "startsAt": "2026-10-14T06:00:00Z",
+    "status": {
+      "state": "active"
+    }
+  }
+]

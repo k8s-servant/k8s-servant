@@ -7,6 +7,7 @@ from k8s_servant.scan.inputs import (
     alert_shares,
     direct_prometheus,
     gather_inputs,
+    proxied_alertmanager,
     proxied_prometheus,
 )
 
@@ -62,3 +63,21 @@ async def test_direct_prometheus_uses_the_configured_url():
     )
     assert await alert_shares(direct_prometheus("http://p:9090", 5, transport)) == {}
     assert seen[0].startswith("http://p:9090/api/v1/query?query=")
+
+
+async def test_crd_dependent_inputs_are_read_when_the_crd_exists():
+    inputs = await gather_inputs(fixture_fetch("gke"))
+    assert inputs.ok("gateways") and inputs.get("gateways")
+
+
+async def test_alertmanager_through_the_proxy_path():
+    calls = []
+    alerts = proxied_alertmanager(fixture_fetch("aks", calls), "monitoring", "kps-alertmanager", 9093)
+    found = await alerts()
+    assert [a["labels"]["alertname"] for a in found] == ["KubeCPUOvercommit"]
+    assert calls[0] == [
+        "get",
+        "--raw",
+        "/api/v1/namespaces/monitoring/services/kps-alertmanager:9093/proxy"
+        "/api/v2/alerts?active=true&silenced=false&inhibited=false",
+    ]
