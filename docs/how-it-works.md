@@ -71,6 +71,7 @@ k8s-servant/
 │   │   ├── draft.py                # Facts as Markdown: sections, evidence, TODO(onboard) questions
 │   │   ├── facts.py                # Scan facts: evidence, certainty, scope; scan results
 │   │   ├── inputs.py               # Scan inputs read once each; Prometheus and Alertmanager access
+│   │   ├── questions.py            # Onboarding questions: confirm unsure facts, fill blind spots
 │   │   └── run.py                  # scan(): inputs, every detector, monitoring access; failures listed, never raised
 │   └── tools/
 │       ├── registry.py             # Common Tool shape, registry, output size cap
