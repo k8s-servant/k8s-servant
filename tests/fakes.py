@@ -117,3 +117,8 @@ def ns(name: str, labels: dict[str, str] | None = None) -> dict:
 def by_key(facts: list, key: str):
     """The fact with this key; fails the test when there is none."""
     return next(f for f in facts if f.key == key)
+
+
+def node(name: str, labels: dict[str, str] | None = None, provider_id: str = "") -> dict:
+    """A Node with labels and an optional `spec.providerID`."""
+    return {"metadata": {"name": name, "labels": labels or {}}, "spec": {"providerID": provider_id}}
