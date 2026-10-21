@@ -11,6 +11,7 @@
     notes              the agent's learned notes
     tools              the tools available right now (MCP or kubectl fallback)
     doctor             check configuration and connectivity, step by step
+    onboard            scan the cluster once and draft its knowledge files for review
 
 The same command works on a laptop (your kubeconfig and `az login`) and inside the
 agent's pod (`kubectl exec -it deploy/k8s-servant -c agent -- k8s-servant ...`),
@@ -32,6 +33,7 @@ import sqlite3
 import sys
 import time
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 import yaml
 
@@ -44,6 +46,20 @@ from k8s_servant.llm.types import Turn
 from k8s_servant.memory import Memory
 from k8s_servant.report import MorningReport, build_morning_report, format_age
 from k8s_servant.runtime import open_agent, open_runtime
+from k8s_servant.scan import scan
+from k8s_servant.scan.draft import (
+    DraftExists,
+    count_statements,
+    markdown_files,
+    refuse_existing,
+    suggested_settings,
+    target_names,
+    values_files,
+    write_files,
+    write_overview,
+)
+from k8s_servant.scan.facts import apply_scope
+from k8s_servant.scan.questions import BLIND_SPOTS, ask_representative, confirm, stop_at_eof, terminal_ask
 from k8s_servant.scheduler import Scheduler
 from k8s_servant.teams import (
     check_card,
@@ -53,6 +69,7 @@ from k8s_servant.teams import (
     should_post_check,
     should_post_report,
 )
+from k8s_servant.tools.cluster_tools import kubectl_json
 from k8s_servant.tools.kubectl_tool import run_kubectl
 from k8s_servant.tools.prometheus_tool import check_ready
 
@@ -88,6 +105,23 @@ def build_parser() -> argparse.ArgumentParser:
     commands.add_parser("notes", help="Show the agent's learned notes.")
     commands.add_parser("tools", help="List the tools available right now.")
     commands.add_parser("doctor", help="Check configuration and connectivity.")
+    onboard = commands.add_parser("onboard", help="Scan the cluster once and draft its knowledge files.")
+    onboard.add_argument(
+        "--out",
+        default="k8s-servant-onboard",
+        metavar="DIR",
+        help="Folder for the draft (default k8s-servant-onboard).",
+    )
+    onboard.add_argument(
+        "--format",
+        choices=("values", "markdown"),
+        default="values",
+        help="Helm values files (default) or plain Markdown plus settings.env.",
+    )
+    onboard.add_argument("--force", action="store_true", help="Overwrite files that already exist.")
+    onboard.add_argument("--no-input", action="store_true", help="Ask nothing; open questions stay TODO lines.")
+    onboard.add_argument("--no-model", action="store_true", help="Do not ask the model for an overview.")
+    onboard.add_argument("--cluster-name", metavar="NAME", help="Cluster name for the draft (default CLUSTER_NAME).")
     return parser
 
 
@@ -482,6 +516,75 @@ async def cmd_doctor(args, config: dict, knowledge, memory: Memory) -> int:
     return 1 if "FAIL" in statuses else 0
 
 
+async def _overview(config: dict, facts) -> str:
+    """The model's overview of the draft, or "" (with a note on stderr) when there is none."""
+    missing = missing_model_settings(config)
+    if missing:
+        print("No model configured: writing the draft without an overview.", file=sys.stderr)
+        return ""
+    try:
+        return await write_overview(build_chat(config), facts)
+    except (*MODEL_ERRORS, ValueError) as exc:
+        print(
+            f"Model call failed: {model_error_text(exc, config)}; writing the draft without an overview.",
+            file=sys.stderr,
+        )
+        return ""
+
+
+async def cmd_onboard(args, config: dict, knowledge, memory: Memory) -> int:
+    """Scan the cluster once, ask about what is unsure, and write the draft files."""
+    configured = config["cluster_name"]
+    cluster = args.cluster_name or (configured if configured and configured != "unknown-cluster" else "my-cluster")
+    out = Path(args.out)
+    if not args.force:
+        # Checked before the scan, with every file a run could write, so a later
+        # "not representative" answer never hides a clash until the end.
+        try:
+            refuse_existing(out, target_names(args.format, cluster))
+        except DraftExists as exc:
+            print(exc, file=sys.stderr)
+            return 1
+
+    def fetch(kubectl_args: list[str]):
+        return kubectl_json(kubectl_args, config["kubectl_path"], config["kubectl_timeout_seconds"])
+
+    result = await scan(fetch, config, cluster, memory)
+    if not result.ok:
+        first = next(iter(result.failed.items()), ("cluster", "nothing could be read"))
+        print(f"Could not read the cluster: {first[0]}: {first[1]}", file=sys.stderr)
+        return 1
+
+    interactive = not args.no_input and sys.stdin.isatty()
+    # One asker for the whole run: once stdin ends, no further prompt is printed.
+    ask = stop_at_eof(terminal_ask)
+    representative = ask_representative(ask) if interactive else False
+    facts = apply_scope(result.facts + list(BLIND_SPOTS), representative)
+    if interactive:
+        facts = confirm(facts, ask)
+
+    overview = "" if args.no_model else await _overview(config, facts)
+    settings = suggested_settings(facts, config, cluster)
+    build = values_files if args.format == "values" else markdown_files
+    files = build(result, facts, settings, representative, overview)
+    try:
+        paths = write_files(out, files, args.force)
+    except DraftExists as exc:
+        print(exc, file=sys.stderr)
+        return 1
+    except OSError as exc:
+        # A read-only volume or an --out that is a file: a message, not a traceback.
+        print(f"Could not write the draft to {out}: {exc.strerror or exc}", file=sys.stderr)
+        return 1
+
+    for path in paths:
+        print(path)
+    stated = count_statements(facts)
+    todo = sum(text.count("TODO(onboard):") for text in files.values())
+    print(f"{stated} facts, {todo} questions left open (TODO(onboard)). Review the files before use.", file=sys.stderr)
+    return 0
+
+
 COMMANDS = {
     "ask": cmd_ask,
     "check": cmd_check,
@@ -492,6 +595,7 @@ COMMANDS = {
     "notes": cmd_notes,
     "tools": cmd_tools,
     "doctor": cmd_doctor,
+    "onboard": cmd_onboard,
 }
 
 
