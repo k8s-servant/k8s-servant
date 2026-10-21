@@ -59,7 +59,7 @@ from k8s_servant.scan.draft import (
     write_overview,
 )
 from k8s_servant.scan.facts import apply_scope
-from k8s_servant.scan.questions import BLIND_SPOTS, ask_representative, confirm, terminal_ask
+from k8s_servant.scan.questions import BLIND_SPOTS, ask_representative, confirm, stop_at_eof, terminal_ask
 from k8s_servant.scheduler import Scheduler
 from k8s_servant.teams import (
     check_card,
@@ -556,10 +556,12 @@ async def cmd_onboard(args, config: dict, knowledge, memory: Memory) -> int:
         return 1
 
     interactive = not args.no_input and sys.stdin.isatty()
-    representative = ask_representative(terminal_ask) if interactive else False
+    # One asker for the whole run: once stdin ends, no further prompt is printed.
+    ask = stop_at_eof(terminal_ask)
+    representative = ask_representative(ask) if interactive else False
     facts = apply_scope(result.facts + list(BLIND_SPOTS), representative)
     if interactive:
-        facts = confirm(facts, terminal_ask)
+        facts = confirm(facts, ask)
 
     overview = "" if args.no_model else await _overview(config, facts)
     settings = suggested_settings(facts, config, cluster)

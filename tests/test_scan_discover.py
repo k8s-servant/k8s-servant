@@ -104,7 +104,8 @@ def test_kind_nodes_fall_back_to_roles():
 def test_other_nodes_are_workers_and_no_cloud_means_no_fact():
     facts = platform_facts(make_inputs(nodes=[node("n1")]))
     assert by_key(facts, "nodepool/workers").statement == "Node pool `workers`: 1 node"
-    assert not [f for f in facts if f.key == "platform/cloud"]
+    cloud_key = "platform/cloud"
+    assert not [f for f in facts if f.key == cloud_key]
 
 
 def test_failed_inputs_make_no_facts():
@@ -116,7 +117,8 @@ def test_failed_inputs_make_no_facts():
 def test_namespace_labels_need_three_application_namespaces():
     namespaces = [ns("kube-system"), ns("shop", {"team": "a"}), ns("pay", {"team": "b"})]
     facts = organisation_facts(make_inputs(namespaces=namespaces), set())
-    assert not [f for f in facts if f.key == "organisation/namespace-labels"]
+    labels_key = "organisation/namespace-labels"
+    assert not [f for f in facts if f.key == labels_key]
 
 
 def test_common_namespace_labels_are_reported():
@@ -137,7 +139,8 @@ def test_common_namespace_labels_are_reported():
 def test_component_namespaces_count_as_platform():
     namespaces = [ns("kube-system"), ns("kyverno"), ns("shop")]
     f = organisation_facts(make_inputs(namespaces=namespaces), {"kyverno"})[0]
-    assert f.key == "organisation/namespaces"
+    namespaces_key = "organisation/namespaces"
+    assert f.key == namespaces_key
     assert f.statement == "3 namespaces: 2 for the platform, 1 for applications"
     assert f.scope == "cluster"
 
@@ -149,7 +152,8 @@ def test_a_pool_without_instance_types_ends_after_the_count():
 
 def test_one_pool_name_is_one_fact_even_with_different_labels():
     nodes = [node("a", {"agentpool": "x"}), node("b", {"kubernetes.azure.com/agentpool": "x"})]
-    pools = [f for f in platform_facts(make_inputs(nodes=nodes)) if f.key == "nodepool/x"]
+    pool_key = "nodepool/x"
+    pools = [f for f in platform_facts(make_inputs(nodes=nodes)) if f.key == pool_key]
     assert len(pools) == 1
     assert pools[0].statement == "Node pool `x`: 2 nodes"
     assert len(pools[0].evidence) == 2

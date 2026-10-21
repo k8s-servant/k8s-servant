@@ -630,3 +630,17 @@ def test_onboard_does_not_count_a_fact_left_out_of_the_file(monkeypatch, tmp_pat
     monkeypatch.setattr(cli, "scan", fake_scan)
     assert cli.main(["onboard", "--no-input", "--no-model", "--out", str(tmp_path / "out")]) == 0
     assert "1 facts," in capsys.readouterr().err
+
+
+def test_onboard_end_of_input_stops_the_questions(monkeypatch, tmp_path):
+    _fixture_scan(monkeypatch, "aks")
+    prompts = []
+
+    def ask(prompt):
+        prompts.append(prompt)
+        return None  # stdin closed at once
+
+    monkeypatch.setattr(cli, "terminal_ask", ask)
+    monkeypatch.setattr(sys.stdin, "isatty", lambda: True)
+    assert cli.main(["onboard", "--no-model", "--out", str(tmp_path / "out")]) == 0
+    assert len(prompts) == 1 and "representative" in prompts[0]
