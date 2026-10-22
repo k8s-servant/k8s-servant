@@ -115,7 +115,7 @@ and writes the findings. No other setting changes the quality of the results as 
 |---|---|---|---|---|
 | Anthropic (Claude) | `anthropic` | API key | `examples/values-anthropic.yaml` | [Anthropic](providers/anthropic.md) |
 | OpenAI | `openai` | API key | `examples/values-openai.yaml` | [OpenAI](providers/openai.md) |
-| Microsoft Foundry (GPT and others) | `foundry` | Workload Identity on AKS, or API key | `examples/values-azure.yaml` | [Foundry](providers/foundry/gpt.md) |
+| Microsoft Foundry (GPT and others) | `foundry` | Workload Identity on AKS (recommended), or API key on any cluster | `examples/values-azure.yaml`, `examples/values-foundry-key.yaml` | [Foundry](providers/foundry/gpt.md) |
 | Claude on Microsoft Foundry | `anthropic` | Workload Identity on AKS | `examples/values-azure-claude.yaml` | [Claude on Foundry](providers/foundry/claude.md) |
 | Ollama, in your network | `ollama` | none | `examples/values-ollama.yaml` | [Ollama](providers/ollama.md) |
 | Any OpenAI-compatible server (vLLM, LiteLLM, Gemini, ...) | `openai-compatible` | API key (optional) | `examples/values-minimal.yaml` | [OpenAI-compatible](providers/openai-compatible.md) |
@@ -138,7 +138,8 @@ The comparison of the providers (APIs, reasoning, caching) is in
     works on every cluster.
 - **Nothing**, for a model in your network without a key, such as an in-cluster Ollama.
 - **A cloud identity instead of a key**, for Microsoft Foundry on AKS with Workload
-    Identity: see [AKS](#aks).
+    Identity: see [AKS](#aks). This is the recommended, more secure choice there: no
+    long-lived key to store, rotate or leak.
 
 Try the model from your laptop first: with the same three settings in your shell,
 `k8s-servant doctor` checks it in one line, and `k8s-servant ask` shows how it answers.
@@ -170,6 +171,7 @@ Start from the examples in this repository:
 | `examples/values-anthropic.yaml` | Any cluster: Claude from Anthropic, key from a Secret |
 | `examples/values-openai.yaml` | Any cluster: OpenAI, key from a Secret |
 | `examples/values-ollama.yaml` | Any cluster: an in-cluster Ollama, no key |
+| `examples/values-foundry-key.yaml` | Any cluster: Microsoft Foundry with an API key (on AKS, Workload Identity below is recommended) |
 | `examples/values-azure.yaml` | AKS: Microsoft Foundry with Workload Identity, the Teams webhook synced from Key Vault by External Secrets ([AKS](#aks)) |
 | `examples/values-azure-csi.yaml` | AKS without any Kubernetes Secret: Workload Identity, the Teams webhook mounted from Key Vault by the Secrets Store CSI driver |
 | `examples/values-azure-claude.yaml` | AKS: Claude on Foundry with Workload Identity |
@@ -313,9 +315,11 @@ Then:
 
 ### AKS
 
-The fully worked Azure path: Microsoft Foundry as the model, reached with Workload
-Identity, so there is no API key to store. Steps 1, 3 and 6 above stay the same; this
-replaces steps 2, 4 and 5.
+The fully worked Azure path, and the recommended one: Microsoft Foundry as the model,
+reached with Workload Identity, so there is no API key to store, rotate or leak. Steps
+1, 3 and 6 above stay the same; this replaces steps 2, 4 and 5. To use Foundry with an
+API key instead (quicker to set up, on any cluster), follow the main steps with
+`examples/values-foundry-key.yaml` ([Foundry recipe](providers/foundry/gpt.md#in-the-cluster-with-an-api-key)).
 
 **Before you start:**
 

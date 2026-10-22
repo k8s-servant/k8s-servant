@@ -98,7 +98,7 @@ def pod_spec(docs: list[dict]) -> dict:
 
 
 @needs_helm
-@pytest.mark.parametrize("name", ["anthropic", "openai", "ollama", "azure-claude"])
+@pytest.mark.parametrize("name", ["anthropic", "openai", "ollama", "azure-claude", "foundry-key"])
 def test_new_example_renders_without_creating_secrets(name):
     docs = render_example(name)
     assert not [d for d in docs if d["kind"] in ("Secret", "ExternalSecret", "SecretStore")]
@@ -119,7 +119,7 @@ def test_azure_claude_uses_entra_and_workload_identity():
 
 
 @needs_helm
-@pytest.mark.parametrize("name", ["anthropic", "openai"])
+@pytest.mark.parametrize("name", ["anthropic", "openai", "foundry-key"])
 def test_key_examples_mount_the_key_file(name):
     docs = render_example(name)
     config = find(docs, "ConfigMap", "k8s-servant-config")["data"]
@@ -128,6 +128,17 @@ def test_key_examples_mount_the_key_file(name):
     volumes = {v["name"]: v for v in pod_spec(docs)["spec"]["volumes"]}
     assert volumes["llm-api-key"]["secret"]["secretName"] == "k8s-servant-llm"
     assert "azure.workload.identity/use" not in pod_spec(docs)["metadata"]["labels"]
+
+
+@needs_helm
+def test_foundry_key_example_needs_no_azure_identity():
+    docs = render_example("foundry-key")
+    config = find(docs, "ConfigMap", "k8s-servant-config")["data"]
+    assert config["LLM_PROVIDER"] == "foundry"
+    assert config["LLM_ENDPOINT"] == "https://my-foundry.openai.azure.com/"
+    assert config["LLM_MODEL"] == "my-deployment"
+    account = find(docs, "ServiceAccount", "k8s-servant")["metadata"]
+    assert "azure.workload.identity/client-id" not in (account.get("annotations") or {})
 
 
 @needs_helm
