@@ -328,7 +328,7 @@ Available today: the agent and CLI (`ask`, `check`, `report`, `serve`, `doctor`,
 on five model providers, MCP with kubectl fallback, knowledge and skills, scheduled
 health checks with memory, the morning report, MS Teams cards, Prometheus/Alertmanager
 tools, summary tools with skipping of unchanged checks, the `onboard` scan that drafts
-the description of your platform (`onboard`), a signed container image and the Helm
+the description of your platform, a signed container image and the Helm
 chart.
 
 Where it is going: k8s-servant should feel like **one more person on the team**. Next

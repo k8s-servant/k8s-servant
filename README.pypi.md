@@ -28,7 +28,7 @@ uvx k8s-servant onboard                # or run once without installing
 For Microsoft Foundry with Entra ID sign-in, install the `azure` extra:
 `uv tool install 'k8s-servant[azure]'`.
 
-## First run
+## Describe your platform
 
 With `kubectl` pointing at a cluster, let the agent draft what it should know about
 your platform. It scans the cluster once (read-only, never Secrets), asks a few
