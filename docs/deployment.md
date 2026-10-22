@@ -129,7 +129,7 @@ The comparison of the providers (APIs, reasoning, caching) is in
 |---|---|
 | `LLM_PROVIDER` | The row above. Required: the chart has no default |
 | `LLM_MODEL` | The model name; on Foundry, the deployment name |
-| `LLM_ENDPOINT` | Required for `foundry` and `openai-compatible`; the others have a default |
+| `LLM_ENDPOINT` | Required for `foundry`, `openai-compatible` and Claude on Foundry (`anthropic` with the Foundry URL); otherwise the provider's default |
 
 **Give the agent access**, depending on the provider:
 
