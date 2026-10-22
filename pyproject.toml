@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "k8s-servant"
 version = "0.3.1" # x-release-please-version
 description = "Read-only AI SRE agent for Kubernetes clusters"
-readme = "README.md"
+readme = "README.pypi.md" # the PyPI page; README.md uses relative links that break there
 license = "Apache-2.0"
 license-files = ["LICENSE", "NOTICE"]
 authors = [{ name = "The k8s-servant Authors" }]
@@ -45,8 +45,24 @@ Changelog = "https://github.com/k8s-servant/k8s-servant/blob/main/CHANGELOG.md"
 [project.scripts]
 k8s-servant = "k8s_servant.cli:main"
 
-[tool.setuptools.packages.find]
-include = ["k8s_servant*"]
+# The built-in skills live in the chart (its ConfigMap reads them from there). The wheel
+# carries a copy as k8s_servant/_knowledge, so an installed CLI has them too. The list
+# is explicit because of that mapping; tests/test_packaging.py checks it is complete.
+[tool.setuptools]
+packages = [
+  "k8s_servant",
+  "k8s_servant.llm",
+  "k8s_servant.scan",
+  "k8s_servant.tools",
+  "k8s_servant._knowledge",
+  "k8s_servant._knowledge.skills",
+]
+
+[tool.setuptools.package-dir]
+"k8s_servant._knowledge" = "charts/k8s-servant/knowledge"
+
+[tool.setuptools.package-data]
+"k8s_servant._knowledge.skills" = ["*/SKILL.md"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

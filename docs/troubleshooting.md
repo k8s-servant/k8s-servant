@@ -27,7 +27,7 @@ each provider's recipe in [model-providers.md](model-providers.md) shows the exp
 | Symptom | Cause | Fix |
 |---|---|---|
 | `LLM_AUTH=entra needs a Microsoft Foundry endpoint` | Entra ID is only used for Foundry hosts (`.openai.azure.com`, `.services.ai.azure.com`, `.cognitiveservices.azure.com`) | Use `LLM_AUTH=api-key` with a key, or fix `LLM_ENDPOINT` |
-| `Entra ID sign-in needs azure-identity` | The `azure` extra is missing outside the image | `pip install -e '.[azure]'` |
+| `Entra ID sign-in needs azure-identity` | The `azure` extra is missing outside the image | `uv tool install --force 'k8s-servant[azure]'`, or `pip install -e '.[azure]'` in a clone |
 | `HTTP 401` right after setup | The data-plane role takes ~5–10 minutes to apply | Wait, run `doctor` again |
 | `HTTP 401` with Claude or another non-OpenAI model | *Cognitive Services OpenAI User* covers only OpenAI models | Assign *Cognitive Services User* (`MODEL_ROLE="Cognitive Services User" scripts/setup-workload-identity.sh ...`) |
 | `HTTP 401` later | `az login` expired, wrong tenant, or the identity lacks the role | `az login`; check the role on the Foundry resource ([Foundry setup guide](providers/foundry/setup.md#6-step-4-give-access)) |

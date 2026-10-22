@@ -90,8 +90,9 @@ The root cause, the evidence, the suggested fix, and what is still unknown.
 
 ### 1. The knowledge folder (`KNOWLEDGE_DIR`)
 
-The default is the chart's folder `charts/k8s-servant/knowledge/`, which holds the built-in
-skills. Two layouts are understood and can be mixed:
+The default holds the built-in skills: the chart's folder `charts/k8s-servant/knowledge/`
+in a git checkout, or the copy inside the installed package (`k8s_servant/_knowledge/`)
+when installed with `uv tool`, `pipx` or `pip`. Two layouts are understood and can be mixed:
 
 ```
 <dir>/environment.md                    environment description

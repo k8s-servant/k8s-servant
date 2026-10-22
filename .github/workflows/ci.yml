@@ -112,11 +112,45 @@ jobs:
           ignore-unfixed: true
           exit-code: "0"
 
+  package:
+    # The wheel the release publishes to PyPI: it must build, pass twine's checks, and
+    # carry the built-in skills when installed outside the git checkout.
+    name: package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+      - run: pip install build==1.6.1 twine==7.0.0
+      - run: python -m build
+      - run: twine check --strict dist/*
+      - name: Install the wheel in a clean environment and load the built-in skills
+        run: |
+          python -m venv "${RUNNER_TEMP}/wheel"
+          "${RUNNER_TEMP}/wheel/bin/pip" install dist/*.whl
+          EXPECTED=$(find charts/k8s-servant/knowledge/skills -name SKILL.md | wc -l)
+          export EXPECTED
+          cd "${RUNNER_TEMP}"
+          wheel/bin/k8s-servant --help > /dev/null
+          wheel/bin/python -I -c '
+          import os
+          from k8s_servant.config import DEFAULT_KNOWLEDGE_DIR
+          from k8s_servant.knowledge import load_knowledge_dir
+          skills = load_knowledge_dir(DEFAULT_KNOWLEDGE_DIR).skills
+          print(DEFAULT_KNOWLEDGE_DIR, sorted(skills))
+          assert "site-packages" in str(DEFAULT_KNOWLEDGE_DIR) and len(skills) == int(os.environ["EXPECTED"])
+          '
+
   result:
     # The one check the branch ruleset requires, so jobs can be added or renamed freely.
     name: CI result
     if: always()
-    needs: [lint, test, helm, docker]
+    needs: [lint, test, helm, docker, package]
     runs-on: ubuntu-latest
     permissions: {}
     steps:

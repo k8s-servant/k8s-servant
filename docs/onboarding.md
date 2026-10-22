@@ -32,6 +32,10 @@ access) and run:
 k8s-servant onboard
 ```
 
+Not installed yet? `uvx k8s-servant onboard` runs it once without installing, and
+`uv tool install k8s-servant` (or `pipx install k8s-servant`) keeps it
+([getting-started.md](getting-started.md)).
+
 The first question decides where facts go:
 
 ```

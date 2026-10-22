@@ -42,7 +42,7 @@ from the Helm chart (`appConfig` in the values, rendered into a ConfigMap). A te
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `KNOWLEDGE_DIR` | chart folder `charts/k8s-servant/knowledge` | Folder with `environment.md`, `cluster.md` and skills. |
+| `KNOWLEDGE_DIR` | the built-in skills: chart folder `charts/k8s-servant/knowledge` in a checkout, the package's copy when installed | Folder with `environment.md`, `cluster.md` and skills. |
 | `DATA_DIR` | `.data` | Memory folder: findings, run history, learned notes ([memory.md](memory.md)). `/data` in the cluster. |
 | `NOTES_MAX_CHARS` | `8000` | How much of the newest learned notes goes into the system prompt. |
 

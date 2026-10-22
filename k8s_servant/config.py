@@ -19,11 +19,13 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from k8s_servant.llm.providers import OLD_SETTINGS, PROVIDERS
 
-# Built-in skills ship inside the Helm chart folder (charts/k8s-servant/knowledge). When
-# the package runs from a git checkout (local development) this path points at
-# them, so local runs and the cluster use the same skill files. In the container
-# KNOWLEDGE_DIR is set explicitly to the mounted ConfigMap.
-DEFAULT_KNOWLEDGE_DIR = Path(__file__).resolve().parent.parent / "charts" / "k8s-servant" / "knowledge"
+# Built-in skills live in the Helm chart folder (charts/k8s-servant/knowledge), and the
+# wheel carries a copy as k8s_servant/_knowledge (pyproject.toml). A git checkout uses
+# the chart folder, so edits show up without a reinstall; an installed package (pipx,
+# uvx) uses its copy. In the container KNOWLEDGE_DIR is set to the mounted ConfigMap.
+CHECKOUT_KNOWLEDGE_DIR = Path(__file__).resolve().parent.parent / "charts" / "k8s-servant" / "knowledge"
+PACKAGED_KNOWLEDGE_DIR = Path(__file__).resolve().parent / "_knowledge"
+DEFAULT_KNOWLEDGE_DIR = CHECKOUT_KNOWLEDGE_DIR if CHECKOUT_KNOWLEDGE_DIR.is_dir() else PACKAGED_KNOWLEDGE_DIR
 
 # The accepted LLM_REASONING_EFFORT values; "" means the parameter is not sent.
 REASONING_EFFORTS = ("", "none", "minimal", "low", "medium", "high", "xhigh", "max")

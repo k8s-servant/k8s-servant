@@ -35,7 +35,7 @@ k8s-servant [--values FILE ...] [--knowledge-dir DIR] [--log-level LEVEL] COMMAN
 | Option | Meaning |
 |---|---|
 | `--values FILE` | Read the `knowledge:` section of a Helm values file. Repeatable; later files win. Use the same files the cluster uses, so your laptop sees the same environment description and skills as the cluster: `--values knowledge-values.yaml --values my-values.yaml` |
-| `--knowledge-dir DIR` | Knowledge folder. Overrides `KNOWLEDGE_DIR`. Default: the chart's `charts/k8s-servant/knowledge` folder, which holds the built-in skills |
+| `--knowledge-dir DIR` | Knowledge folder. Overrides `KNOWLEDGE_DIR`. Default: the built-in skills, from the chart's `charts/k8s-servant/knowledge` folder in a git checkout or the installed package's copy |
 | `--log-level LEVEL` | `DEBUG`, `INFO` or `WARNING`. Overrides `LOG_LEVEL`. Logs go to stderr |
 
 Tip: define an alias for local work on one cluster:
