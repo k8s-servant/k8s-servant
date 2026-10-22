@@ -182,7 +182,7 @@ a stored scan), `2` when `--show` is combined with another option.
 | Topic | What the scan reads off the cluster |
 |---|---|
 | Platform | Kubernetes version; the managed service (AKS, EKS, GKE) from node labels, or a kind cluster; node pools with their node count and instance types |
-| Components | GitOps (Flux, Argo CD), policy engines (Kyverno, Gatekeeper), cert-manager, ingress and gateway controllers, autoscalers, backup and similar, from the [catalog](#adding-a-component-to-the-catalog) |
+| Components | GitOps (Flux, Argo CD), policy engines (Kyverno, Gatekeeper), cert-manager, ingress and gateway controllers, autoscalers, backup and similar, from a list of well-known components ([missed one?](#the-scan-missed-a-component)) |
 | Service mesh | Istio, Linkerd, Consul, Cilium's mesh, egress gateways |
 | Secret management | External Secrets Operator, the Secrets Store CSI driver and its providers, Sealed Secrets, the Vault injector (the tools only; never a Secret) |
 | Monitoring | Prometheus, Alertmanager, Grafana, Loki, log shippers, OpenTelemetry; the Prometheus and Alertmanager services to suggest as `PROMETHEUS_URL` and `ALERTMANAGER_URL` |
@@ -299,91 +299,23 @@ history comes from the configured `PROMETHEUS_URL` and `ALERTMANAGER_URL`. That 
 expected: no new RBAC is needed. Run `k8s-servant onboard` from a laptop for the full
 picture.
 
-## Adding a component to the catalog
+## The scan missed a component?
 
-The scan knows about components such as Kyverno, cert-manager or Istio because each
-one has a row in a list, `CATALOG` in
-[`k8s_servant/scan/catalog.py`](https://github.com/k8s-servant/k8s-servant/blob/main/k8s_servant/scan/catalog.py).
-If the scan misses a component you run, add a row for it. You don't need to change
-any other code: the draft, the questions and the re-scan use the new row by themselves.
+The scan recognises a fixed list of well-known components (Flux, Kyverno, Istio,
+cert-manager and similar). Vendor products and in-house tools are often not on it. That
+affects only the first draft: the agent still sees those components when it
+investigates, because it reads the cluster through its tools.
 
-### How the scan recognises a component
+Add what the scan missed to the draft yourself, in your own words. The draft is your
+file, and the environment description is the right place for it:
 
-A row lists the traces a component's Helm chart leaves in a cluster with its default
-values. The scan looks for two kinds of trace:
+```yaml
+knowledge:
+  environment: |
+    ...
+    - ExternalDNS (namespace `external-dns`) manages DNS records for Services and Ingresses.
+```
 
-- **Something running:** a Deployment, DaemonSet or StatefulSet whose name matches the
-    row, with at least one ready pod. This shows the component is in use.
-- **Its API:** the CustomResourceDefinitions (CRDs) or webhook configurations the
-    component installs. This shows it is installed completely.
-
-What the draft says depends on which traces it finds:
-
-| Running? | Its API (when the row declares one) | The draft says |
-|---|---|---|
-| yes | found, or the row declares none | "ExternalDNS (DNS records from Services and Ingresses) runs in namespace `external-dns`", with the workload as evidence |
-| yes | missing | a question: "ExternalDNS runs but its CRDs are missing. Is it installed fully?" |
-| no | found | a question: the CRDs or webhooks are installed but no controller runs. Left over from an uninstall? |
-| no, but its default namespace exists | – | a question: is it used here? |
-| no trace at all | – | nothing |
-
-So declare CRDs or webhooks only when **every** install has them. If a chart installs a
-CRD only when asked to, leave it out: otherwise every install without it would show up
-as "installed incompletely".
-
-### The fields of a row
-
-| Field | Example | What it is for |
-|---|---|---|
-| key | `"external-dns"` | A stable ID. The fact is stored as `component/external-dns`, and the re-scan compares by it, so don't rename it later |
-| name | `"ExternalDNS"` | The name shown in the draft |
-| topic | `"components"` | The section of the draft: `components`, `mesh`, `secrets`, `monitoring` or `network` |
-| role | `"DNS records from Services and Ingresses"` | A few words on what it does, shown after the name |
-| `workloads=` | `("external-dns",)` | Names of Deployments, DaemonSets or StatefulSets, as regular expressions that must match the whole name, in any namespace. Allow a release-name prefix where charts add one: `r"(.+-)?ingress-nginx-controller"` |
-| `crds=` | `("kyverno.io",)` | CRD API groups the component always installs |
-| `crd_names=` | `("applications.argoproj.io",)` | Exact CRD names, instead of `crds=`, when other projects share the group. Argo CD and Argo Rollouts both use `argoproj.io` |
-| `webhooks=` | `("istio-sidecar-injector.*",)` | Names of validating or mutating webhook configurations, as regular expressions |
-| `namespaces=` | `("external-dns",)` | The namespaces its charts install into by default. Used only for the "namespace exists but nothing runs" question |
-| `only_ask=` | `"Cilium Envoy runs. Do you use Cilium's service mesh features?"` | For components whose workload alone doesn't prove they are used. When it runs, the draft asks this question instead of stating anything |
-
-The first four are required, plus at least one trace: `workloads=`, `crds=`,
-`crd_names=` or `webhooks=`.
-
-### Example: ExternalDNS
-
-ExternalDNS is not in the catalog today, which makes it a good example.
-
-1. **Find its traces.** Render the upstream chart with its default values
-    (`helm template external-dns external-dns/external-dns`) and note the names. The
-    chart creates a Deployment called `external-dns`, usually in a namespace of the same
-    name. Its `DNSEndpoint` CRD is installed only on request, so
-    the row declares no CRDs.
-
-2. **Add the row** to `CATALOG`, next to similar components:
-
-    ```python
-    _c(
-        "external-dns",
-        "ExternalDNS",
-        "components",
-        "DNS records from Services and Ingresses",
-        workloads=("external-dns",),
-        namespaces=("external-dns",),
-    )
-    ```
-
-3. **Add a test** to `tests/test_scan_catalog.py`. `make_inputs` builds fake scan
-    inputs and `deploy` builds a Deployment with one ready pod (both are in
-    `tests/fakes.py`):
-
-    ```python
-    def test_external_dns_is_seen_from_its_deployment():
-        facts, _ = component_facts(make_inputs(deployments=[deploy("external-dns", "external-dns")]))
-        found = by_key(facts, "component/external-dns")
-        assert found.certainty == "seen"
-        assert found.statement == "ExternalDNS (DNS records from Services and Ingresses) runs in namespace `external-dns`"
-    ```
-
-4. **Run the tests:** `.venv/bin/pytest tests/test_scan_catalog.py`.
-    `test_every_catalog_row_is_valid` also checks the new row: a unique key, a known
-    topic, at least one trace, and regular expressions that compile.
+You can also answer `[a]dd a note` to any question during `onboard`. Recognising
+components without a fixed list is planned:
+[#67](https://github.com/k8s-servant/k8s-servant/issues/67).

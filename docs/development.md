@@ -148,6 +148,76 @@ it as an instruction with the reason, and add a test that the rule is present (s
 3. Test it through `cli.main([...])` in `tests/test_cli.py`.
 4. Document it in [cli.md](cli.md).
 
+### Add a component to the onboard catalog
+
+`k8s-servant onboard` recognises well-known components through `CATALOG` in
+`k8s_servant/scan/catalog.py`, one row per component. For each row the scan checks two
+traces, using the objects it has already read:
+
+- **Running:** a Deployment, DaemonSet or StatefulSet whose name matches the row, with
+    at least one ready pod.
+- **API installed:** the CRDs or webhook configurations the row declares.
+
+Both found, or running with no API declared, gives a statement with the evidence
+("Kyverno (policy engine) runs in namespace `kyverno` [CRD group kyverno.io;
+Deployment kyverno/kyverno-admission-controller (1 ready)]"). One without the other
+gives a question (half-installed, left over). Only the row's default namespace gives
+"is it used here?". No trace gives nothing.
+
+Rows do more than name things. A namespace where a catalog component runs counts as
+platform, not application, which the network facts rely on. The scan also trusts
+Prometheus and Alertmanager Services only in namespaces where their catalog
+controllers run.
+
+1. Find the traces: `helm template` the upstream chart with its default values and
+      note the workload names, the CRD groups it always installs, its webhook
+      configurations and its usual namespace.
+2. Add the row with `_c(key, name, topic, role, ...)`:
+
+    ```python
+    _c(
+        "external-dns",
+        "ExternalDNS",
+        "components",
+        "DNS records from Services and Ingresses",
+        workloads=("external-dns",),
+        namespaces=("external-dns",),
+    )
+    ```
+
+    - `key` is stored as `component/<key>` and the re-scan compares by it: never rename it.
+    - `topic` is the draft section: `components`, `mesh`, `secrets`, `monitoring` or `network`.
+    - `workloads=` and `webhooks=` are regular expressions matched against the whole
+        name, in any namespace. Allow a release prefix where charts add one:
+        `r"(.+-)?ingress-nginx-controller"`.
+    - Declare `crds=` (API groups) or `webhooks=` only when **every** install has them;
+        otherwise an install without them becomes an "installed fully?" question.
+        Use `crd_names=` (exact CRD names) when other projects share the group, as
+        Argo CD and Argo Rollouts share `argoproj.io`.
+    - `only_ask=` is for workloads that don't prove the feature is used (Cilium Envoy
+        runs without the mesh features): the draft then asks instead of stating.
+
+3. Test the row in `tests/test_scan_catalog.py` with `make_inputs` and `deploy` from
+      `tests/fakes.py`:
+
+    ```python
+    def test_external_dns_is_seen_from_its_deployment():
+        facts, _ = component_facts(make_inputs(deployments=[deploy("external-dns", "external-dns")]))
+        found = by_key(facts, "component/external-dns")
+        assert found.certainty == "seen"
+        assert found.statement == "ExternalDNS (DNS records from Services and Ingresses) runs in namespace `external-dns`"
+    ```
+
+    `test_every_catalog_row_is_valid` checks every row: a unique key, a known topic,
+    at least one trace, and regular expressions that compile.
+
+4. Run `onboard --no-input --no-model` against a cluster that has the component (a
+      kind cluster is enough) and read the line in the draft.
+
+The draft, the questions and the re-scan pick up a new row without other changes.
+Components outside the catalog are not recognised yet; see
+[#67](https://github.com/k8s-servant/k8s-servant/issues/67).
+
 ## Before you commit
 
 ```bash
