@@ -166,7 +166,7 @@ Start from the examples in this repository:
 | File | Holds |
 |---|---|
 | [`charts/k8s-servant/values.yaml`](https://github.com/k8s-servant/k8s-servant/blob/main/charts/k8s-servant/values.yaml) | Chart defaults, every key commented |
-| [`examples/knowledge-values.yaml`](https://github.com/k8s-servant/k8s-servant/blob/main/examples/knowledge-values.yaml) | An example platform description and cluster notes: copy and describe *your* platform, or start from the [first-run draft](#step-1-draft-the-knowledge) |
+| [`examples/knowledge-values.yaml`](https://github.com/k8s-servant/k8s-servant/blob/main/examples/knowledge-values.yaml) | An example platform description and cluster notes: copy and describe *your* platform, or start from the [draft from Step 1](#step-1-draft-the-knowledge) |
 | [`examples/values-minimal.yaml`](https://github.com/k8s-servant/k8s-servant/blob/main/examples/values-minimal.yaml) | Any cluster: `openai-compatible` with an API key and the Teams webhook from Secrets created with kubectl |
 | [`examples/values-anthropic.yaml`](https://github.com/k8s-servant/k8s-servant/blob/main/examples/values-anthropic.yaml) | Any cluster: Claude from Anthropic, key from a Secret |
 | [`examples/values-openai.yaml`](https://github.com/k8s-servant/k8s-servant/blob/main/examples/values-openai.yaml) | Any cluster: OpenAI, key from a Secret |
@@ -476,9 +476,3 @@ The project has not tested a GKE install yet; reports are welcome.
     pod itself needs a Google identity (for example for a CSI driver that mounts the
     file) through a Google service account, add `iam.gke.io/gcp-service-account` to
     `serviceAccount.annotations`.
-
-### Other clusters
-
-On-premises clusters, kind and others need nothing cloud-specific: an API key from a
-Secret (or an in-cluster Ollama) and a StorageClass for the memory volume. To run from
-your own registry, see [running-from-a-mirror.md](running-from-a-mirror.md).
