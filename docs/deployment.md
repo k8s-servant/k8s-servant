@@ -127,7 +127,7 @@ The comparison of the providers (APIs, reasoning, caching) is in
 
 | Setting | What it is |
 |---|---|
-| `LLM_PROVIDER` | The row above. The chart's default is `foundry`, so set it for any other provider |
+| `LLM_PROVIDER` | The row above. Required: the chart has no default |
 | `LLM_MODEL` | The model name; on Foundry, the deployment name |
 | `LLM_ENDPOINT` | Required for `foundry` and `openai-compatible`; the others have a default |
 
