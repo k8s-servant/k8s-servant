@@ -1,7 +1,6 @@
 ---
 title: k8s-servant
 hide:
-  - navigation
   - toc
 ---
 
