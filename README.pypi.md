@@ -1,5 +1,12 @@
 # k8s-servant
 
+[![PyPI](https://img.shields.io/pypi/v/k8s-servant)](https://pypi.org/project/k8s-servant/)
+[![Python](https://img.shields.io/pypi/pyversions/k8s-servant)](https://pypi.org/project/k8s-servant/)
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://github.com/k8s-servant/k8s-servant/blob/main/LICENSE)
+![Status](https://img.shields.io/badge/Status-early_alpha-orange)
+![Access](https://img.shields.io/badge/Cluster_access-read--only-success)
+[![Docs](https://img.shields.io/badge/docs-k8s--servant.dev-blue)](https://k8s-servant.dev)
+
 A **read-only AI SRE** for Kubernetes clusters. It looks at a cluster the way an
 experienced cluster administrator would: it finds what is wrong, explains why with
 evidence, says what to do about it, and remembers what it already told you. **It never
