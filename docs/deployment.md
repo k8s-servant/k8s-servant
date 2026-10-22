@@ -65,7 +65,7 @@ signatures, and how to keep your settings in a private repository without a fork
 | What | Why |
 |---|---|
 | A cluster and Helm 3.8 or newer | The chart is an OCI artifact |
-| A chat model with tool calling | Pick a provider and get its credential: [model-providers.md](model-providers.md) |
+| Access to a chat model with tool calling | Chosen in [Step 2](#step-2-choose-the-model-and-give-the-agent-access) |
 | (Optional) A Teams webhook URL | For the morning report and alerts: [MS Teams setup](teams-setup.md) |
 | A default StorageClass, or `persistence.storageClassName` | For the 1 Gi memory volume |
 | Approval to send this cluster's data to the model | Your organisation's data-processing rules ([data-processing.md](data-processing.md)) |
@@ -91,17 +91,57 @@ Once installed, the agent re-scans before each morning report and lists what cha
 since the last scan. To take a fresh draft from the running pod:
 `kubectl -n k8s-servant exec deploy/k8s-servant -c agent -- k8s-servant onboard --show`.
 
-## Step 2: Give the agent access to the model
+## Step 2: Choose the model and give the agent access
 
-One of these, depending on the provider:
+The model does the investigating: it decides which tools to call, reads their output
+and writes the findings. No other setting changes the quality of the results as much.
 
-- **An API key** (Anthropic, OpenAI, an OpenAI-compatible server, Microsoft Foundry
-    with a key): put it in a Kubernetes Secret, or a file your secret tool mounts, and
+**What to look for:**
+
+- **Tool calling is required.** The agent works only through tools; a model without
+    it cannot do anything.
+- **A strong model pays off.** The agent follows long, multi-step procedures (read the
+    pod, then its events, then its logs). Small local models are fine for trying it out,
+    not for relying on it: on the [getting-started demo](getting-started.md) a small
+    local model stopped after the first tool call, while a larger hosted model read the
+    logs and named the exact cause.
+- **Where the data may go.** The model receives object names, events, metrics and log
+    lines from the cluster ([data-processing.md](data-processing.md)). If that data must
+    not leave your network, run the model there (Ollama or another server of yours).
+
+**Pick a provider:**
+
+| Provider | `LLM_PROVIDER` | Access | Example values | Recipe |
+|---|---|---|---|---|
+| Anthropic (Claude) | `anthropic` | API key | `examples/values-anthropic.yaml` | [Anthropic](providers/anthropic.md) |
+| OpenAI | `openai` | API key | `examples/values-openai.yaml` | [OpenAI](providers/openai.md) |
+| Microsoft Foundry (GPT and others) | `foundry` | Workload Identity on AKS, or API key | `examples/values-azure.yaml` | [Foundry](providers/foundry/gpt.md) |
+| Claude on Microsoft Foundry | `anthropic` | Workload Identity on AKS | `examples/values-azure-claude.yaml` | [Claude on Foundry](providers/foundry/claude.md) |
+| Ollama, in your network | `ollama` | none | `examples/values-ollama.yaml` | [Ollama](providers/ollama.md) |
+| Any OpenAI-compatible server (vLLM, LiteLLM, Gemini, ...) | `openai-compatible` | API key (optional) | `examples/values-minimal.yaml` | [OpenAI-compatible](providers/openai-compatible.md) |
+
+The comparison of the providers (APIs, reasoning, caching) is in
+[model-providers.md](model-providers.md#choose-a-provider).
+
+**Set three values** in `appConfig` ([Step 4](#step-4-write-the-values)):
+
+| Setting | What it is |
+|---|---|
+| `LLM_PROVIDER` | The row above. Required: the chart has no default |
+| `LLM_MODEL` | The model name; on Foundry, the deployment name |
+| `LLM_ENDPOINT` | Required for `foundry`, `openai-compatible` and Claude on Foundry (`anthropic` with the Foundry URL); otherwise the provider's default |
+
+**Give the agent access**, depending on the provider:
+
+- **An API key:** put it in a Kubernetes Secret, or a file your secret tool mounts, and
     point `llmApiKey` at it ([Credentials](#credentials-bring-your-own-secrets)). This
     works on every cluster.
 - **Nothing**, for a model in your network without a key, such as an in-cluster Ollama.
 - **A cloud identity instead of a key**, for Microsoft Foundry on AKS with Workload
     Identity: see [AKS](#aks).
+
+Try the model from your laptop first: with the same three settings in your shell,
+`k8s-servant doctor` checks it in one line, and `k8s-servant ask` shows how it answers.
 
 ## Step 3: Network
 
