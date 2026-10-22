@@ -4,6 +4,8 @@ hide:
   - toc
 ---
 
+# k8s-servant { .visually-hidden }
+
 ![k8s-servant](images/logo-light.svg#only-light){ width="420" }
 ![k8s-servant](images/logo-dark.svg#only-dark){ width="420" }
 
