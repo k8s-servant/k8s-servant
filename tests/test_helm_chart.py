@@ -265,6 +265,19 @@ def test_cluster_name_provider_model_and_endpoint_are_required(key):
     assert key in render_error("--set-string", f"appConfig.{key}=")
 
 
+def test_the_chart_does_not_pick_a_model_provider():
+    # No provider is a better default than any one of them: the user chooses.
+    values = yaml.safe_load((CHART / "values.yaml").read_text())
+    assert values["appConfig"]["LLM_PROVIDER"] == ""
+
+
+def test_a_missing_provider_names_the_choices():
+    error = render_error("--set-string", "appConfig.LLM_PROVIDER=")
+    assert "appConfig.LLM_PROVIDER is required" in error
+    for provider in ("anthropic", "openai", "foundry", "ollama", "openai-compatible"):
+        assert provider in error
+
+
 def test_endpoint_required_only_for_foundry_and_openai_compatible():
     # Anthropic and OpenAI have a default endpoint; the other two providers need one.
     base = ["--set-string", "appConfig.LLM_ENDPOINT="]

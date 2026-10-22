@@ -136,10 +136,9 @@ Start from the examples in this repository:
 
 Every provider has a full recipe in [model-providers.md](model-providers.md).
 
-The chart requires `appConfig.CLUSTER_NAME` and `appConfig.LLM_MODEL`, plus
-`appConfig.LLM_ENDPOINT` for `foundry` and `openai-compatible`. The chart's
-`values.yaml` sets `LLM_PROVIDER` to `foundry` by default, so set
-`appConfig.LLM_PROVIDER` yourself for any other provider.
+The chart requires `appConfig.CLUSTER_NAME`, `appConfig.LLM_PROVIDER` (it has no
+default) and `appConfig.LLM_MODEL`, plus `appConfig.LLM_ENDPOINT` for `foundry` and
+`openai-compatible`.
 
 ### Credentials: bring your own Secrets
 
