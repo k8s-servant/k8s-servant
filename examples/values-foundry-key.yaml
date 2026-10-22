@@ -1,0 +1,30 @@
+# Example values: a model on Microsoft Foundry with an API key, on any cluster (AKS,
+# EKS, GKE, on-premises). The quickest way to try Foundry. On AKS, Workload Identity
+# (examples/values-azure.yaml) is the recommended, more secure choice: there is no
+# long-lived key to store, rotate or leak.
+# The key is a credential: keep it in a Secret you create first, which the chart
+# mounts as a file. The resource must allow key access (disableLocalAuth: false).
+# See docs/providers/foundry/gpt.md. All names below are placeholders.
+#
+#   kubectl create namespace k8s-servant
+#   kubectl -n k8s-servant create secret generic k8s-servant-llm --from-file=./api-key
+#   rm ./api-key
+#   helm install k8s-servant oci://ghcr.io/k8s-servant/charts/k8s-servant \
+#     -n k8s-servant -f examples/values-foundry-key.yaml
+
+# Agent settings for this cluster.
+appConfig:
+  # Shown in reports and Teams cards.
+  CLUSTER_NAME: my-cluster
+  LLM_PROVIDER: foundry
+  # The Foundry resource endpoint; /openai/v1/ is added for you.
+  LLM_ENDPOINT: https://my-foundry.openai.azure.com/
+  # The deployment name, not the model name.
+  LLM_MODEL: my-deployment
+  # Authenticate with the API key below, never with Entra ID.
+  LLM_AUTH: api-key
+
+# The API key, mounted as a file.
+llmApiKey:
+  # Secret created above.
+  existingSecret: k8s-servant-llm

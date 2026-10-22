@@ -160,7 +160,7 @@ which also explains in plain words why the agent speaks three different APIs.
 
 | `LLM_PROVIDER` | Model | Sign-in | Recipe | Helm example |
 |---|---|---|---|---|
-| `foundry` | GPT and others on Microsoft Foundry | Entra ID or API key | [Foundry](docs/providers/foundry/gpt.md) | `examples/values-azure.yaml` |
+| `foundry` | GPT and others on Microsoft Foundry | Entra ID (recommended) or API key | [Foundry](docs/providers/foundry/gpt.md) | `examples/values-azure.yaml` (Workload Identity), `examples/values-foundry-key.yaml` (API key, any cluster) |
 | `anthropic` (Foundry endpoint) | Claude on Microsoft Foundry | Entra ID | [Claude on Foundry](docs/providers/foundry/claude.md) | `examples/values-azure-claude.yaml` |
 | `openai` | OpenAI | API key | [OpenAI](docs/providers/openai.md) | `examples/values-openai.yaml` |
 | `anthropic` | Claude from Anthropic | API key | [Anthropic](docs/providers/anthropic.md) | `examples/values-anthropic.yaml` |

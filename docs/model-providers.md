@@ -14,7 +14,7 @@ Entra ID), and what `doctor` should print.
 | [OpenAI](providers/openai.md) | `openai` | API key |
 | [Ollama](providers/ollama.md), on a laptop or in the cluster | `ollama` | none |
 | [OpenAI-compatible](providers/openai-compatible.md): vLLM, LiteLLM, Gemini, LM Studio, ... | `openai-compatible` | API key (optional) |
-| [GPT and other models on Microsoft Foundry](providers/foundry/gpt.md) | `foundry` | Entra ID or API key |
+| [GPT and other models on Microsoft Foundry](providers/foundry/gpt.md) | `foundry` | Entra ID (recommended) or API key |
 | [Claude on Microsoft Foundry](providers/foundry/claude.md) | `anthropic` | Entra ID |
 
 No provider is the "main" one. Microsoft Foundry also has an
