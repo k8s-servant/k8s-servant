@@ -321,7 +321,7 @@ The agent pod authenticates with AKS **Workload Identity**: a user-assigned mana
 identity with a federated credential for the agent's ServiceAccount.
 `scripts/setup-workload-identity.sh` creates the identity and assigns it this
 role (set `MODEL_ROLE="Cognitive Services User"` for Claude and other non-OpenAI models;
-[deployment.md](../../deployment.md#workload-identity)). Done by hand, the assignment is:
+[deployment.md](../../deployment.md#aks)). Done by hand, the assignment is:
 
 ```bash
 az role assignment create \
@@ -508,7 +508,7 @@ Sources: [Default safety policies](https://learn.microsoft.com/azure/foundry/gua
 | **410** | The model version has been retired | Deploy a current model (Step 2) |
 | **429** | Tokens-per-minute or requests-per-minute exceeded | The SDK retries automatically (3×). If it persists, raise `--sku-capacity` |
 | "cannot reach LLM_ENDPOINT" / timeout | DNS, firewall or private endpoint problem; on a laptop, VPN or proxy | Step 5; `nslookup <name>.openai.azure.com`; try the curl test |
-| "could not get an Entra ID token" (`CredentialUnavailableError`) | No credential found: not logged in locally, or Workload Identity not set up in the pod | `az login`; in the cluster check the ServiceAccount annotation and the federated credential ([deployment.md](../../deployment.md#workload-identity)) |
+| "could not get an Entra ID token" (`CredentialUnavailableError`) | No credential found: not logged in locally, or Workload Identity not set up in the pod | `az login`; in the cluster check the ServiceAccount annotation and the federated credential ([deployment.md](../../deployment.md#aks)) |
 | `LLM_ENDPOINT must start with https://` | Endpoint typo | Use the value from Step 3 |
 
 Source: [Troubleshoot errors](https://learn.microsoft.com/azure/foundry/openai/how-to/troubleshoot-errors).
