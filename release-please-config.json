@@ -20,7 +20,8 @@
     ".": {
       "package-name": "k8s-servant",
       "extra-files": [
-        { "type": "generic", "path": "charts/k8s-servant/Chart.yaml" }
+        { "type": "generic", "path": "charts/k8s-servant/Chart.yaml" },
+        { "type": "generic", "path": "examples/argocd-application.yaml" }
       ]
     }
   }

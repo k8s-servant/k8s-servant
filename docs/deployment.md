@@ -272,13 +272,29 @@ into your GitOps repository, generate the ConfigMaps (for example with a Kustomi
 another tool through `extraObjects` (an `ExternalSecret`, a `SecretProviderClass`,
 ...), add a `dependsOn` on that tool's HelmRelease so its CRDs exist first.
 
+### With Argo CD (optional)
+
+[`examples/argocd-application.yaml`](https://github.com/k8s-servant/k8s-servant/blob/main/examples/argocd-application.yaml) is an `Application` with two sources: the
+chart from `ghcr.io/k8s-servant/charts` (Argo CD's Helm OCI source takes the path
+without `oci://`), and your Git repository with the values files, which the chart
+source reads as `$values/...` (the platform description, then this cluster; later
+wins). Put the values files in your repository, set its URL and the paths, and apply
+the `Application` where Argo CD runs. It creates the namespace and syncs automatically.
+
+Argo CD does not check cosign signatures. To admit only signed releases, add an
+admission policy that verifies them
+([verifying-releases.md](verifying-releases.md#enforce-it-in-the-cluster)). If your
+values install objects of another tool through `extraObjects`, make sure that tool
+and its CRDs are installed first, for example with a lower sync wave on its own
+`Application`.
+
 ## Step 6: Check the deployment
 
 All of these are read-only:
 
 ```bash
 # The release and the pod
-helm -n k8s-servant status k8s-servant                    # or: kubectl -n flux-system get helmrelease
+helm -n k8s-servant status k8s-servant                    # Flux: kubectl -n flux-system get helmrelease; Argo CD: kubectl -n argocd get application k8s-servant
 kubectl -n k8s-servant get pods                          # 2/2 Running
 kubectl -n k8s-servant get secret <your-secret-names>   # the credentials exist (if you use Secrets)
 
@@ -310,8 +326,8 @@ Then:
 
 | Task | How |
 |---|---|
-| **Upgrade** | `helm upgrade` to the new chart version (or bump the version in the HelmRelease). The chart version pins the matching image. Read the CHANGELOG first while the project is before `v1.0` |
-| **Roll back** | `helm rollback k8s-servant` (or revert the version in Git with Flux) |
+| **Upgrade** | `helm upgrade` to the new chart version (with GitOps, bump the version in the HelmRelease or the Application). The chart version pins the matching image. Read the CHANGELOG first while the project is before `v1.0` |
+| **Roll back** | `helm rollback k8s-servant` (with GitOps, revert the version in Git) |
 | **Change a setting** | `appConfig` in your values; the pod restarts by itself (ConfigMap checksum) |
 | **Change what the agent knows** | `knowledge` in the values files ([knowledge-and-skills.md](knowledge-and-skills.md)); the pod restarts by itself |
 | **Change the kubernetes-mcp-server version** | `mcp.image.tag` in the values. The chart's default is the tested version |

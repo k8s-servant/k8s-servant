@@ -238,7 +238,9 @@ spec:
 ```
 
 GitOps tools that pull the chart can verify it on the way in with the same identity
-and issuer. For example, `examples/flux-helmrelease.yaml` does this for Flux.
+and issuer. For example, `examples/flux-helmrelease.yaml` does this for Flux. Argo CD
+does not verify cosign signatures, so with Argo CD rely on an admission policy
+([Enforce it in the cluster](#enforce-it-in-the-cluster)).
 
 If you mirror the images into your own registry, copy the signatures too
 (`oras cp -r`; `cosign copy` did not copy them in our test), or verify before mirroring

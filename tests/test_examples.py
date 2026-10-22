@@ -4,6 +4,7 @@ Users copy these files as a starting point, so they must render the chart, teach
 CLI the same things the cluster learns, and contain only placeholders.
 """
 
+import json
 import re
 import shutil
 import subprocess
@@ -206,3 +207,30 @@ def test_flux_example_pulls_the_signed_oci_chart_with_both_values_files():
     assert release["chartRef"] == {"kind": "OCIRepository", "name": "k8s-servant"}
     assert release["targetNamespace"] == release["releaseName"] == "k8s-servant"
     assert [v["name"] for v in release["valuesFrom"]] == ["k8s-servant-knowledge", "k8s-servant-values"]
+
+
+def test_argocd_example_installs_the_oci_chart_with_values_from_git():
+    app = yaml.safe_load((EXAMPLES / "argocd-application.yaml").read_text())
+    assert app["kind"] == "Application"
+    assert app["spec"]["destination"]["namespace"] == "k8s-servant"
+    chart, values = app["spec"]["sources"]
+    # Argo CD's Helm OCI source takes the registry path without the oci:// scheme.
+    assert chart["repoURL"] == "ghcr.io/k8s-servant/charts"
+    assert chart["chart"] == "k8s-servant"
+    assert chart["helm"]["releaseName"] == "k8s-servant"
+    # Later files win: platform description, then this cluster.
+    files = chart["helm"]["valueFiles"]
+    assert len(files) == 2 and all(f.startswith("$values/") for f in files)
+    assert files[0].endswith("knowledge-values.yaml")
+    assert values["ref"] == "values"
+    assert "CreateNamespace=true" in app["spec"]["syncPolicy"]["syncOptions"]
+
+
+def test_argocd_example_pin_follows_the_release():
+    # release-please bumps the marked line, so a copied example always names a released chart.
+    config = json.loads((ROOT / "release-please-config.json").read_text())
+    extra = config["packages"]["."]["extra-files"]
+    assert {"type": "generic", "path": "examples/argocd-application.yaml"} in extra
+    manifest = json.loads((ROOT / ".release-please-manifest.json").read_text())
+    line = next(x for x in (EXAMPLES / "argocd-application.yaml").read_text().splitlines() if "targetRevision: 0" in x)
+    assert line.strip() == f"targetRevision: {manifest['.']} # x-release-please-version"

@@ -251,7 +251,8 @@ OCI artifact. The full guide is [docs/deployment.md](docs/deployment.md). In sho
    helm install k8s-servant oci://ghcr.io/k8s-servant/charts/k8s-servant \
      -n k8s-servant --create-namespace -f my-values.yaml
    ```
-   With Flux, use `examples/flux-helmrelease.yaml` instead.
+   With GitOps, use `examples/flux-helmrelease.yaml` (Flux) or
+   `examples/argocd-application.yaml` (Argo CD) instead.
 5. **Check:** the pod shows 2/2 Running, then run
    `kubectl -n k8s-servant exec deploy/k8s-servant -c agent -- k8s-servant doctor`,
    and `kubectl auth can-i get secrets --as=system:serviceaccount:k8s-servant:k8s-servant -A`
@@ -299,7 +300,7 @@ search and navigation. The same pages, in the repository:
 | [docs/architecture.md](docs/architecture.md) | How the agent is built and why: components, loop, summary tools, MCP/kubectl fallback, safety layers, scheduler, logging |
 | [docs/tools.md](docs/tools.md) | Every tool: what it reads, its safety rules, when the model uses it |
 | [docs/reports.md](docs/reports.md) | Health checks, fingerprints, skipping unchanged checks, the morning report, Teams cards and posting rules |
-| [docs/deployment.md](docs/deployment.md) | Deploying to a cluster: steps for any cluster (values, credentials, Helm or Flux, checks, day-2 operations), then AKS, EKS and GKE specifics |
+| [docs/deployment.md](docs/deployment.md) | Deploying to a cluster: steps for any cluster (values, credentials, Helm, Flux or Argo CD, checks, day-2 operations), then AKS, EKS and GKE specifics |
 | [docs/cli.md](docs/cli.md) | The `k8s-servant` command: every option, examples, exit codes |
 | [docs/how-the-agent-learns.md](docs/how-the-agent-learns.md) | How knowledge reaches the model: loading, the system prompt (example and size), learned notes, skills loaded on demand |
 | [docs/knowledge-and-skills.md](docs/knowledge-and-skills.md) | Teaching the agent: environment description, cluster notes, writing and testing skills |

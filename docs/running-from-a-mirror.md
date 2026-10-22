@@ -132,6 +132,10 @@ versions automatically, keep a `semver` range, but then only versions you have m
 are found. Keep the `verify` block as it is: the copied signature still names this
 project's release workflow.
 
+With Argo CD, set the chart source's `repoURL` in `examples/argocd-application.yaml` to
+`myregistry.example.com/k8s-servant/charts` (no `oci://`) and `targetRevision` to the
+version you mirrored.
+
 ## Enforce signatures on the mirror
 
 The admission policies in
