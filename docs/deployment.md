@@ -23,7 +23,7 @@ namespace k8s-servant
 ├── ConfigMap k8s-servant-mcp        the MCP server's config.toml
 ├── PersistentVolumeClaim k8s-servant-data   1 Gi, /data: memory.db + notes.md (kept on uninstall)
 ├── (your Secrets)                   API key and Teams webhook, created by you; mounted as files
-├── (extraObjects)                  anything else you install with the release, e.g. an ExternalSecret
+├── (extraObjects)                  anything else you install with the release
 cluster-wide
 ├── ClusterRoleBinding k8s-servant-view            → built-in "view" (namespaced, no Secrets)
 └── ClusterRoleBinding k8s-servant-cluster-reader  → ClusterRole k8s-servant-cluster-reader
@@ -215,8 +215,9 @@ arguments. `helm template` with the same values shows what will be applied.
 a `HelmRelease` that installs the chart into the namespace `k8s-servant`, with values
 from two ConfigMaps (the platform description, then this cluster; later wins). Copy it
 into your GitOps repository, generate the ConfigMaps (for example with a Kustomize
-`configMapGenerator`), and let Flux reconcile it. If you use External Secrets, add a
-`dependsOn` on its HelmRelease so the CRDs exist before the agent is installed.
+`configMapGenerator`), and let Flux reconcile it. If your values install objects of
+another tool through `extraObjects` (an `ExternalSecret`, a `SecretProviderClass`,
+...), add a `dependsOn` on that tool's HelmRelease so its CRDs exist first.
 
 ## Step 6: Check the deployment
 
@@ -226,7 +227,7 @@ All of these are read-only:
 # The release and the pod
 helm -n k8s-servant status k8s-servant                    # or: kubectl -n flux-system get helmrelease
 kubectl -n k8s-servant get pods                          # 2/2 Running
-kubectl -n k8s-servant get externalsecret                # SecretSynced, Ready=True (if enabled)
+kubectl -n k8s-servant get secret <your-secret-names>   # the credentials exist (if you use Secrets)
 
 # The agent's view of its own setup: model, MCP, kubectl, RBAC, Prometheus, Teams
 kubectl -n k8s-servant exec deploy/k8s-servant -c agent -- k8s-servant doctor
@@ -283,7 +284,7 @@ the Teams webhook from Key Vault. Values: `examples/values-azure.yaml`,
 |---|---|
 | OIDC issuer and Workload Identity on the cluster | `az aks show -g my-cluster-rg -n my-cluster --query "[oidcIssuerProfile.enabled, securityProfile.workloadIdentity.enabled]"` → `[true, true]` |
 | A Foundry resource with a deployed model | `scripts/setup-foundry.sh` ([Foundry setup guide](providers/foundry/setup.md)) |
-| (Optional) External Secrets Operator, to sync the webhook from Key Vault | `kubectl get crd externalsecrets.external-secrets.io secretstores.external-secrets.io` |
+| (Only for `examples/values-azure.yaml`) External Secrets Operator, which that example uses to sync the webhook from Key Vault; `values-azure-csi.yaml` uses the Secrets Store CSI driver instead, and any other secret tool works too | `kubectl get crd externalsecrets.external-secrets.io` |
 | Rights | Contributor on the identity's resource group; Owner or User Access Administrator on the Key Vault and the Foundry resource |
 
 #### Workload Identity
@@ -350,10 +351,11 @@ The project has not tested an EKS install yet; reports are welcome.
 - **Model:** use an API key from a Secret (Step 2). Amazon Bedrock is not a built-in
     provider; an OpenAI-compatible gateway in front of it (for example LiteLLM) works
     as `openai-compatible`.
-- **Secrets from AWS:** with External Secrets and AWS Secrets Manager or Parameter
-    Store, put the `SecretStore` and `ExternalSecret` into `extraObjects`. For IAM roles
-    for service accounts (IRSA), add `eks.amazonaws.com/role-arn` to
-    `serviceAccount.annotations`; EKS Pod Identity needs no annotation.
+- **Secrets:** however you manage them today: a Kubernetes Secret your tool creates,
+    or a file it mounts ([Credentials](#credentials-bring-your-own-secrets)). If the
+    pod itself needs an AWS identity (for example for a CSI driver that mounts the
+    file), add `eks.amazonaws.com/role-arn` to `serviceAccount.annotations` for IAM
+    roles for service accounts (IRSA); EKS Pod Identity needs no annotation.
 
 ### GKE
 
@@ -362,9 +364,10 @@ The project has not tested a GKE install yet; reports are welcome.
 - **Model:** use an API key from a Secret (Step 2). Vertex AI is not a built-in
     provider; an OpenAI-compatible gateway in front of it (for example LiteLLM) works
     as `openai-compatible`.
-- **Secrets from Google Cloud:** with External Secrets and Secret Manager, put the
-    `SecretStore` and `ExternalSecret` into `extraObjects`. For Workload Identity
-    through a Google service account, add `iam.gke.io/gcp-service-account` to
+- **Secrets:** however you manage them today: a Kubernetes Secret your tool creates,
+    or a file it mounts ([Credentials](#credentials-bring-your-own-secrets)). If the
+    pod itself needs a Google identity (for example for a CSI driver that mounts the
+    file) through a Google service account, add `iam.gke.io/gcp-service-account` to
     `serviceAccount.annotations`.
 
 ### Other clusters
