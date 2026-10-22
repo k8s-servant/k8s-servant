@@ -283,3 +283,27 @@ def test_other_model_roles_are_refused_before_any_azure_call(fake_az, monkeypatc
     assert result.returncode == 1
     assert "MODEL_ROLE" in result.stderr and "Cognitive Services User" in result.stderr
     assert fake_az.read_text() == ""
+
+
+def test_key_vault_can_be_skipped_with_none(fake_az, monkeypatch):
+    # The Teams webhook can come from any Secret; then the identity needs no Key Vault access.
+    monkeypatch.setenv("AZ_EXISTS", "0")
+    args = list(ARGS)
+    args[5] = "none"
+    result = _run(*args)
+    assert result.returncode == 0, result.stderr
+    calls = fake_az.read_text()
+    assert "keyvault" not in calls
+    assert "Key Vault Secrets User" not in calls
+    assert f"--scope {FOUNDRY_ID}" in calls
+    assert "Key Vault:  none" in result.stdout
+
+
+def test_an_empty_key_vault_argument_is_still_an_error(fake_az):
+    args = list(ARGS)
+    args[5] = ""
+    result = _run(*args)
+    assert result.returncode == 1
+    assert "KEYVAULT_ID (arg 6) is required" in result.stderr
+    assert "none" in result.stderr
+    assert fake_az.read_text() == ""
