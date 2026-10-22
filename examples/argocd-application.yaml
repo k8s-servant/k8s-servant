@@ -24,8 +24,9 @@ spec:
     # The chart. Argo CD's Helm OCI source takes the registry path without oci://.
     - repoURL: ghcr.io/k8s-servant/charts
       chart: k8s-servant
-      # Pin the release; the chart version pins the matching image.
-      targetRevision: 0.4.0
+      # Pin a release; the chart version pins the matching image. release-please keeps
+      # this line at the latest release.
+      targetRevision: 0.3.1 # x-release-please-version
       helm:
         releaseName: k8s-servant
         # Later files win: platform description, then this cluster.

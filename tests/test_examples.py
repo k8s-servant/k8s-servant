@@ -4,6 +4,7 @@ Users copy these files as a starting point, so they must render the chart, teach
 CLI the same things the cluster learns, and contain only placeholders.
 """
 
+import json
 import re
 import shutil
 import subprocess
@@ -223,3 +224,13 @@ def test_argocd_example_installs_the_oci_chart_with_values_from_git():
     assert files[0].endswith("knowledge-values.yaml")
     assert values["ref"] == "values"
     assert "CreateNamespace=true" in app["spec"]["syncPolicy"]["syncOptions"]
+
+
+def test_argocd_example_pin_follows_the_release():
+    # release-please bumps the marked line, so a copied example always names a released chart.
+    config = json.loads((ROOT / "release-please-config.json").read_text())
+    extra = config["packages"]["."]["extra-files"]
+    assert {"type": "generic", "path": "examples/argocd-application.yaml"} in extra
+    manifest = json.loads((ROOT / ".release-please-manifest.json").read_text())
+    line = next(x for x in (EXAMPLES / "argocd-application.yaml").read_text().splitlines() if "targetRevision: 0" in x)
+    assert line.strip() == f"targetRevision: {manifest['.']} # x-release-please-version"
