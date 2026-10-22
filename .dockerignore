@@ -1,5 +1,5 @@
 # Keep the build context small and free of local state and credentials. The image
-# needs only pyproject.toml, README.md and the k8s_servant package.
+# needs only pyproject.toml, README.pypi.md, the k8s_servant package and the built-in skills.
 
 # Local settings and memory (may hold endpoints, findings, notes)
 .env
@@ -16,12 +16,14 @@ __pycache__
 .superpowers
 .claude
 
-# Not needed at runtime: the chart delivers knowledge, CI runs the tests
+# Not needed at runtime: the chart delivers knowledge, CI runs the tests. The built-in
+# skills are the exception: pyproject.toml packages them into the wheel.
 tests
 docs
 tasks
 examples
 charts
+!charts/k8s-servant/knowledge
 .github
 scripts
 deploy

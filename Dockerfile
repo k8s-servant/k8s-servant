@@ -36,8 +36,9 @@ RUN curl -fsSLO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/${TARGET
 # Install the package and its dependencies into /install (not editable, no tests or
 # docs): the runtime stage copies this one folder.
 WORKDIR /build
-COPY pyproject.toml README.md LICENSE NOTICE ./
+COPY pyproject.toml README.pypi.md LICENSE NOTICE ./
 COPY k8s_servant ./k8s_servant
+COPY charts/k8s-servant/knowledge ./charts/k8s-servant/knowledge
 RUN pip install --no-cache-dir --prefix=/install '.[azure]'
 
 # ========================

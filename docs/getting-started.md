@@ -7,15 +7,21 @@ need Python 3.12 or newer (`python3 --version`), `kubectl`, Docker and
 **1. Install**
 
 ```bash
-git clone https://github.com/k8s-servant/k8s-servant.git && cd k8s-servant
-python3 -m venv .venv
-.venv/bin/pip install -e .
-source .venv/bin/activate
+uv tool install k8s-servant        # or: pipx install k8s-servant
+k8s-servant --help
 ```
 
-`pip install -e .` is all a user needs. Developers add the test tools with
-`'.[dev]'`; Microsoft Foundry with Entra ID sign-in also needs the `azure` extra, for
-example `'.[dev,azure]'`.
+[uv](https://docs.astral.sh/uv/) can fetch a matching Python for you. Microsoft
+Foundry with Entra ID sign-in also needs the `azure` extra:
+`uv tool install 'k8s-servant[azure]'`. To run it once without installing, use
+`uvx k8s-servant ...` in place of `k8s-servant ...`.
+
+To work on the code instead, install from a clone:
+
+```bash
+git clone https://github.com/k8s-servant/k8s-servant.git && cd k8s-servant
+python3 -m venv .venv && .venv/bin/pip install -e '.[dev]' && source .venv/bin/activate
+```
 
 **2. A cluster with something broken**
 
@@ -93,15 +99,21 @@ kind delete cluster --name k8s-servant-demo && rm -rf .data k8s-servant-onboard
 
 ## Going further
 
-- **Keep your settings.** `cp .env.example .env`, fill it in (no secrets in it: see
+- **Keep your settings.** Copy
+    [.env.example](https://github.com/k8s-servant/k8s-servant/blob/main/.env.example)
+    from the repository to `.env`, fill it in (no secrets in it: see
     [Secrets: local vs cluster](configuration.md#secrets-local-vs-cluster)), then load it into each new
     shell with `set -a; source .env; set +a`.
 - **The MCP server** (recommended; the agent falls back to kubectl without it). In its
     own terminal, with the binary from its GitHub releases or through npm:
 
     ```bash
-    npx -y kubernetes-mcp-server@0.0.67 --config deploy/local/mcp-config.toml
+    curl -fsSLO https://raw.githubusercontent.com/k8s-servant/k8s-servant/main/deploy/local/mcp-config.toml
+    npx -y kubernetes-mcp-server@0.0.67 --config mcp-config.toml
     ```
+
+    The config turns on only the read-only `core` tools and denies Secrets; read it
+    before you use it.
 
     Then `unset MCP_URL` in the shell you use for the agent (step 4 set it to empty, which
     turns MCP off); unset, it defaults to `http://localhost:8080/mcp`.
@@ -116,10 +128,12 @@ kind delete cluster --name k8s-servant-demo && rm -rf .data k8s-servant-onboard
     kubectl -n monitoring port-forward svc/alertmanager-operated 9093
     ```
 
-- **Your platform's knowledge**, the same files the cluster uses:
+- **Your platform's knowledge**, the same values files the cluster uses (step 5 drafts
+    them; [knowledge-values.yaml](https://github.com/k8s-servant/k8s-servant/blob/main/examples/knowledge-values.yaml)
+    is a full example):
 
     ```bash
-    alias kss='k8s-servant --values examples/knowledge-values.yaml --values my-values.yaml'
+    alias kss='k8s-servant --values knowledge-values.yaml --values my-values.yaml'
     kss report           # the morning report, now
     kss check --post     # a health check, posted to Teams (see [MS Teams setup](teams-setup.md))
     kss serve            # the scheduler, as it runs in the cluster (Ctrl-C to stop)

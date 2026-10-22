@@ -28,14 +28,15 @@ PR opened or updated ──► ci · security · codeql · pr-title · claude-re
 merge (squash; PR title = commit message) ──► main
                            └─► release-please opens or updates the release PR
 merge the release PR ──► tag vX.Y.Z ──► signed image + signed Helm chart on GHCR
+                                       └─► Python package on PyPI (with attestations)
 weekly ──► security scans · CodeQL · Scorecard · Dependabot PRs
 ```
 
 | When | What runs | Publishes |
 |---|---|---|
-| PR opened or updated | lint, tests (3 Python versions), helm, docker build + Trivy, gitleaks, zizmor, dependency-review, CodeQL, pr-title, Claude review | nothing |
+| PR opened or updated | lint, tests (3 Python versions), helm, docker build + Trivy, package, gitleaks, zizmor, dependency-review, CodeQL, pr-title, Claude review | nothing |
 | Merge to `main` | the same CI and security checks, CodeQL, Scorecard, release-please | nothing (the release PR is updated) |
-| Release PR merged | release-please, then our publish jobs | tag, GitHub Release, image, chart |
+| Release PR merged | release-please, then our publish jobs | tag, GitHub Release, image, chart, PyPI package |
 | A PR or merge that touches `docs/` or `zensical.toml` | docs (strict site build) | on merge: the site at https://k8s-servant.dev |
 | Weekly | security scans, CodeQL, Scorecard, Dependabot | Dependabot PRs |
 
@@ -126,6 +127,20 @@ Locally:
 ```bash
 docker build -t k8s-servant:dev .
 trivy image --severity HIGH,CRITICAL --ignore-unfixed k8s-servant:dev
+```
+
+### package: the PyPI wheel
+
+Builds the sdist and the wheel that a release publishes, runs `twine check --strict`
+on them, installs the wheel into a clean virtual environment outside the checkout, and
+checks that the built-in skills load from the installed package. The skills live in
+the chart folder and are mapped into the wheel as `k8s_servant/_knowledge`
+(`pyproject.toml`), so this is the check that catches a wheel without them.
+
+Locally:
+
+```bash
+pip install build twine && python -m build && twine check --strict dist/*
 ```
 
 ## security.yml: is anything dangerous coming in
@@ -348,7 +363,12 @@ Runs on every push to `main`. The work is split between Google's
           provenance attestation, and signs them with cosign (keyless, tied to this
           workflow's identity);
       - `publish chart` packages, pushes and signs the chart at
-          `oci://ghcr.io/k8s-servant/charts/k8s-servant`.
+          `oci://ghcr.io/k8s-servant/charts/k8s-servant`;
+      - `build python package` builds the sdist and the wheel from the tag, without
+          `id-token`, and hands them to `publish to PyPI`, which uploads them to
+          [PyPI](https://pypi.org/project/k8s-servant/) through trusted publishing (no
+          API token is stored) with PEP 740 attestations. It runs in the `pypi`
+          environment, which the PyPI trusted publisher is bound to.
 
       How users check these signatures: [verifying-releases.md](verifying-releases.md).
 

@@ -25,6 +25,7 @@ kubernetes-mcp-server --config deploy/local/mcp-config.toml     # local MCP serv
 helm lint charts/k8s-servant                                    # chart
 helm template k8s-servant charts/k8s-servant -f examples/values-azure.yaml   # render
 docker build -t k8s-servant:dev .                               # image
+python -m build && twine check --strict dist/*                  # PyPI package (sdist + wheel)
 pip install -e '.[docs]' && zensical build --strict             # docs site (k8s-servant.dev)
 ```
 
@@ -82,6 +83,10 @@ pip install -e '.[docs]' && zensical build --strict             # docs site (k8s
   `my-cluster`).
 - **Git:** Conventional Commit messages and PR titles (`feat:`, `fix(chart):`, ...).
   The changelog is generated from them.
+- **Packaging:** the PyPI package lists its subpackages by hand in `pyproject.toml`,
+  because the built-in skills are mapped in from the chart folder as
+  `k8s_servant/_knowledge`. Add a new subpackage there (`tests/test_packaging.py`
+  checks). The PyPI page is `README.pypi.md`: absolute links only.
 - **Changelog:** never create or edit `CHANGELOG.md`. release-please writes it, and only
   produces a clean file when it starts absent or empty.
 - **Release signing identity:** releases are signed keyless as

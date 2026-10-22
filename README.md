@@ -176,14 +176,15 @@ You need Python 3.12 or newer, `kubectl`, and a model: a local
 OpenAI.
 
 ```bash
-git clone https://github.com/k8s-servant/k8s-servant.git && cd k8s-servant
-python3 -m venv .venv && .venv/bin/pip install -e . && source .venv/bin/activate
+uv tool install k8s-servant                       # or: pipx install k8s-servant
 export LLM_PROVIDER=ollama LLM_MODEL=qwen3        # or anthropic / openai with LLM_API_KEY_FILE
 export CLUSTER_NAME=demo MCP_URL=                 # kubectl only; reads your current context
 k8s-servant doctor
 k8s-servant ask "Are there any unhealthy pods? Why?"
 ```
 
+To run it once without installing, use `uvx k8s-servant` in place of `k8s-servant`.
+To work on the code, install from a clone instead ([Development](#development)).
 The full walkthrough, with a throwaway kind cluster that has something broken in it,
 a safe way to keep the API key, the MCP server and Prometheus:
 [docs/getting-started.md](docs/getting-started.md). Every setting:
@@ -345,6 +346,8 @@ default. Details: [docs/roadmap.md](docs/roadmap.md) and the
 ## Development
 
 ```bash
+git clone https://github.com/k8s-servant/k8s-servant.git && cd k8s-servant
+python3 -m venv .venv && .venv/bin/pip install -e '.[dev,azure]'
 .venv/bin/pytest            # full test suite (includes documentation checks)
 .venv/bin/pytest -k kubectl # one area
 ```

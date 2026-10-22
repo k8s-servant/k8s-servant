@@ -98,8 +98,8 @@ Rules that hold for every provider:
     warning; set `LLM_AUTH=entra` and remove the key to use Workload Identity.
 - Keys are read from `LLM_API_KEY_FILE` (a file; in the cluster the chart mounts your
     Secret there) or `LLM_API_KEY`; the file wins. The key is never logged.
-- Entra ID needs the Azure extra: `pip install 'k8s-servant[azure]'`, or
-    `pip install -e '.[dev,azure]'` in a clone. The container image already includes it.
+- Entra ID needs the Azure extra: `uv tool install 'k8s-servant[azure]'` (or `pipx`),
+    or `pip install -e '.[dev,azure]'` in a clone. The container image already includes it.
 - `LLM_REASONING_EFFORT` defaults to `medium` for `foundry`, `openai` and `anthropic`,
     and to empty (not sent) for `ollama` and `openai-compatible`. On Anthropic,
     `minimal` is sent as `low` (with a warning in the log, as the Messages API has no

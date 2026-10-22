@@ -53,3 +53,10 @@ def test_dockerignore_keeps_secrets_and_local_state_out_of_the_build_context():
     entries = {line.strip().rstrip("/") for line in DOCKERIGNORE.splitlines() if line.strip()}
     for entry in (".env", ".data", ".git", ".venv", "tests", "docs"):
         assert entry in entries, f"{entry} must be in .dockerignore"
+
+
+def test_the_build_gets_the_built_in_skills():
+    # pyproject.toml maps k8s_servant/_knowledge to the chart folder, so the pip
+    # install in the builder stage fails without it.
+    assert "COPY charts/k8s-servant/knowledge ./charts/k8s-servant/knowledge" in DOCKERFILE
+    assert "!charts/k8s-servant/knowledge" in DOCKERIGNORE.splitlines()

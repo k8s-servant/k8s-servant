@@ -8,6 +8,9 @@ signed:
 | Agent image | `ghcr.io/k8s-servant/k8s-servant:<version>` |
 | Helm chart | `oci://ghcr.io/k8s-servant/charts/k8s-servant` (version `<version>`) |
 
+The Python package for the CLI goes to [PyPI](https://pypi.org/project/k8s-servant/)
+with its own attestations ([The PyPI package](#the-pypi-package)).
+
 The signature lets you check two things before you run anything: the artifact was built
 by **this project's release workflow**, not by a fork or someone else, and it has **not
 changed** since it was built. This page explains how the signing works and how to check
@@ -21,6 +24,7 @@ it, by hand or automatically in a cluster.
 - [What the certificate tells you](#what-the-certificate-tells-you)
 - [Enforce it in the cluster](#enforce-it-in-the-cluster)
 - [SBOM and provenance](#sbom-and-provenance)
+- [The PyPI package](#the-pypi-package)
 - [For maintainers](#for-maintainers)
 
 ## How the signing works
@@ -260,6 +264,20 @@ docker buildx imagetools inspect ghcr.io/k8s-servant/k8s-servant:<version> --for
 docker buildx imagetools inspect ghcr.io/k8s-servant/k8s-servant:<version> --format '{{ json .Provenance }}'
 ```
 
+## The PyPI package
+
+The release workflow uploads the sdist and the wheel with
+[trusted publishing](https://docs.pypi.org/trusted-publishers/): PyPI accepts the
+workflow's short-lived OIDC token instead of a stored API token. The upload also
+carries a [PEP 740](https://peps.python.org/pep-0740/) attestation per file, signed
+through Sigstore in the same keyless way as the image, with the identity above. PyPI
+shows them on each file's page. To check a file yourself:
+
+```bash
+uvx pypi-attestations verify pypi --repository https://github.com/k8s-servant/k8s-servant \
+  pypi:k8s_servant-<version>-py3-none-any.whl
+```
+
 ## For maintainers
 
 - The identity above is derived from the workflow **file path** and the **branch** the
@@ -269,7 +287,7 @@ docker buildx imagetools inspect ghcr.io/k8s-servant/k8s-servant:<version> --for
   `examples/flux-helmrelease.yaml` in the same PR.
 - The identity names the workflow file and the branch, **not the job**. Any job in
   `release-please.yml` with `id-token: write` can sign as this identity, so keep that
-  permission limited to the `publish image` and `publish chart` jobs, and review any
+  permission limited to the `publish image`, `publish chart` and `publish to PyPI` jobs, and review any
   new job in that file with this in mind. See
   [ci-and-releases.md](ci-and-releases.md#release-pleaseyml-versions-and-published-artifacts).
 - The SBOM and provenance are covered by the signature because the workflow signs the
