@@ -112,9 +112,9 @@ Rules that hold for every provider:
 - The full settings table is in [configuration.md](configuration.md). To start from
     a ready-made Helm values file, copy one from `examples/` (listed in each recipe).
 
-Every recipe installs with plain Helm. Flux or another GitOps tool works the same
-way: see [`examples/flux-helmrelease.yaml`](https://github.com/k8s-servant/k8s-servant/blob/main/examples/flux-helmrelease.yaml) if you
-prefer it.
+Every recipe installs with plain Helm. Flux, Argo CD or another GitOps tool works the
+same way: see [`examples/flux-helmrelease.yaml`](https://github.com/k8s-servant/k8s-servant/blob/main/examples/flux-helmrelease.yaml)
+or [`examples/argocd-application.yaml`](https://github.com/k8s-servant/k8s-servant/blob/main/examples/argocd-application.yaml) if you prefer one.
 
 ## Settings each provider ignores
 

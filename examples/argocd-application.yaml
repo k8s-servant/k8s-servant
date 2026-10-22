@@ -1,0 +1,44 @@
+# Example: install k8s-servant with Argo CD from the OCI chart, with the values files
+# from your own Git repository (a multi-source Application).
+#
+# Keep the values files in Git, for example:
+#   k8s-servant/knowledge-values.yaml   the platform description (shared by clusters)
+#   k8s-servant/my-cluster.yaml         this cluster: appConfig, credentials, notes
+# then apply this file to the cluster where Argo CD runs:
+#   kubectl apply -n argocd -f examples/argocd-application.yaml
+#
+# Argo CD does not check cosign signatures. To admit only signed releases, verify
+# them with an admission policy (docs/verifying-releases.md). All names below are
+# placeholders.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: k8s-servant
+  namespace: argocd
+spec:
+  project: default
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: k8s-servant
+  sources:
+    # The chart. Argo CD's Helm OCI source takes the registry path without oci://.
+    - repoURL: ghcr.io/k8s-servant/charts
+      chart: k8s-servant
+      # Pin the release; the chart version pins the matching image.
+      targetRevision: 0.4.0
+      helm:
+        releaseName: k8s-servant
+        # Later files win: platform description, then this cluster.
+        valueFiles:
+          - $values/k8s-servant/knowledge-values.yaml
+          - $values/k8s-servant/my-cluster.yaml
+    # Your Git repository with the values files, referred to above as $values.
+    - repoURL: https://git.example.com/platform/gitops.git
+      targetRevision: main
+      ref: values
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

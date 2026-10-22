@@ -99,7 +99,8 @@ k8s-servant/
 │   ├── values-openai.yaml          # OpenAI, key from a Secret
 │   ├── values-ollama.yaml          # An in-cluster Ollama, no key
 │   ├── values-minimal.yaml         # Any cluster: OpenAI-compatible endpoint and Teams webhook from kubectl-created Secrets
-│   └── flux-helmrelease.yaml       # Flux HelmRelease installing the OCI chart
+│   ├── flux-helmrelease.yaml       # Flux HelmRelease installing the OCI chart
+│   └── argocd-application.yaml     # Argo CD Application installing the OCI chart, values from Git
 ├── deploy/local/
 │   └── mcp-config.toml             # kubernetes-mcp-server config for local runs (read-only, core toolset)
 ├── scripts/
