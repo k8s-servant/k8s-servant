@@ -208,6 +208,7 @@ How the Secret gets there is your choice:
 - **kubectl:** put the value in a file named after the key, then
     `kubectl -n k8s-servant create secret generic teams-webhook --from-file=./webhook-url`
     (see [`examples/values-minimal.yaml`](https://github.com/k8s-servant/k8s-servant/blob/main/examples/values-minimal.yaml)).
+    Fine for trying it out; for the long run, see below.
 - **External Secrets Operator:** put a `SecretStore` and an `ExternalSecret` that
     creates the Secret into `extraObjects`, so they are installed with the release.
     [`examples/values-azure.yaml`](https://github.com/k8s-servant/k8s-servant/blob/main/examples/values-azure.yaml) does this for Azure Key Vault with Workload Identity.
@@ -217,6 +218,17 @@ How the Secret gets there is your choice:
     `extraVolumeMounts`, put the `SecretProviderClass` into `extraObjects`, and point
     `file` at the mounted file. [`examples/values-azure-csi.yaml`](https://github.com/k8s-servant/k8s-servant/blob/main/examples/values-azure-csi.yaml) does this for Azure Key
     Vault: nothing is stored in a Kubernetes Secret.
+
+> [!TIP]
+> **For a long-running install, manage the credentials with a secret tool rather than
+> by hand with kubectl.** A Secret created by hand exists only in the cluster: it is not
+> in Git or in a secret store, so nobody can review it, nothing re-creates it when the
+> cluster is rebuilt, and rotating it means someone runs kubectl again. A tool keeps the
+> value in one managed place (a cloud secret store, Vault, or encrypted in Git) with
+> access control, an audit trail and rotation, and creates or mounts it for you.
+> Common choices are External Secrets Operator, Sealed Secrets, SOPS, the Secrets Store
+> CSI driver and Vault. Use the one your platform already runs; the chart works with
+> all of them.
 
 ### Extension points
 
@@ -370,7 +382,9 @@ script without arguments for the full list of options.
 
 **3. The Teams webhook (optional).** The webhook URL is a credential: keep it in a
 Secret however you manage secrets today
-([Credentials](#credentials-bring-your-own-secrets)). The simplest is kubectl:
+([Credentials](#credentials-bring-your-own-secrets)). The simplest is kubectl, fine
+for a first install; for the long run, prefer a secret tool
+([why](#credentials-bring-your-own-secrets)):
 
 ```bash
 kubectl create namespace k8s-servant
