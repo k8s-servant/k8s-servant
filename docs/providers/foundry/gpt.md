@@ -3,12 +3,15 @@
 **Choose it when** your organisation runs on Azure and you want a model inside your own
 tenant, in an EU or US data zone. On AKS the pod signs in with Workload Identity, with
 no key to manage (recommended); on any cluster it can use an API key instead. It serves
-GPT models and others (for example DeepSeek, Llama, Grok) through the Responses API. *Cognitive Services OpenAI User*, the role the setup script
-assigns by default, covers only OpenAI models: for DeepSeek, Llama, Grok and other
-non-OpenAI models run the script with `MODEL_ROLE="Cognitive Services User"`
-([Microsoft Learn](https://learn.microsoft.com/azure/foundry/foundry-models/how-to/configure-entra-id#troubleshooting)). Partner models that offer only Chat Completions use
-[`openai-compatible`](../openai-compatible.md) with a Foundry endpoint,
-and Claude has [its own recipe](claude.md).
+GPT models and others (for example DeepSeek, Llama, Grok) through the Responses API.
+
+*Cognitive Services OpenAI User*, the role the setup script assigns by default, covers
+only OpenAI models: for DeepSeek, Llama, Grok and other non-OpenAI models run the
+script with `MODEL_ROLE="Cognitive Services User"`
+([Microsoft Learn](https://learn.microsoft.com/azure/foundry/foundry-models/how-to/configure-entra-id#troubleshooting)).
+Partner models that offer only Chat Completions use
+[`openai-compatible`](../openai-compatible.md) with a Foundry endpoint, and Claude has
+[its own recipe](claude.md).
 
 The Azure side (resource, deployment, roles, network) is in
 [Foundry setup guide](setup.md) and the background in
@@ -52,7 +55,7 @@ chmod 600 ~/.config/k8s-servant/llm-api-key
 
 ```bash
 LLM_AUTH=api-key
-LLM_API_KEY_FILE=~/.config/k8s-servant/llm-api-key
+LLM_API_KEY_FILE=~/.config/k8s-servant/llm-api-key   # ~ expands with: set -a; source .env; set +a
 ```
 
 ## In the cluster with Workload Identity (recommended)
