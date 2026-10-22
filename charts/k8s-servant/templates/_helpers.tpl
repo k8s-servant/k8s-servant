@@ -88,6 +88,9 @@ webhook URL come only from Secrets mounted as files.
 {{- end }}
 {{- range $required }}
 {{- if not (toString (index $.Values.appConfig .) ) }}
+{{- if eq . "LLM_PROVIDER" }}
+{{- fail "appConfig.LLM_PROVIDER is required: anthropic, openai, foundry, ollama or openai-compatible (docs/model-providers.md)" }}
+{{- end }}
 {{- fail (printf "appConfig.%s is required" .) }}
 {{- end }}
 {{- end }}

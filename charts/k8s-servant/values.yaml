@@ -116,9 +116,9 @@ llmApiKey:
 appConfig:
   # Cluster name shown in reports and Teams cards; required.
   CLUSTER_NAME: ""
-  # Model provider: foundry, anthropic, openai, openai-compatible or ollama; required.
-  # See docs/model-providers.md.
-  LLM_PROVIDER: foundry
+  # Model provider: anthropic, openai, foundry, ollama or openai-compatible; required,
+  # no default. See docs/model-providers.md.
+  LLM_PROVIDER: ""
   # Endpoint URL; required for foundry and openai-compatible, optional otherwise
   # (anthropic and openai have a default; for Claude on Foundry set the Foundry URL).
   LLM_ENDPOINT: ""
