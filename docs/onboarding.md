@@ -1,4 +1,4 @@
-# First run: `k8s-servant onboard`
+# Describe your platform with `k8s-servant onboard`
 
 The agent is only as good as what it knows about your platform: what runs there, how
 traffic is kept in check, where monitoring lives and what is normal noise. Writing that
@@ -23,7 +23,7 @@ evidence instead of an empty page.
 - **stdout carries only the paths it wrote.** Questions, notes and the closing summary
     go to stderr.
 
-## A first run on a laptop
+## Run it from a laptop
 
 Point `kubectl` at the cluster (the scan uses your current context and your own
 access) and run:

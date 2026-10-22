@@ -37,7 +37,7 @@ the terminal and to an **MS Teams** channel.
 - [How It Works](#how-it-works)
 - [Choose a Model Provider](#choose-a-model-provider)
 - [Quickstart](#quickstart)
-- [First Run](#first-run)
+- [Describe Your Platform](#describe-your-platform)
 - [Deploying to Any Cluster](#deploying-to-any-cluster)
 - [Teaching the Agent](#teaching-the-agent)
 - [Documentation](#documentation)
@@ -192,7 +192,7 @@ a safe way to keep the API key, the MCP server and Prometheus:
 
 ---
 
-## First Run
+## Describe Your Platform
 
 Before you write the environment description by hand, let the agent draft it. With
 `kubectl` pointing at a cluster:
@@ -292,7 +292,7 @@ search and navigation. The same pages, in the repository:
 | Document | What it covers |
 |---|---|
 | [docs/getting-started.md](docs/getting-started.md) | The full local quickstart on a throwaway kind cluster, then the MCP server, Prometheus and your platform's knowledge |
-| [docs/onboarding.md](docs/onboarding.md) | The first run: `k8s-servant onboard` drafts the knowledge files from a read-only scan, and the re-scan before each morning report shows what changed |
+| [docs/onboarding.md](docs/onboarding.md) | Describe your platform: `k8s-servant onboard` drafts the knowledge files from a read-only scan, and the re-scan before each morning report shows what changed |
 | [docs/configuration.md](docs/configuration.md) | Every setting (environment variables), and which values are secrets locally and in the cluster |
 | [docs/teams-setup.md](docs/teams-setup.md) | Creating the Teams Workflows webhook, storing it and testing it |
 | [docs/how-it-works.md](docs/how-it-works.md) | The flow from a question to an answer, step by step, and the repository structure |
@@ -327,8 +327,8 @@ search and navigation. The same pages, in the repository:
 Available today: the agent and CLI (`ask`, `check`, `report`, `serve`, `doctor`, ...)
 on five model providers, MCP with kubectl fallback, knowledge and skills, scheduled
 health checks with memory, the morning report, MS Teams cards, Prometheus/Alertmanager
-tools, summary tools with skipping of unchanged checks, the first-run scan that drafts
-the description of your platform (`onboard`), a signed container image and the Helm
+tools, summary tools with skipping of unchanged checks, the `onboard` scan that drafts
+the description of your platform, a signed container image and the Helm
 chart.
 
 Where it is going: k8s-servant should feel like **one more person on the team**. Next
