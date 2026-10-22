@@ -111,7 +111,7 @@ What the Helm chart does to keep the promise, each item pinned by a test in
 Check it after a deployment:
 `kubectl auth can-i get secrets --as=system:serviceaccount:k8s-servant:k8s-servant -A`
 must print `no`; `k8s-servant doctor` in the pod checks this too
-([deployment.md](deployment.md#6-check-the-deployment)).
+([deployment.md](deployment.md#step-6-check-the-deployment)).
 
 ## Recommendations
 

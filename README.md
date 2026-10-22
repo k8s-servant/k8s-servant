@@ -299,7 +299,7 @@ search and navigation. The same pages, in the repository:
 | [docs/architecture.md](docs/architecture.md) | How the agent is built and why: components, loop, summary tools, MCP/kubectl fallback, safety layers, scheduler, logging |
 | [docs/tools.md](docs/tools.md) | Every tool: what it reads, its safety rules, when the model uses it |
 | [docs/reports.md](docs/reports.md) | Health checks, fingerprints, skipping unchanged checks, the morning report, Teams cards and posting rules |
-| [docs/deployment.md](docs/deployment.md) | Deploying to a cluster: Helm/Flux install, Workload Identity, network, values, checks, day-2 operations |
+| [docs/deployment.md](docs/deployment.md) | Deploying to a cluster: steps for any cluster (values, credentials, Helm or Flux, checks, day-2 operations), then AKS, EKS and GKE specifics |
 | [docs/cli.md](docs/cli.md) | The `k8s-servant` command: every option, examples, exit codes |
 | [docs/how-the-agent-learns.md](docs/how-the-agent-learns.md) | How knowledge reaches the model: loading, the system prompt (example and size), learned notes, skills loaded on demand |
 | [docs/knowledge-and-skills.md](docs/knowledge-and-skills.md) | Teaching the agent: environment description, cluster notes, writing and testing skills |

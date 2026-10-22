@@ -65,7 +65,7 @@ Honest notes from the first real runs:
 - **One cluster per process**, single replica; memory is SQLite on a 1 Gi volume.
 - **Clusters that are recreated regularly** lose their memory with the volume, and a
     new OIDC issuer needs the federated credential re-pointed
-    ([deployment.md](deployment.md#when-a-cluster-is-recreated)).
+    ([deployment.md](deployment.md#when-the-cluster-is-recreated)).
 - **Model quality varies by provider and model.** All five providers are supported
     ([model-providers.md](model-providers.md)), but small self-hosted models find
     fewer problems than current hosted reasoning models. Bedrock and Vertex AI sign-in
