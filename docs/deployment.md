@@ -113,12 +113,12 @@ and writes the findings. No other setting changes the quality of the results as 
 
 | Provider | `LLM_PROVIDER` | Access | Example values | Recipe |
 |---|---|---|---|---|
-| Anthropic (Claude) | `anthropic` | API key | `examples/values-anthropic.yaml` | [Anthropic](providers/anthropic.md) |
-| OpenAI | `openai` | API key | `examples/values-openai.yaml` | [OpenAI](providers/openai.md) |
-| Microsoft Foundry (GPT and others) | `foundry` | Workload Identity on AKS (recommended), or API key on any cluster | `examples/values-azure.yaml`, `examples/values-foundry-key.yaml` | [Foundry](providers/foundry/gpt.md) |
-| Claude on Microsoft Foundry | `anthropic` | Workload Identity on AKS | `examples/values-azure-claude.yaml` | [Claude on Foundry](providers/foundry/claude.md) |
-| Ollama, in your network | `ollama` | none | `examples/values-ollama.yaml` | [Ollama](providers/ollama.md) |
-| Any OpenAI-compatible server (vLLM, LiteLLM, Gemini, ...) | `openai-compatible` | API key (optional) | `examples/values-minimal.yaml` | [OpenAI-compatible](providers/openai-compatible.md) |
+| Anthropic (Claude) | `anthropic` | API key | [`examples/values-anthropic.yaml`](https://github.com/k8s-servant/k8s-servant/blob/main/examples/values-anthropic.yaml) | [Anthropic](providers/anthropic.md) |
+| OpenAI | `openai` | API key | [`examples/values-openai.yaml`](https://github.com/k8s-servant/k8s-servant/blob/main/examples/values-openai.yaml) | [OpenAI](providers/openai.md) |
+| Microsoft Foundry (GPT and others) | `foundry` | Workload Identity on AKS (recommended), or API key on any cluster | [`examples/values-azure.yaml`](https://github.com/k8s-servant/k8s-servant/blob/main/examples/values-azure.yaml), [`examples/values-foundry-key.yaml`](https://github.com/k8s-servant/k8s-servant/blob/main/examples/values-foundry-key.yaml) | [Foundry](providers/foundry/gpt.md) |
+| Claude on Microsoft Foundry | `anthropic` | Workload Identity on AKS | [`examples/values-azure-claude.yaml`](https://github.com/k8s-servant/k8s-servant/blob/main/examples/values-azure-claude.yaml) | [Claude on Foundry](providers/foundry/claude.md) |
+| Ollama, in your network | `ollama` | none | [`examples/values-ollama.yaml`](https://github.com/k8s-servant/k8s-servant/blob/main/examples/values-ollama.yaml) | [Ollama](providers/ollama.md) |
+| Any OpenAI-compatible server (vLLM, LiteLLM, Gemini, ...) | `openai-compatible` | API key (optional) | [`examples/values-minimal.yaml`](https://github.com/k8s-servant/k8s-servant/blob/main/examples/values-minimal.yaml) | [OpenAI-compatible](providers/openai-compatible.md) |
 
 The comparison of the providers (APIs, reasoning, caching) is in
 [model-providers.md](model-providers.md#choose-a-provider).
@@ -165,16 +165,16 @@ Start from the examples in this repository:
 
 | File | Holds |
 |---|---|
-| `charts/k8s-servant/values.yaml` | Chart defaults, every key commented |
-| `examples/knowledge-values.yaml` | An example platform description and cluster notes: copy and describe *your* platform, or start from the [first-run draft](#step-1-draft-the-knowledge) |
-| `examples/values-minimal.yaml` | Any cluster: `openai-compatible` with an API key and the Teams webhook from Secrets created with kubectl |
-| `examples/values-anthropic.yaml` | Any cluster: Claude from Anthropic, key from a Secret |
-| `examples/values-openai.yaml` | Any cluster: OpenAI, key from a Secret |
-| `examples/values-ollama.yaml` | Any cluster: an in-cluster Ollama, no key |
-| `examples/values-foundry-key.yaml` | Any cluster: Microsoft Foundry with an API key (on AKS, Workload Identity below is recommended) |
-| `examples/values-azure.yaml` | AKS: Microsoft Foundry with Workload Identity, the Teams webhook synced from Key Vault by External Secrets ([AKS](#aks)) |
-| `examples/values-azure-csi.yaml` | AKS without any Kubernetes Secret: Workload Identity, the Teams webhook mounted from Key Vault by the Secrets Store CSI driver |
-| `examples/values-azure-claude.yaml` | AKS: Claude on Foundry with Workload Identity |
+| [`charts/k8s-servant/values.yaml`](https://github.com/k8s-servant/k8s-servant/blob/main/charts/k8s-servant/values.yaml) | Chart defaults, every key commented |
+| [`examples/knowledge-values.yaml`](https://github.com/k8s-servant/k8s-servant/blob/main/examples/knowledge-values.yaml) | An example platform description and cluster notes: copy and describe *your* platform, or start from the [first-run draft](#step-1-draft-the-knowledge) |
+| [`examples/values-minimal.yaml`](https://github.com/k8s-servant/k8s-servant/blob/main/examples/values-minimal.yaml) | Any cluster: `openai-compatible` with an API key and the Teams webhook from Secrets created with kubectl |
+| [`examples/values-anthropic.yaml`](https://github.com/k8s-servant/k8s-servant/blob/main/examples/values-anthropic.yaml) | Any cluster: Claude from Anthropic, key from a Secret |
+| [`examples/values-openai.yaml`](https://github.com/k8s-servant/k8s-servant/blob/main/examples/values-openai.yaml) | Any cluster: OpenAI, key from a Secret |
+| [`examples/values-ollama.yaml`](https://github.com/k8s-servant/k8s-servant/blob/main/examples/values-ollama.yaml) | Any cluster: an in-cluster Ollama, no key |
+| [`examples/values-foundry-key.yaml`](https://github.com/k8s-servant/k8s-servant/blob/main/examples/values-foundry-key.yaml) | Any cluster: Microsoft Foundry with an API key (on AKS, Workload Identity below is recommended) |
+| [`examples/values-azure.yaml`](https://github.com/k8s-servant/k8s-servant/blob/main/examples/values-azure.yaml) | AKS: Microsoft Foundry with Workload Identity, the Teams webhook synced from Key Vault by External Secrets ([AKS](#aks)) |
+| [`examples/values-azure-csi.yaml`](https://github.com/k8s-servant/k8s-servant/blob/main/examples/values-azure-csi.yaml) | AKS without any Kubernetes Secret: Workload Identity, the Teams webhook mounted from Key Vault by the Secrets Store CSI driver |
+| [`examples/values-azure-claude.yaml`](https://github.com/k8s-servant/k8s-servant/blob/main/examples/values-azure-claude.yaml) | AKS: Claude on Foundry with Workload Identity |
 
 Every provider has a full recipe in [model-providers.md](model-providers.md).
 
@@ -207,15 +207,15 @@ How the Secret gets there is your choice:
 
 - **kubectl:** put the value in a file named after the key, then
     `kubectl -n k8s-servant create secret generic teams-webhook --from-file=./webhook-url`
-    (see `examples/values-minimal.yaml`).
+    (see [`examples/values-minimal.yaml`](https://github.com/k8s-servant/k8s-servant/blob/main/examples/values-minimal.yaml)).
 - **External Secrets Operator:** put a `SecretStore` and an `ExternalSecret` that
     creates the Secret into `extraObjects`, so they are installed with the release.
-    `examples/values-azure.yaml` does this for Azure Key Vault with Workload Identity.
+    [`examples/values-azure.yaml`](https://github.com/k8s-servant/k8s-servant/blob/main/examples/values-azure.yaml) does this for Azure Key Vault with Workload Identity.
 - **Sealed Secrets, SOPS, Vault Agent, ...:** create the Secret as you usually do, and
     set its name.
 - **Secrets Store CSI driver:** mount the volume with `extraVolumes` and
     `extraVolumeMounts`, put the `SecretProviderClass` into `extraObjects`, and point
-    `file` at the mounted file. `examples/values-azure-csi.yaml` does this for Azure Key
+    `file` at the mounted file. [`examples/values-azure-csi.yaml`](https://github.com/k8s-servant/k8s-servant/blob/main/examples/values-azure-csi.yaml) does this for Azure Key
     Vault: nothing is stored in a Kubernetes Secret.
 
 ### Extension points
@@ -251,7 +251,7 @@ arguments. `helm template` with the same values shows what will be applied.
 
 ### With Flux (optional)
 
-`examples/flux-helmrelease.yaml` contains an `OCIRepository` pointing at
+[`examples/flux-helmrelease.yaml`](https://github.com/k8s-servant/k8s-servant/blob/main/examples/flux-helmrelease.yaml) contains an `OCIRepository` pointing at
 `oci://ghcr.io/k8s-servant/charts/k8s-servant` (with cosign signature verification) and
 a `HelmRelease` that installs the chart into the namespace `k8s-servant`, with values
 from two ConfigMaps (the platform description, then this cluster; later wins). Copy it
@@ -319,7 +319,7 @@ The fully worked Azure path, and the recommended one: Microsoft Foundry as the m
 reached with Workload Identity, so there is no API key to store, rotate or leak. Steps
 1, 3 and 6 above stay the same; this replaces steps 2, 4 and 5. To use Foundry with an
 API key instead (quicker to set up, on any cluster), follow the main steps with
-`examples/values-foundry-key.yaml` ([Foundry recipe](providers/foundry/gpt.md#in-the-cluster-with-an-api-key)).
+[`examples/values-foundry-key.yaml`](https://github.com/k8s-servant/k8s-servant/blob/main/examples/values-foundry-key.yaml) ([Foundry recipe](providers/foundry/gpt.md#in-the-cluster-with-an-api-key)).
 
 **Before you start:**
 
@@ -384,11 +384,11 @@ ID instead of `none` as argument 6 (`az keyvault show --name my-keyvault --query
 tsv`), and the script grants read access to that one secret: scoped to the secret on
 a vault with Azure RBAC; on a vault with access policies only after you accept
 vault-wide read with `ALLOW_VAULT_WIDE_SECRET_READ=yes`. Then sync it with External
-Secrets (`examples/values-azure.yaml`) or mount it with the Secrets Store CSI driver
-(`examples/values-azure-csi.yaml`).
+Secrets ([`examples/values-azure.yaml`](https://github.com/k8s-servant/k8s-servant/blob/main/examples/values-azure.yaml)) or mount it with the Secrets Store CSI driver
+([`examples/values-azure-csi.yaml`](https://github.com/k8s-servant/k8s-servant/blob/main/examples/values-azure-csi.yaml)).
 
-**4. The values.** Start from `examples/values-azure.yaml` (Claude on Foundry:
-`examples/values-azure-claude.yaml`) and fill in:
+**4. The values.** Start from [`examples/values-azure.yaml`](https://github.com/k8s-servant/k8s-servant/blob/main/examples/values-azure.yaml) (Claude on Foundry:
+[`examples/values-azure-claude.yaml`](https://github.com/k8s-servant/k8s-servant/blob/main/examples/values-azure-claude.yaml)) and fill in:
 
 ```yaml
 azureWorkloadIdentity:
