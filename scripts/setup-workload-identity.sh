@@ -3,8 +3,8 @@
 # setup-workload-identity.sh
 # Creates the Azure identity the k8s-servant pod uses (AKS Workload Identity)
 # and gives it exactly the access it needs:
-#   - read ONE Key Vault secret: the Teams webhook URL, synced by External
-#     Secrets into the agent's own Kubernetes Secret;
+#   - optionally, read ONE Key Vault secret: the Teams webhook URL, synced by a
+#     secret tool (External Secrets, the Secrets Store CSI driver) for the agent;
 #   - call the chat model in the Microsoft Foundry resource.
 # This script is the documented way to set the identity up (a prerequisite of
 # the deployment, see docs/deployment.md).
@@ -35,6 +35,9 @@
 # into the cluster's resource group (it would block the destroy or be deleted
 # with it, changing its client ID), and reminds you to re-run after recreation.
 #
+# KEYVAULT_ID=none skips step 4: use it when the Teams webhook comes from a Secret
+# you create another way (kubectl, Sealed Secrets, ...) or there is no webhook.
+#
 # The Key Vault and the Foundry resource are given as resource IDs because they
 # usually live in other subscriptions than the cluster:
 #   az keyvault show --name <vault> --query id -o tsv
@@ -47,7 +50,7 @@
 # Usage:
 #   [MODEL_ROLE="Cognitive Services User"] ./scripts/setup-workload-identity.sh \
 #     <SUBSCRIPTION_NAME> <IDENTITY_RESOURCE_GROUP> <IDENTITY_NAME> \
-#     <CLUSTER_RESOURCE_GROUP> <CLUSTER_NAME> <KEYVAULT_ID> <FOUNDRY_ID> \
+#     <CLUSTER_RESOURCE_GROUP> <CLUSTER_NAME> <KEYVAULT_ID|none> <FOUNDRY_ID> \
 #     [KEYVAULT_SECRET_NAME] [SERVICE_ACCOUNT_NAMESPACE] [SERVICE_ACCOUNT_NAME]
 #
 # Example:
@@ -92,7 +95,9 @@ ERRORS=()
 [[ -z "$CLUSTER_RESOURCE_GROUP" ]]  && ERRORS+=("CLUSTER_RESOURCE_GROUP (arg 4) is required")
 [[ -z "$CLUSTER_NAME" ]]            && ERRORS+=("CLUSTER_NAME (arg 5) is required")
 if [[ -z "$KEYVAULT_ID" ]]; then
-  ERRORS+=("KEYVAULT_ID (arg 6) is required: az keyvault show --name <vault> --query id -o tsv")
+  ERRORS+=("KEYVAULT_ID (arg 6) is required: az keyvault show --name <vault> --query id -o tsv, or none when the Teams webhook does not come from Key Vault")
+elif [[ "$KEYVAULT_ID" == "none" ]]; then
+  :
 elif [[ ! "$KEYVAULT_ID" =~ $KV_ID_PATTERN ]]; then
   ERRORS+=("KEYVAULT_ID (arg 6) must be a Key Vault resource ID (/subscriptions/.../providers/Microsoft.KeyVault/vaults/<name>)")
 fi
@@ -117,7 +122,7 @@ if [[ ${#ERRORS[@]} -gt 0 ]]; then
   echo "ERROR: Invalid arguments:" >&2
   for err in "${ERRORS[@]}"; do echo "  - $err" >&2; done
   echo "" >&2
-  echo "Usage: [MODEL_ROLE=\"Cognitive Services User\"] $0 <SUBSCRIPTION_NAME> <IDENTITY_RESOURCE_GROUP> <IDENTITY_NAME> <CLUSTER_RESOURCE_GROUP> <CLUSTER_NAME> <KEYVAULT_ID> <FOUNDRY_ID> [KEYVAULT_SECRET_NAME] [SERVICE_ACCOUNT_NAMESPACE] [SERVICE_ACCOUNT_NAME]" >&2
+  echo "Usage: [MODEL_ROLE=\"Cognitive Services User\"] $0 <SUBSCRIPTION_NAME> <IDENTITY_RESOURCE_GROUP> <IDENTITY_NAME> <CLUSTER_RESOURCE_GROUP> <CLUSTER_NAME> <KEYVAULT_ID|none> <FOUNDRY_ID> [KEYVAULT_SECRET_NAME] [SERVICE_ACCOUNT_NAMESPACE] [SERVICE_ACCOUNT_NAME]" >&2
   exit 1
 fi
 
@@ -127,10 +132,12 @@ if ! command -v az >/dev/null 2>&1; then
 fi
 
 # Parts of the Key Vault ID: `az keyvault show` / `set-policy` take name, group and subscription.
-[[ "$KEYVAULT_ID" =~ $KV_ID_PATTERN ]]
-KEYVAULT_SUBSCRIPTION="${BASH_REMATCH[1]}"
-KEYVAULT_RESOURCE_GROUP="${BASH_REMATCH[2]}"
-KEYVAULT_NAME="${BASH_REMATCH[3]}"
+if [[ "$KEYVAULT_ID" != "none" ]]; then
+  [[ "$KEYVAULT_ID" =~ $KV_ID_PATTERN ]]
+  KEYVAULT_SUBSCRIPTION="${BASH_REMATCH[1]}"
+  KEYVAULT_RESOURCE_GROUP="${BASH_REMATCH[2]}"
+  KEYVAULT_NAME="${BASH_REMATCH[3]}"
+fi
 
 SUBJECT="system:serviceaccount:${SERVICE_ACCOUNT_NAMESPACE}:${SERVICE_ACCOUNT_NAME}"
 # One credential per cluster, so one identity can serve several clusters.
@@ -209,32 +216,40 @@ fi
 # ---------------------------------------------------------------------------
 # 4. Key Vault: read the one secret
 # ---------------------------------------------------------------------------
-# Stop if the vault cannot be read: guessing "access policy" would grant every secret.
-if ! KV_RBAC=$(az keyvault show --name "$KEYVAULT_NAME" --resource-group "$KEYVAULT_RESOURCE_GROUP" \
-  --subscription "$KEYVAULT_SUBSCRIPTION" --query properties.enableRbacAuthorization -o tsv); then
-  echo "ERROR: cannot read Key Vault $KEYVAULT_NAME (wrong ID, or no access). Nothing was granted on it." >&2
-  exit 1
-fi
-if [[ "$KV_RBAC" == "true" ]]; then
-  echo "==> Key Vault $KEYVAULT_NAME uses Azure RBAC: granting access to secret $KEYVAULT_SECRET_NAME only"
-  KV_ACCESS="RBAC, scoped to secret $KEYVAULT_SECRET_NAME"
-  assign_role "$KV_ROLE" "${KEYVAULT_ID}/secrets/${KEYVAULT_SECRET_NAME}"
+# The Teams webhook can come from any Secret instead (KEYVAULT_ID=none): then no
+# Key Vault access is granted at all.
+if [[ "$KEYVAULT_ID" == "none" ]]; then
+  echo "==> Key Vault: none (the Teams webhook comes from a Secret you create another way)"
+  KEYVAULT_NAME="none"
+  KV_ACCESS="no access granted"
 else
-  # An access policy cannot be limited to one secret. Granting it would let the agent's
-  # identity read every secret in a (usually shared) vault, so it needs an explicit yes.
-  if [[ "${ALLOW_VAULT_WIDE_SECRET_READ:-}" != "yes" ]]; then
-    echo "ERROR: Key Vault $KEYVAULT_NAME uses access policies, which cannot be limited to one secret." >&2
-    echo "  Granting 'get' would let the identity read EVERY secret in $KEYVAULT_NAME. Either:" >&2
-    echo "  - switch the vault to Azure RBAC (then only $KEYVAULT_SECRET_NAME is granted), or" >&2
-    echo "  - copy the secret into a vault of its own, or" >&2
-    echo "  - accept it: re-run with ALLOW_VAULT_WIDE_SECRET_READ=yes" >&2
+  # Stop if the vault cannot be read: guessing "access policy" would grant every secret.
+  if ! KV_RBAC=$(az keyvault show --name "$KEYVAULT_NAME" --resource-group "$KEYVAULT_RESOURCE_GROUP" \
+    --subscription "$KEYVAULT_SUBSCRIPTION" --query properties.enableRbacAuthorization -o tsv); then
+    echo "ERROR: cannot read Key Vault $KEYVAULT_NAME (wrong ID, or no access). Nothing was granted on it." >&2
     exit 1
   fi
-  echo "==> Key Vault $KEYVAULT_NAME uses access policies: setting 'get' on secrets (ALLOW_VAULT_WIDE_SECRET_READ=yes)"
-  echo "    WARNING: the identity can read EVERY secret in $KEYVAULT_NAME."
-  KV_ACCESS="access policy (get on all secrets)"
-  az keyvault set-policy --name "$KEYVAULT_NAME" --resource-group "$KEYVAULT_RESOURCE_GROUP" \
-    --subscription "$KEYVAULT_SUBSCRIPTION" --object-id "$PRINCIPAL_ID" --secret-permissions get --output none
+  if [[ "$KV_RBAC" == "true" ]]; then
+    echo "==> Key Vault $KEYVAULT_NAME uses Azure RBAC: granting access to secret $KEYVAULT_SECRET_NAME only"
+    KV_ACCESS="RBAC, scoped to secret $KEYVAULT_SECRET_NAME"
+    assign_role "$KV_ROLE" "${KEYVAULT_ID}/secrets/${KEYVAULT_SECRET_NAME}"
+  else
+    # An access policy cannot be limited to one secret. Granting it would let the agent's
+    # identity read every secret in a (usually shared) vault, so it needs an explicit yes.
+    if [[ "${ALLOW_VAULT_WIDE_SECRET_READ:-}" != "yes" ]]; then
+      echo "ERROR: Key Vault $KEYVAULT_NAME uses access policies, which cannot be limited to one secret." >&2
+      echo "  Granting 'get' would let the identity read EVERY secret in $KEYVAULT_NAME. Either:" >&2
+      echo "  - switch the vault to Azure RBAC (then only $KEYVAULT_SECRET_NAME is granted), or" >&2
+      echo "  - copy the secret into a vault of its own, or" >&2
+      echo "  - accept it: re-run with ALLOW_VAULT_WIDE_SECRET_READ=yes" >&2
+      exit 1
+    fi
+    echo "==> Key Vault $KEYVAULT_NAME uses access policies: setting 'get' on secrets (ALLOW_VAULT_WIDE_SECRET_READ=yes)"
+    echo "    WARNING: the identity can read EVERY secret in $KEYVAULT_NAME."
+    KV_ACCESS="access policy (get on all secrets)"
+    az keyvault set-policy --name "$KEYVAULT_NAME" --resource-group "$KEYVAULT_RESOURCE_GROUP" \
+      --subscription "$KEYVAULT_SUBSCRIPTION" --object-id "$PRINCIPAL_ID" --secret-permissions get --output none
+  fi
 fi
 
 # ---------------------------------------------------------------------------
