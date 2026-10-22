@@ -20,7 +20,7 @@ nav = [
   { "Get started" = [
     { "Quickstart" = "getting-started.md" },
     { "First run" = "onboarding.md" },
-    { "Deploy to a cluster" = "deployment.md" },
+    { "Deploy to any cluster" = "deployment.md" },
     { "Run from a mirror" = "running-from-a-mirror.md" },
   ] },
   { "Model providers" = [

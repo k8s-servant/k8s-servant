@@ -1,4 +1,4 @@
-# Deploying to a cluster
+# Deploying to any cluster
 
 How k8s-servant gets into a Kubernetes cluster and how to run it there. The chart is
 plain Helm and works on any conformant cluster (AKS, EKS, GKE, on-premises, kind) and

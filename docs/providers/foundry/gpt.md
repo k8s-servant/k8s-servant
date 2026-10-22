@@ -81,7 +81,7 @@ appConfig:
 Run `scripts/setup-workload-identity.sh` (identity, federated credential, the
 *Cognitive Services OpenAI User* role on the Foundry resource) and put the client and
 tenant IDs it prints into `azureWorkloadIdentity`. The full AKS walk-through is in
-[Deploying to a cluster](../../deployment.md#aks). With `LLM_AUTH=entra` no key is
+[Deploying to any cluster](../../deployment.md#aks). With `LLM_AUTH=entra` no key is
 ever used.
 
 Expected `doctor` model line:
