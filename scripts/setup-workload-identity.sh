@@ -21,7 +21,7 @@
 #   4. Key Vault: on an Azure RBAC vault, "Key Vault Secrets User" scoped to the
 #      one secret (not the vault). On an access-policy vault that is impossible,
 #      so the script stops unless ALLOW_VAULT_WIDE_SECRET_READ=yes is set; then
-#      "get" on secrets is set for the whole vault.
+#      "get" on secrets is set for the whole vault. Skipped with KEYVAULT_ID=none.
 #   5. The model role on the Foundry resource (any subscription of the same
 #      tenant): "Cognitive Services OpenAI User" by default, which covers only
 #      OpenAI models (least privilege for GPT). Claude and other non-OpenAI models
@@ -62,8 +62,9 @@
 #          --resource-group my-foundry-rg --query id -o tsv)"
 #
 # Required permissions: Contributor on the identity's resource group, and Owner
-# or User Access Administrator (role assignments) on the Key Vault and the
-# Foundry resource; for an access-policy vault, permission to change its policies.
+# or User Access Administrator (role assignments) on the Foundry resource and,
+# unless KEYVAULT_ID=none, the Key Vault; for an access-policy vault, permission
+# to change its policies.
 # =============================================================================
 set -euo pipefail
 
