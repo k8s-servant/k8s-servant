@@ -103,7 +103,7 @@ Almost nothing in `.env` is secret:
 In the Azure example, one managed identity does both jobs: it calls the model and
 reads the webhook secret from Key Vault (for External Secrets).
 `scripts/setup-workload-identity.sh` creates it
-([deployment.md](deployment.md#1-workload-identity-aks)). The chart itself
+([deployment.md](deployment.md#workload-identity)). The chart itself
 never creates Secrets; see
 [Credentials](deployment.md#credentials-bring-your-own-secrets).
 
