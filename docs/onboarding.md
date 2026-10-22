@@ -301,30 +301,89 @@ picture.
 
 ## Adding a component to the catalog
 
-The components the scan recognises are data: one row per component in
-`CATALOG` in
+The scan knows about components such as Kyverno, cert-manager or Istio because each
+one has a row in a list, `CATALOG` in
 [`k8s_servant/scan/catalog.py`](https://github.com/k8s-servant/k8s-servant/blob/main/k8s_servant/scan/catalog.py).
-A row names the component, its topic and role, and the traces its upstream chart leaves
-by default: CRD groups (or exact CRD names when the group is shared), workload names
-(regexes, full match), webhook configuration names and namespaces.
+If the scan misses a component you run, add a row for it. You don't need to change
+any other code: the draft, the questions and the re-scan use the new row by themselves.
 
-An illustrative row, for ExternalDNS (not in the catalog today):
+### How the scan recognises a component
 
-```python
-_c(
-    "external-dns",
-    "ExternalDNS",
-    "components",
-    "DNS records from Services and Ingresses",
-    workloads=("external-dns",),
-    namespaces=("external-dns",),
-)
-```
+A row lists the traces a component's Helm chart leaves in a cluster with its default
+values. The scan looks for two kinds of trace:
 
-Declare CRDs or webhooks only when every install has them: a running controller
-without its declared API becomes a question. (ExternalDNS installs its `DNSEndpoint`
-CRD only on request, so this row declares none.) Then add one test to
-`tests/test_scan_catalog.py` that builds inputs with `make_inputs` (from
-`tests/fakes.py`) and checks the row's fact, like
-`test_a_component_without_crds_is_seen_from_its_workload`. That is all: the draft, the questions
-and the re-scan pick the new row up by themselves.
+- **Something running:** a Deployment, DaemonSet or StatefulSet whose name matches the
+    row, with at least one ready pod. This shows the component is in use.
+- **Its API:** the CustomResourceDefinitions (CRDs) or webhook configurations the
+    component installs. This shows it is installed completely.
+
+What the draft says depends on which traces it finds:
+
+| Running? | Its API (when the row declares one) | The draft says |
+|---|---|---|
+| yes | found, or the row declares none | "ExternalDNS (DNS records from Services and Ingresses) runs in namespace `external-dns`", with the workload as evidence |
+| yes | missing | a question: "ExternalDNS runs but its CRDs are missing. Is it installed fully?" |
+| no | found | a question: the CRDs or webhooks are installed but no controller runs. Left over from an uninstall? |
+| no, but its default namespace exists | – | a question: is it used here? |
+| no trace at all | – | nothing |
+
+So declare CRDs or webhooks only when **every** install has them. If a chart installs a
+CRD only when asked to, leave it out: otherwise every install without it would show up
+as "installed incompletely".
+
+### The fields of a row
+
+| Field | Example | What it is for |
+|---|---|---|
+| key | `"external-dns"` | A stable ID. The fact is stored as `component/external-dns`, and the re-scan compares by it, so don't rename it later |
+| name | `"ExternalDNS"` | The name shown in the draft |
+| topic | `"components"` | The section of the draft: `components`, `mesh`, `secrets`, `monitoring` or `network` |
+| role | `"DNS records from Services and Ingresses"` | A few words on what it does, shown after the name |
+| `workloads=` | `("external-dns",)` | Names of Deployments, DaemonSets or StatefulSets, as regular expressions that must match the whole name, in any namespace. Allow a release-name prefix where charts add one: `r"(.+-)?ingress-nginx-controller"` |
+| `crds=` | `("kyverno.io",)` | CRD API groups the component always installs |
+| `crd_names=` | `("applications.argoproj.io",)` | Exact CRD names, instead of `crds=`, when other projects share the group. Argo CD and Argo Rollouts both use `argoproj.io` |
+| `webhooks=` | `("istio-sidecar-injector.*",)` | Names of validating or mutating webhook configurations, as regular expressions |
+| `namespaces=` | `("external-dns",)` | The namespaces its charts install into by default. Used only for the "namespace exists but nothing runs" question |
+| `only_ask=` | `"Cilium Envoy runs. Do you use Cilium's service mesh features?"` | For components whose workload alone doesn't prove they are used. When it runs, the draft asks this question instead of stating anything |
+
+The first four are required, plus at least one trace: `workloads=`, `crds=`,
+`crd_names=` or `webhooks=`.
+
+### Example: ExternalDNS
+
+ExternalDNS is not in the catalog today, which makes it a good example.
+
+1. **Find its traces.** Render the upstream chart with its default values
+    (`helm template external-dns external-dns/external-dns`) and note the names. The
+    chart creates a Deployment called `external-dns`, usually in a namespace of the same
+    name. Its `DNSEndpoint` CRD is installed only on request, so
+    the row declares no CRDs.
+
+2. **Add the row** to `CATALOG`, next to similar components:
+
+    ```python
+    _c(
+        "external-dns",
+        "ExternalDNS",
+        "components",
+        "DNS records from Services and Ingresses",
+        workloads=("external-dns",),
+        namespaces=("external-dns",),
+    )
+    ```
+
+3. **Add a test** to `tests/test_scan_catalog.py`. `make_inputs` builds fake scan
+    inputs and `deploy` builds a Deployment with one ready pod (both are in
+    `tests/fakes.py`):
+
+    ```python
+    def test_external_dns_is_seen_from_its_deployment():
+        facts, _ = component_facts(make_inputs(deployments=[deploy("external-dns", "external-dns")]))
+        found = by_key(facts, "component/external-dns")
+        assert found.certainty == "seen"
+        assert found.statement == "ExternalDNS (DNS records from Services and Ingresses) runs in namespace `external-dns`"
+    ```
+
+4. **Run the tests:** `.venv/bin/pytest tests/test_scan_catalog.py`.
+    `test_every_catalog_row_is_valid` also checks the new row: a unique key, a known
+    topic, at least one trace, and regular expressions that compile.
