@@ -267,82 +267,116 @@ Then:
 | **Read or edit learned notes** | `kubectl -n k8s-servant exec deploy/k8s-servant -c agent -- k8s-servant notes`; editing: [memory.md](memory.md#learned-notes) |
 | **Copy the memory out** | `kubectl -n k8s-servant cp -c agent <pod>:/data ./agent-data` |
 | **Uninstall** | `helm uninstall k8s-servant -n k8s-servant` (or remove the HelmRelease). Everything is deleted **except** the PersistentVolumeClaim (`helm.sh/resource-policy: keep`). Delete it by hand to forget all findings: `kubectl -n k8s-servant delete pvc k8s-servant-data` |
-| **Cluster recreated** | The memory volume goes with the cluster, so the first check reports every open problem as new. Consider `appConfig.TEAMS_POST_MODE: off` for short-lived clusters. On AKS, also re-point the federated credential ([AKS](#when-the-cluster-is-recreated)) |
+| **Cluster recreated** | The memory volume goes with the cluster, so the first check reports every open problem as new. Consider `appConfig.TEAMS_POST_MODE: off` for short-lived clusters. On AKS, re-run `setup-workload-identity.sh`: the new cluster has a new OIDC issuer ([AKS](#aks)) |
 | **Pod restarts all the time** | The liveness probe fails when the scheduler has not touched `/tmp/heartbeat` for 5 minutes. Read `kubectl logs --previous`; see [troubleshooting.md](troubleshooting.md#in-the-cluster) |
 
 ## Cloud-specific setup
 
 ### AKS
 
-The fully worked Azure path: Microsoft Foundry with Workload Identity (no API key), and
-the Teams webhook from Key Vault. Values: `examples/values-azure.yaml`,
-`examples/values-azure-csi.yaml` or `examples/values-azure-claude.yaml`.
+The fully worked Azure path: Microsoft Foundry as the model, reached with Workload
+Identity, so there is no API key to store. Steps 1, 3 and 6 above stay the same; this
+replaces steps 2, 4 and 5.
 
 **Before you start:**
 
 | What | How to check |
 |---|---|
 | OIDC issuer and Workload Identity on the cluster | `az aks show -g my-cluster-rg -n my-cluster --query "[oidcIssuerProfile.enabled, securityProfile.workloadIdentity.enabled]"` → `[true, true]` |
-| A Foundry resource with a deployed model | `scripts/setup-foundry.sh` ([Foundry setup guide](providers/foundry/setup.md)) |
-| (Only for `examples/values-azure.yaml`) External Secrets Operator, which that example uses to sync the webhook from Key Vault; `values-azure-csi.yaml` uses the Secrets Store CSI driver instead, and any other secret tool works too | `kubectl get crd externalsecrets.external-secrets.io` |
-| Rights | Contributor on the identity's resource group; Owner or User Access Administrator on the Key Vault and the Foundry resource |
+| Rights | Contributor on the identity's resource group; Owner or User Access Administrator on the Foundry resource (and on the Key Vault, if you use one) |
 
-#### Workload Identity
-
-A user-assigned managed identity, used for two things: the agent calls the model with
-it, and (in `examples/values-azure.yaml`) External Secrets reads the webhook URL from
-Key Vault with it. Several clusters (for example `dev` and `staging`) can share one
-identity, with one federated credential per cluster. Keep the identity in a resource group that outlives the
-clusters.
-
-Create it with the script (it is safe to re-run):
+**1. A model in Foundry.** Create the resource and a model deployment, or use ones you
+have ([Foundry setup guide](providers/foundry/setup.md)):
 
 ```bash
 az login
+./scripts/setup-foundry.sh "<subscription>" "my-foundry-rg" "my-foundry" "westeurope"
+```
+
+It prints the `LLM_ENDPOINT` and `LLM_MODEL` values to use.
+
+**2. The identity.** A user-assigned managed identity that the pod uses to call the
+model, through a federated credential for the ServiceAccount
+`k8s-servant/k8s-servant`. Several clusters (for example `dev` and `staging`) can share
+one identity, with one federated credential per cluster. Keep it in a resource group
+that outlives the clusters. The script is safe to re-run:
+
+```bash
 ./scripts/setup-workload-identity.sh \
   "<subscription>" "<identity-resource-group>" "k8s-servant-identity" \
   "my-cluster-rg" "my-cluster" \
-  "$(az keyvault show --name my-keyvault --query id -o tsv)" \
+  none \
   "$(az cognitiveservices account show --name my-foundry \
        --resource-group my-foundry-rg --query id -o tsv)"
 ```
 
-Run `./scripts/setup-workload-identity.sh` without arguments for the full list,
-including the optional secret name and ServiceAccount namespace and name.
-
-The script does the following:
+The script:
 
 - creates the identity in the cluster's region;
-- creates (or re-points) the federated credential for
-    `system:serviceaccount:k8s-servant:k8s-servant` on the cluster's OIDC issuer;
-- gives the identity read access to the one Key Vault secret. On a vault that uses
-    Azure RBAC, the role is scoped to that secret only. A vault with access policies
-    cannot limit access to one secret, so the script stops there. It continues only
-    when you accept vault-wide read access with `ALLOW_VAULT_WIDE_SECRET_READ=yes`;
+- creates the federated credential on the cluster's OIDC issuer, or re-points it
+    when the cluster was recreated and has a new issuer;
 - gives the identity *Cognitive Services OpenAI User* on the Foundry resource, which
-    covers OpenAI models only; for Claude and other non-OpenAI models set
-    `MODEL_ROLE="Cognitive Services User"` when running the script;
-- prints the values snippet (client ID, tenant ID) and an equivalent Terraform snippet.
+    covers OpenAI models only; for Claude and other non-OpenAI models run it with
+    `MODEL_ROLE="Cognitive Services User"`;
+- prints the values snippet (client ID, tenant ID) and an equivalent Terraform
+    snippet.
 
-For a second cluster, run the same command with that cluster's resource group and name
-as arguments 4 and 5: it finds the identity and roles, and adds the federated
-credential.
+For a second cluster, run it again with that cluster's resource group and name
+(arguments 4 and 5). Role assignments can take a few minutes to take effect. Run the
+script without arguments for the full list of options.
 
-Role assignments can take a few minutes to take effect.
+**3. The Teams webhook (optional).** The webhook URL is a credential: keep it in a
+Secret however you manage secrets today
+([Credentials](#credentials-bring-your-own-secrets)). The simplest is kubectl:
 
-Workload Identity is off in the chart defaults, so the Azure examples turn it on
-explicitly; with it enabled, the chart refuses to render with an empty client ID.
+```bash
+kubectl create namespace k8s-servant
+nano webhook-url                    # paste the URL, save; an editor keeps it out of shell history
+kubectl -n k8s-servant create secret generic k8s-servant-teams-webhook --from-file=./webhook-url
+rm webhook-url
+```
 
-#### When the cluster is recreated
+If you keep it in **Azure Key Vault**, the same identity can read it. Pass the vault's
+ID instead of `none` as argument 6 (`az keyvault show --name my-keyvault --query id -o
+tsv`), and the script grants read access to that one secret: scoped to the secret on
+a vault with Azure RBAC; on a vault with access policies only after you accept
+vault-wide read with `ALLOW_VAULT_WIDE_SECRET_READ=yes`. Then sync it with External
+Secrets (`examples/values-azure.yaml`) or mount it with the Secrets Store CSI driver
+(`examples/values-azure-csi.yaml`).
 
-A cluster that is destroyed and recreated (for example a short-lived test cluster) gets
-a **new OIDC issuer**. A federated credential that still points to the old one makes
-Entra ID refuse the pod's tokens: the model calls and the ExternalSecret fail with
-`AADSTS70021` / `No matching federated identity record found`.
+**4. The values.** Start from `examples/values-azure.yaml` (Claude on Foundry:
+`examples/values-azure-claude.yaml`) and fill in:
 
-Re-run `scripts/setup-workload-identity.sh` with the same arguments: it finds the
-credential and points it to the new issuer. If you recreate clusters with automation,
-add that step there (the script prints a Terraform snippet).
+```yaml
+azureWorkloadIdentity:
+  enabled: true
+  clientId: "<from the script>"
+  tenantId: "<from the script>"
+appConfig:
+  CLUSTER_NAME: my-cluster
+  LLM_PROVIDER: foundry
+  LLM_ENDPOINT: https://my-foundry.openai.azure.com/openai/v1/
+  LLM_MODEL: my-deployment
+  LLM_AUTH: entra
+teamsWebhook:
+  existingSecret: k8s-servant-teams-webhook   # leave out if you post no webhook
+```
+
+Without Key Vault, drop the example's `extraObjects`. Workload Identity is off in the
+chart defaults; with it enabled, the chart refuses to render with an empty client ID.
+
+**5. Install and check:**
+
+```bash
+helm install k8s-servant oci://ghcr.io/k8s-servant/charts/k8s-servant \
+  -n k8s-servant --create-namespace \
+  -f knowledge-values.yaml -f my-cluster.yaml
+kubectl -n k8s-servant exec deploy/k8s-servant -c agent -- k8s-servant doctor
+```
+
+`doctor` should show the model line OK. A `401` right after setup means the role is
+not active yet: wait a few minutes. Then continue with
+[Step 6](#step-6-check-the-deployment).
 
 ### EKS
 

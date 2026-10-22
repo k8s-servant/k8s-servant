@@ -211,7 +211,7 @@ Why two resources:
 Why not one per cluster: non-prod clusters usually share a subscription and network
 already, so a resource per cluster adds work without real separation. Recreating a
 cluster does not affect the Foundry resource; only the agent's federated credential
-changes ([deployment.md](../../deployment.md#when-the-cluster-is-recreated)).
+changes ([deployment.md](../../deployment.md#aks)).
 
 One deployment can serve several non-prod clusters. Add a second only if the agents
 start competing for throughput.
