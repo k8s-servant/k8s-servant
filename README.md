@@ -38,7 +38,7 @@ the terminal and to an **MS Teams** channel.
 - [Choose a Model Provider](#choose-a-model-provider)
 - [Quickstart](#quickstart)
 - [First Run](#first-run)
-- [Deploying to a Cluster](#deploying-to-a-cluster)
+- [Deploying to Any Cluster](#deploying-to-any-cluster)
 - [Teaching the Agent](#teaching-the-agent)
 - [Documentation](#documentation)
 - [Roadmap](#roadmap)
@@ -79,7 +79,7 @@ the terminal and to an **MS Teams** channel.
   carries evidence so you can check it. See [Known limitations](docs/faq.md#known-limitations).
 - **Runs in the cluster or on a laptop.** In a cluster it is one pod (the agent and a
   kubernetes-mcp-server sidecar), installed from the Helm chart in this repository
-  ([Deploying to a Cluster](#deploying-to-a-cluster)).
+  ([Deploying to Any Cluster](#deploying-to-any-cluster)).
 
 ---
 
@@ -214,7 +214,7 @@ Guide: [docs/onboarding.md](docs/onboarding.md).
 
 ---
 
-## Deploying to a Cluster
+## Deploying to Any Cluster
 
 In a cluster the agent is one pod with two containers, the agent (`k8s-servant serve`)
 and the kubernetes-mcp-server sidecar, installed from the Helm chart published as an
@@ -300,7 +300,7 @@ search and navigation. The same pages, in the repository:
 | [docs/architecture.md](docs/architecture.md) | How the agent is built and why: components, loop, summary tools, MCP/kubectl fallback, safety layers, scheduler, logging |
 | [docs/tools.md](docs/tools.md) | Every tool: what it reads, its safety rules, when the model uses it |
 | [docs/reports.md](docs/reports.md) | Health checks, fingerprints, skipping unchanged checks, the morning report, Teams cards and posting rules |
-| [docs/deployment.md](docs/deployment.md) | Deploying to a cluster: steps for any cluster (values, credentials, Helm, Flux or Argo CD, checks, day-2 operations), then AKS, EKS and GKE specifics |
+| [docs/deployment.md](docs/deployment.md) | Deploying to any cluster: the steps (values, credentials, Helm, Flux or Argo CD, checks, day-2 operations), then AKS, EKS and GKE specifics |
 | [docs/cli.md](docs/cli.md) | The `k8s-servant` command: every option, examples, exit codes |
 | [docs/how-the-agent-learns.md](docs/how-the-agent-learns.md) | How knowledge reaches the model: loading, the system prompt (example and size), learned notes, skills loaded on demand |
 | [docs/knowledge-and-skills.md](docs/knowledge-and-skills.md) | Teaching the agent: environment description, cluster notes, writing and testing skills |

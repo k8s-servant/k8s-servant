@@ -49,7 +49,7 @@ terminal and to an MS Teams channel.
     One pod from the Helm chart, with scheduled health checks, a morning report
     and Teams cards.
 
-    [Deploying to a cluster](deployment.md)
+    [Deploying to any cluster](deployment.md)
 
 -   **Why it is safe**
 
