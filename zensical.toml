@@ -81,6 +81,7 @@ features = [
   "content.action.edit",
   "content.code.copy",
   "content.tooltips",
+  "navigation.expand",
   "navigation.footer",
   "navigation.indexes",
   "navigation.instant",

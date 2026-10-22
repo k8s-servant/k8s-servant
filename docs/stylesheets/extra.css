@@ -2,3 +2,14 @@
 .md-typeset table:not([class]) td:first-child code {
   white-space: nowrap;
 }
+
+/* A heading for screen readers and search only: the home page shows the logo instead,
+   and without a heading of its own the theme would print the nav label ("Home"). */
+.md-typeset .visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
