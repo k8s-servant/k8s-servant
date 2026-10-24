@@ -1,5 +1,44 @@
 # Changelog
 
+## [0.4.0](https://github.com/k8s-servant/k8s-servant/compare/v0.3.1...v0.4.0) (2026-10-24)
+
+
+### ⚠ BREAKING CHANGES
+
+* **chart:** no default model provider ([#75](https://github.com/k8s-servant/k8s-servant/issues/75))
+
+### Features
+
+* **chart:** no default model provider ([#75](https://github.com/k8s-servant/k8s-servant/issues/75)) ([5810c7e](https://github.com/k8s-servant/k8s-servant/commit/5810c7e029eb1849fdfd6d57976a8915c061a95c))
+* **onboard:** discover cluster facts with evidence ([#35](https://github.com/k8s-servant/k8s-servant/issues/35)) ([#59](https://github.com/k8s-servant/k8s-servant/issues/59)) ([b8785c2](https://github.com/k8s-servant/k8s-servant/commit/b8785c2ba52ee5d7a6d273d42df1e6fe0ef9ad85))
+* **onboard:** re-scan before the morning report and show what changed ([#35](https://github.com/k8s-servant/k8s-servant/issues/35)) ([#62](https://github.com/k8s-servant/k8s-servant/issues/62)) ([55f6770](https://github.com/k8s-servant/k8s-servant/commit/55f6770d76802ea59bf8583a7589cf3286394784))
+* **onboard:** the onboard command writes the draft values files ([#35](https://github.com/k8s-servant/k8s-servant/issues/35)) ([#61](https://github.com/k8s-servant/k8s-servant/issues/61)) ([4b764f3](https://github.com/k8s-servant/k8s-servant/commit/4b764f3284543226fedc98f193b94891f195786e))
+* publish the CLI to PyPI ([#65](https://github.com/k8s-servant/k8s-servant/issues/65)) ([1c45989](https://github.com/k8s-servant/k8s-servant/commit/1c45989967da0afcdb9af36acc12c7f3a88651b5))
+* **scripts:** make the Key Vault optional in setup-workload-identity.sh ([#72](https://github.com/k8s-servant/k8s-servant/issues/72)) ([ff07430](https://github.com/k8s-servant/k8s-servant/commit/ff0743028fefc5ca7a6fa47564754a338496561b))
+
+
+### Bug fixes
+
+* **onboard:** write settings.env next to the values files ([#35](https://github.com/k8s-servant/k8s-servant/issues/35)) ([#63](https://github.com/k8s-servant/k8s-servant/issues/63)) ([f51867e](https://github.com/k8s-servant/k8s-servant/commit/f51867e4a979f99614d52450f0cc8d03a4d48fe3))
+
+
+### Documentation
+
+* add badges to the PyPI page ([#69](https://github.com/k8s-servant/k8s-servant/issues/69)) ([5ae907f](https://github.com/k8s-servant/k8s-servant/commit/5ae907fc2e528a2e10bd4d367b2c009f8b4f0614))
+* add choosing the model to the deployment steps ([#74](https://github.com/k8s-servant/k8s-servant/issues/74)) ([5ecb047](https://github.com/k8s-servant/k8s-servant/commit/5ecb0477061831e63f36e719c5dd5b30cb958fb2))
+* call the deployment guide 'Deploying to any cluster' ([#80](https://github.com/k8s-servant/k8s-servant/issues/80)) ([ea4dd65](https://github.com/k8s-servant/k8s-servant/commit/ea4dd65b8258ea2847c450abc02095423019f1e5))
+* explain how to add a component to the onboard catalog ([#66](https://github.com/k8s-servant/k8s-servant/issues/66)) ([01bc147](https://github.com/k8s-servant/k8s-servant/commit/01bc1470fbbf07b19fed7aa339c97d3ae0a4b10b))
+* first run with k8s-servant onboard ([#35](https://github.com/k8s-servant/k8s-servant/issues/35)) ([#64](https://github.com/k8s-servant/k8s-servant/issues/64)) ([70cf3d7](https://github.com/k8s-servant/k8s-servant/commit/70cf3d7c211e0964c6763af01ba2cc5fab3fde53))
+* give AKS its own complete install steps ([#73](https://github.com/k8s-servant/k8s-servant/issues/73)) ([08977c4](https://github.com/k8s-servant/k8s-servant/commit/08977c40dc92804ed0a6c0bdcac452370d5fc68c))
+* install with Argo CD as well as Flux ([#78](https://github.com/k8s-servant/k8s-servant/issues/78)) ([1686aab](https://github.com/k8s-servant/k8s-servant/commit/1686aaba8320e0978eea399439822082b0512cfa))
+* make the deployment guide provider-neutral ([#71](https://github.com/k8s-servant/k8s-servant/issues/71)) ([2e3ccd5](https://github.com/k8s-servant/k8s-servant/commit/2e3ccd5c97e5bede2e9ef3ccad4a57f7119798bc))
+* move the onboard catalog guide out of the user guide ([#68](https://github.com/k8s-servant/k8s-servant/issues/68)) ([0b24376](https://github.com/k8s-servant/k8s-servant/commit/0b243762295edd5b2fb38b4c03eaea2fafb5e6c5))
+* recommend a secret tool over hand-made Secrets for long-running installs ([#77](https://github.com/k8s-servant/k8s-servant/issues/77)) ([aafe9bf](https://github.com/k8s-servant/k8s-servant/commit/aafe9bfb7e8802f4e0f42089641b8d89c44cb0a1))
+* rename 'First run' to 'Describe your platform', drop 'Other clusters' ([#83](https://github.com/k8s-servant/k8s-servant/issues/83)) ([380fbcf](https://github.com/k8s-servant/k8s-servant/commit/380fbcf8ba19723cf2a75edd754a93f270a782a5))
+* show all sections in the left sidebar instead of top tabs ([#81](https://github.com/k8s-servant/k8s-servant/issues/81)) ([61fb943](https://github.com/k8s-servant/k8s-servant/commit/61fb9431f182754a7c18dd306c29959e6bd2ba97))
+* show Foundry with an API key, with Workload Identity as the recommended way ([#76](https://github.com/k8s-servant/k8s-servant/issues/76)) ([9003a74](https://github.com/k8s-servant/k8s-servant/commit/9003a74aa438f9a6e65d4e5d4aac555af655d76c))
+* show the full sidebar on every page, home included ([#82](https://github.com/k8s-servant/k8s-servant/issues/82)) ([394705d](https://github.com/k8s-servant/k8s-servant/commit/394705d685195d1aec480c531ce3ba0de623f9d4))
+
 ## [0.3.1](https://github.com/k8s-servant/k8s-servant/compare/v0.3.0...v0.3.1) (2026-10-20)
 
 

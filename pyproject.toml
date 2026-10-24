@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "k8s-servant"
-version = "0.3.1" # x-release-please-version
+version = "0.4.0" # x-release-please-version
 description = "Read-only AI SRE agent for Kubernetes clusters"
 readme = "README.pypi.md" # the PyPI page; README.md uses relative links that break there
 license = "Apache-2.0"
