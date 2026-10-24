@@ -26,7 +26,7 @@ spec:
       chart: k8s-servant
       # Pin a release; the chart version pins the matching image. release-please keeps
       # this line at the latest release.
-      targetRevision: 0.3.1 # x-release-please-version
+      targetRevision: 0.4.0 # x-release-please-version
       helm:
         releaseName: k8s-servant
         # Later files win: platform description, then this cluster.

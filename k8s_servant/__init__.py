@@ -11,4 +11,4 @@ The package is split into small modules, each with one job:
     cli.py         the `k8s-servant` command
 """
 
-__version__ = "0.3.1"
+__version__ = "0.4.0"
