@@ -3,6 +3,13 @@ name: Release
 # release-please keeps a release PR open from Conventional Commit history. Merging it
 # tags vX.Y.Z and creates the GitHub release; the jobs below then publish the signed
 # multi-arch image and the Helm chart to GHCR, and the Python package to PyPI.
+#
+# release-please runs with a GitHub App token, not GITHUB_TOKEN: GitHub does not start
+# workflows on its own for events that GITHUB_TOKEN creates, so the release PR's checks
+# would wait for a maintainer to approve them. The App needs Contents, Pull requests and
+# Issues (read and write) on this repository; its Client ID is the repository variable
+# RELEASE_APP_CLIENT_ID and its private key the secret RELEASE_APP_PRIVATE_KEY. The
+# publish jobs keep GITHUB_TOKEN, and the signing identity stays this workflow file.
 on:
   push:
     branches: [main]
@@ -17,18 +24,24 @@ jobs:
   release-please:
     name: release-please
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      pull-requests: write
-      issues: write
+    permissions: {} # release-please uses the App token
     outputs:
       release_created: ${{ steps.release.outputs.release_created }}
       tag_name: ${{ steps.release.outputs.tag_name }}
       version: ${{ steps.release.outputs.version }}
     steps:
+      - id: app-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+          permission-issues: write
       - id: release
         uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         with:
+          token: ${{ steps.app-token.outputs.token }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
 

@@ -847,9 +847,9 @@ marker `# x-release-please-version` appears (`pyproject.toml`, `version` and
 `appVersion` in `Chart.yaml`), plus `.release-please-manifest.json`. That is why
 `CHANGELOG.md` and versions are never edited by hand.
 
-PRs created with the built-in `GITHUB_TOKEN` do not trigger other workflows, so CI does
-not run on the release PR yet
-([#7](https://github.com/k8s-servant/k8s-servant/issues/7)).
+The job runs with a GitHub App token instead of the built-in `GITHUB_TOKEN`, because
+GitHub does not start CI on its own for a PR that `GITHUB_TOKEN` opens
+([the release App token](ci-and-releases.md#the-release-app-token)).
 
 Merging the release PR tags `vX.Y.Z` and creates the GitHub Release; then the publish
 jobs run.

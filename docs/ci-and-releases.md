@@ -375,6 +375,27 @@ Runs on every push to `main`. The work is split between Google's
 The bot knows only about versions, changelogs, tags and releases. Anything else that
 should happen on a release is another job with the same `if:` condition.
 
+### The release App token
+
+The bot runs with a token from the org's `k8s-servant-release` GitHub App, not the
+built-in `GITHUB_TOKEN`. GitHub does not start workflows on its own for a PR that
+`GITHUB_TOKEN` opens or updates; the checks wait until a maintainer approves them. With
+the App token, CI and the required checks start on every release PR update, so the PR
+merges like any other.
+
+- The App has Contents, Pull requests and Issues (read and write) and is installed on
+    this repository only. The workflow asks for the same three permissions when it
+    mints the token, which lasts at most an hour and is revoked when the job ends.
+- Its Client ID is the repository variable `RELEASE_APP_CLIENT_ID`, and its private
+    key is the secret `RELEASE_APP_PRIVATE_KEY`. Only the `release-please` job reads
+    them; the publish jobs keep `GITHUB_TOKEN`.
+- The signing identity does not change: signatures still come from this workflow file
+    on `main` ([verifying-releases.md](verifying-releases.md)).
+- If the key leaks, generate a new one in the App settings, update the secret and
+    delete the old key. Someone holding it could open PRs, push branches and edit
+    releases in this repository, but not change workflow files, not merge to `main`
+    past the ruleset, and not sign or publish a release.
+
 ### Version rules
 
 | Commit type | Before 1.0 | After 1.0 |
