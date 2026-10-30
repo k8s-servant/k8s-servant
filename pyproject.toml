@@ -25,7 +25,7 @@ requires-python = ">=3.12"
 dependencies = [
   "openai>=3.27,<4",        # chat model client (Foundry exposes an OpenAI-compatible v1 endpoint)
   "mcp>=2.3,<3",            # Model Context Protocol client for kubernetes-mcp-server
-  "anthropic>=1.15,<2",     # Claude client (Messages API); small and pure Python, so always installed
+  "anthropic>=1.15,<3",     # Claude client (Messages API); small and pure Python, so always installed
   "pyyaml>=6,<7",           # skill frontmatter and Helm values files
   "httpx2>=2.13,<3",        # Prometheus, Alertmanager and Teams HTTP calls (same client the SDKs use)
   "tzdata>=2025.1",         # time zone data for the daily report; Alpine images have none
