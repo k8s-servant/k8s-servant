@@ -47,7 +47,7 @@ jobs:
           python-version: ${{ matrix.python }}
           cache: pip
       # The chart tests render the chart with helm; without it they would be skipped.
-      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+      - uses: azure/setup-helm@2f5e7bc67f1f9972ab16657bb795f36d8f04de0e # v5.1.0
       - run: pip install -e '.[dev,azure]'
       - run: pytest --cov=k8s_servant --cov-report=term-missing --cov-report=xml
       - if: matrix.python == '3.14'
@@ -66,7 +66,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+      - uses: azure/setup-helm@2f5e7bc67f1f9972ab16657bb795f36d8f04de0e # v5.1.0
       - name: Lint the chart with the example values
         run: helm lint --strict charts/k8s-servant -f examples/knowledge-values.yaml -f examples/values-azure.yaml
       - name: Render the chart with the example values
