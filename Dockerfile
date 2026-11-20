@@ -12,7 +12,7 @@
 # ========================
 # Builder stage
 # ========================
-FROM python:3.14-alpine AS builder
+FROM python:3.15-alpine AS builder
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
@@ -44,7 +44,7 @@ RUN pip install --no-cache-dir --prefix=/install '.[azure]'
 # ========================
 # Runtime stage
 # ========================
-FROM python:3.14-alpine
+FROM python:3.15-alpine
 
 LABEL org.opencontainers.image.title="k8s-servant" \
       org.opencontainers.image.description="Read-only AI SRE agent for Kubernetes" \
